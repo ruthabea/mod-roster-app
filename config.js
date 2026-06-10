@@ -3,7 +3,14 @@ const SUPABASE_URL = 'https://yvbemhhnrgmccasifzey.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl2YmVtaGhucmdtY2Nhc2lmemV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwODg3ODQsImV4cCI6MjA5NjY2NDc4NH0.I2nk7xpCoBewq3_anek_PjOjDW5VC__eIeYJDFSwN0M';
 
 // Initialize Supabase client
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let supabase;
+try {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    console.log('Supabase client initialized successfully');
+} catch (e) {
+    console.error('Failed to initialize Supabase:', e);
+    supabase = null;
+}
 
 // Database helper functions
 const db = {
@@ -296,6 +303,152 @@ const db = {
 
 // Check if Supabase is configured
 function isSupabaseConfigured() {
-    return SUPABASE_URL !== 'YOUR_SUPABASE_PROJECT_URL' && 
+    return supabase !== null && 
+           SUPABASE_URL !== 'YOUR_SUPABASE_PROJECT_URL' && 
            SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY';
 }
+
+// ==================== SYNC LOCAL STORAGE TO DATABASE ====================
+async function syncLocalStorageToDatabase() {
+    if (!isSupabaseConfigured()) {
+        console.error('Supabase is not configured');
+        return { success: false, message: 'Supabase not configured' };
+    }
+    
+    const results = {
+        contacts: { synced: 0, errors: 0 },
+        escalation: { synced: 0, errors: 0 },
+        roster: { synced: 0, errors: 0 }
+    };
+    
+    console.log('Starting sync from localStorage to Supabase...');
+    
+    // 1. Sync Contacts
+    const contactsData = localStorage.getItem('oncall_contacts_data');
+    if (contactsData) {
+        console.log('Syncing contacts...');
+        const contacts = JSON.parse(contactsData);
+        for (const [team, teamContacts] of Object.entries(contacts)) {
+            for (const contact of teamContacts) {
+                try {
+                    const { error } = await supabase.from('contacts').insert({
+                        team: team,
+                        area: contact.area || '',
+                        name: contact.name || '',
+                        site: contact.site || '',
+                        escalation: contact.escalation || '',
+                        phone: contact.phone || '',
+                        cpid: contact.cpid || '',
+                        email: contact.email || ''
+                    });
+                    if (error) {
+                        console.error('Contact sync error:', error);
+                        results.contacts.errors++;
+                    } else {
+                        results.contacts.synced++;
+                    }
+                } catch (e) {
+                    console.error('Contact sync exception:', e);
+                    results.contacts.errors++;
+                }
+            }
+        }
+        console.log(`Contacts: ${results.contacts.synced} synced, ${results.contacts.errors} errors`);
+    }
+    
+    // 2. Sync Escalation Matrix
+    const escalationData = localStorage.getItem('escalation_matrix_data');
+    if (escalationData) {
+        console.log('Syncing escalation matrix...');
+        const entries = JSON.parse(escalationData);
+        for (const entry of entries) {
+            try {
+                const { error } = await supabase.from('escalation_matrix').insert({
+                    app: entry.app || '',
+                    area: entry.area || '',
+                    on_call: entry.onCall || '',
+                    first_esc: entry.first || '',
+                    second_esc: entry.second || '',
+                    third_esc: entry.third || '',
+                    fourth_esc: entry.fourth || '',
+                    fifth_esc: entry.fifth || '',
+                    first_alert: entry.firstAlert || false,
+                    second_alert: entry.secondAlert || false
+                });
+                if (error) {
+                    console.error('Escalation sync error:', error);
+                    results.escalation.errors++;
+                } else {
+                    results.escalation.synced++;
+                }
+            } catch (e) {
+                console.error('Escalation sync exception:', e);
+                results.escalation.errors++;
+            }
+        }
+        console.log(`Escalation: ${results.escalation.synced} synced, ${results.escalation.errors} errors`);
+    }
+    
+    // 3. Sync Roster
+    const rosterData = localStorage.getItem('oncall_roster_data');
+    if (rosterData) {
+        console.log('Syncing roster...');
+        const entries = JSON.parse(rosterData);
+        for (let i = 0; i < entries.length; i++) {
+            const entry = entries[i];
+            try {
+                const { error } = await supabase.from('roster').insert({
+                    time_shift: entry.time || '',
+                    app: entry.app || '',
+                    team: entry.team || '',
+                    mon: entry.days?.mon || '',
+                    tue: entry.days?.tue || '',
+                    wed: entry.days?.wed || '',
+                    thu: entry.days?.thu || '',
+                    fri: entry.days?.fri || '',
+                    sat: entry.days?.sat || '',
+                    sun: entry.days?.sun || '',
+                    sort_order: i
+                });
+                if (error) {
+                    console.error('Roster sync error:', error);
+                    results.roster.errors++;
+                } else {
+                    results.roster.synced++;
+                }
+            } catch (e) {
+                console.error('Roster sync exception:', e);
+                results.roster.errors++;
+            }
+        }
+        console.log(`Roster: ${results.roster.synced} synced, ${results.roster.errors} errors`);
+    }
+    
+    console.log('Sync complete!', results);
+    return { success: true, results };
+}
+
+// Function to clear database tables (use with caution)
+async function clearDatabaseTables() {
+    if (!isSupabaseConfigured()) {
+        console.error('Supabase is not configured');
+        return false;
+    }
+    
+    if (!confirm('This will DELETE ALL DATA from the database. Are you sure?')) {
+        return false;
+    }
+    
+    console.log('Clearing database tables...');
+    
+    await supabase.from('contacts').delete().neq('id', 0);
+    await supabase.from('escalation_matrix').delete().neq('id', 0);
+    await supabase.from('roster').delete().neq('id', 0);
+    
+    console.log('Database tables cleared');
+    return true;
+}
+
+// Make sync function available globally
+window.syncLocalStorageToDatabase = syncLocalStorageToDatabase;
+window.clearDatabaseTables = clearDatabaseTables;
