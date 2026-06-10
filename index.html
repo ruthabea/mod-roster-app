@@ -1,0 +1,1352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Amdocs Support Portal - MOD & On-Call Roster</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Main Screen Navigation -->
+    <div class="main-screen-nav">
+        <button class="main-screen-tab active" onclick="switchMainScreen('mod')">
+            <span class="main-tab-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+            </span>
+            MOD Schedule
+        </button>
+        <button class="main-screen-tab" onclick="switchMainScreen('oncall')">
+            <span class="main-tab-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                </svg>
+            </span>
+            On-Call Roster
+        </button>
+    </div>
+
+    <!-- ==================== MOD SCHEDULE SCREEN ==================== -->
+    <div id="modScreen" class="main-screen active">
+        <div class="container">
+            <header>
+                <h1>MOD Schedule</h1>
+                <p class="subtitle">Manager On Duty - Onsite & Offshore</p>
+            </header>
+
+            <!-- MOD Navigation Tabs -->
+            <nav class="main-nav">
+                <button class="nav-tab active" onclick="showTab('mod', 'schedule')">MOD Schedule</button>
+                <button class="nav-tab" onclick="showTab('mod', 'details')">MOD Details</button>
+                <button class="nav-tab" onclick="showTab('mod', 'escalation')">MOD Escalation</button>
+                <button class="nav-tab" onclick="showTab('mod', 'l2support')">L2 Support & Contact</button>
+            </nav>
+
+            <!-- MOD Tab 1: Schedule -->
+            <section id="mod-scheduleTab" class="tab-content active">
+                <div class="card schedule-display-card">
+                    <div class="schedule-display-header">
+                        <div>
+                            <h2>Current MOD Schedule</h2>
+                            <p id="modScheduleInfo" class="schedule-meta"></p>
+                        </div>
+                        <div class="schedule-display-actions">
+                            <button class="btn btn-outline" onclick="exportScheduleJSON('mod')">Export</button>
+                            <button class="btn btn-outline" onclick="window.print()">Print</button>
+                            <button class="btn btn-secondary" id="modAdminToggleBtn" onclick="toggleAdminPanel('mod')">Admin Settings</button>
+                        </div>
+                    </div>
+                    
+                    <div id="modNoScheduleMessage" class="no-schedule-message">
+                        <div class="no-schedule-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                <line x1="16" y1="2" x2="16" y2="6"></line>
+                                <line x1="8" y1="2" x2="8" y2="6"></line>
+                                <line x1="3" y1="10" x2="21" y2="10"></line>
+                            </svg>
+                        </div>
+                        <h3>No Schedule Available</h3>
+                        <p>Click "Admin Settings" to upload the MOD list and generate a schedule.</p>
+                    </div>
+                    
+                    <div id="modScheduleTableContainer" class="hidden">
+                        <div id="modScheduleContent" class="schedule-content"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- MOD Tab 2: Details -->
+            <section id="mod-detailsTab" class="tab-content">
+                <div class="card">
+                    <h2>MOD Details</h2>
+                    <p class="help-text">Complete contact information for all Manager On Duty personnel.</p>
+                    
+                    <div id="modNoDetailsMessage" class="no-schedule-message">
+                        <h3>No MOD Data Available</h3>
+                        <p>Generate a schedule first to see MOD details.</p>
+                    </div>
+                    
+                    <div id="modDetailsContent" class="hidden">
+                        <div class="details-section">
+                            <h3><span class="badge onshore">Onsite</span> MOD Personnel</h3>
+                            <div class="table-container">
+                                <table class="details-table">
+                                    <thead>
+                                        <tr><th>Name</th><th>Email</th><th>Phone</th></tr>
+                                    </thead>
+                                    <tbody id="modOnsiteDetailsBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="details-section">
+                            <h3><span class="badge offshore">Offshore</span> MOD Personnel</h3>
+                            <div class="table-container">
+                                <table class="details-table">
+                                    <thead>
+                                        <tr><th>Name</th><th>Email</th><th>Phone</th></tr>
+                                    </thead>
+                                    <tbody id="modOffshoreDetailsBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- MOD Tab 3: Escalation -->
+            <section id="mod-escalationTab" class="tab-content">
+                <div class="card">
+                    <h2>MOD Escalation</h2>
+                    <p class="help-text">Contact escalation path for MOD-related issues.</p>
+                    
+                    <div class="table-container">
+                        <table class="escalation-table">
+                            <thead>
+                                <tr><th></th><th>Name</th><th>Role</th><th>Email</th><th>Phone</th></tr>
+                            </thead>
+                            <tbody id="modEscalationBody">
+                                <tr class="escalation-row level-1">
+                                    <td class="escalation-level">1st escalation</td>
+                                    <td id="modEsc1Name">Vikramjeet Saini</td>
+                                    <td id="modEsc1Role">Operations Program Manager</td>
+                                    <td id="modEsc1Email"><a href="mailto:VSAINI@amdocs.com">VSAINI@amdocs.com</a></td>
+                                    <td id="modEsc1Phone">+61 434516369</td>
+                                </tr>
+                                <tr class="escalation-row level-2">
+                                    <td class="escalation-level">2nd escalation</td>
+                                    <td id="modEsc2Name">Balasubramanian Nachimuthu</td>
+                                    <td id="modEsc2Role">Engineering Services Leader</td>
+                                    <td id="modEsc2Email"><a href="mailto:BALUN@amdocs.com">BALUN@amdocs.com</a></td>
+                                    <td id="modEsc2Phone">+917798988740</td>
+                                </tr>
+                                <tr class="escalation-row level-3">
+                                    <td class="escalation-level">3rd escalation</td>
+                                    <td id="modEsc3Name">Dudi Shmueli</td>
+                                    <td id="modEsc3Role">Customer Service Executive (CSE)</td>
+                                    <td id="modEsc3Email"><a href="mailto:DUDISH@amdocs.com">DUDISH@amdocs.com</a></td>
+                                    <td id="modEsc3Phone">+61 448833436</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="escalation-edit-section">
+                        <button class="btn btn-secondary btn-sm" onclick="toggleEscalationEdit('mod')">Edit Escalation Contacts</button>
+                    </div>
+                    
+                    <div id="modEscalationEditForm" class="escalation-edit-form hidden">
+                        <h4>Edit Escalation Contacts</h4>
+                        <div class="escalation-edit-group">
+                            <h5>1st Escalation</h5>
+                            <div class="form-row">
+                                <div class="form-group"><label>Name</label><input type="text" id="modEditEsc1Name" value="Vikramjeet Saini"></div>
+                                <div class="form-group"><label>Role</label><input type="text" id="modEditEsc1Role" value="Operations Program Manager"></div>
+                                <div class="form-group"><label>Email</label><input type="email" id="modEditEsc1Email" value="VSAINI@amdocs.com"></div>
+                                <div class="form-group"><label>Phone</label><input type="tel" id="modEditEsc1Phone" value="+61 434516369"></div>
+                            </div>
+                        </div>
+                        <div class="escalation-edit-group">
+                            <h5>2nd Escalation</h5>
+                            <div class="form-row">
+                                <div class="form-group"><label>Name</label><input type="text" id="modEditEsc2Name" value="Balasubramanian Nachimuthu"></div>
+                                <div class="form-group"><label>Role</label><input type="text" id="modEditEsc2Role" value="Engineering Services Leader"></div>
+                                <div class="form-group"><label>Email</label><input type="email" id="modEditEsc2Email" value="BALUN@amdocs.com"></div>
+                                <div class="form-group"><label>Phone</label><input type="tel" id="modEditEsc2Phone" value="+917798988740"></div>
+                            </div>
+                        </div>
+                        <div class="escalation-edit-group">
+                            <h5>3rd Escalation</h5>
+                            <div class="form-row">
+                                <div class="form-group"><label>Name</label><input type="text" id="modEditEsc3Name" value="Dudi Shmueli"></div>
+                                <div class="form-group"><label>Role</label><input type="text" id="modEditEsc3Role" value="Customer Service Executive (CSE)"></div>
+                                <div class="form-group"><label>Email</label><input type="email" id="modEditEsc3Email" value="DUDISH@amdocs.com"></div>
+                                <div class="form-group"><label>Phone</label><input type="tel" id="modEditEsc3Phone" value="+61 448833436"></div>
+                            </div>
+                        </div>
+                        <div class="actions" style="margin-top: 1rem; margin-bottom: 0;">
+                            <button class="btn btn-secondary" onclick="toggleEscalationEdit('mod')">Cancel</button>
+                            <button class="btn btn-primary" onclick="saveEscalationContacts('mod')">Save Changes</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- MOD Tab 4: L2 Support -->
+            <section id="mod-l2supportTab" class="tab-content">
+                <div class="card l2-support-card">
+                    <h2>L2 Support & Contact Guidelines</h2>
+                    
+                    <div class="l2-section business-hours">
+                        <div class="l2-section-header">
+                            <h3>Business Hours: Monday to Friday 8:00AM to 6:00PM AEST</h3>
+                        </div>
+                        <div class="l2-flow-container">
+                            <div class="l2-flow-step step-1">
+                                <div class="step-number">1</div>
+                                <div class="step-content">
+                                    <div class="step-title">Assignment Group in IT Assist:</div>
+                                    <div class="step-value highlight-blue">AMS-AS Triage</div>
+                                    <div class="step-title" style="margin-top: 0.5rem;">L2 Email Distribution List:</div>
+                                    <div class="step-value"><a href="mailto:aiooptusl2@amdocs.com">aiooptusl2@amdocs.com</a></div>
+                                    <div class="step-value"><a href="mailto:OptusAMSASSupport@optus.com.au">OptusAMSASSupport@optus.com.au</a></div>
+                                </div>
+                                <div class="step-instruction">For <strong>Business as usual communications</strong>, please assign to <strong>AMS-AS Triage</strong> in IT Assist</div>
+                            </div>
+                            <div class="l2-flow-arrow">→</div>
+                            <div class="l2-flow-step step-2">
+                                <div class="step-number">2</div>
+                                <div class="step-content">
+                                    <div class="step-title">Contact L2 Desk Phones:</div>
+                                    <div class="step-value">Manila: <span class="highlight-blue">+6563131969</span></div>
+                                    <div class="step-title" style="margin-top: 0.5rem;">L2 Service Mobile Phones:</div>
+                                    <div class="step-value">Manila: <span class="highlight-blue">+63-9178499165</span></div>
+                                </div>
+                                <div class="step-instruction"><strong>L2 contact details:</strong> please call the desk phones first</div>
+                            </div>
+                            <div class="l2-flow-arrow">→</div>
+                            <div class="l2-flow-step step-3">
+                                <div class="step-number">3</div>
+                                <div class="step-content">
+                                    <div class="step-title">Lead Contact Numbers:</div>
+                                    <div class="step-value highlight-blue">Neil Natividad</div>
+                                    <div class="step-value"><span class="highlight-blue">+63-9190610170</span></div>
+                                </div>
+                                <div class="step-instruction"><strong>First point of escalation</strong> is via the Amdocs L2 Leads if unable to contact Desk Phones or Service Mobile phones.</div>
+                            </div>
+                            <div class="l2-flow-arrow">→</div>
+                            <div class="l2-flow-step step-4">
+                                <div class="step-number">4</div>
+                                <div class="step-content">
+                                    <div class="step-title">Managers Contact Numbers:</div>
+                                    <div class="step-value highlight-blue">Josie Solar</div>
+                                    <div class="step-value"><span class="highlight-blue">+63-9178593389</span></div>
+                                </div>
+                                <div class="step-instruction"><strong>Second point of escalation</strong> via the Managers if you are unable to contact the First</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="l2-section outside-hours">
+                        <div class="l2-section-header outside">
+                            <h3>Outside Business Hours Support/Escalation</h3>
+                            <span class="example-text">Example: EoD/Billing Job Failures</span>
+                        </div>
+                        <div class="l2-outside-flow">
+                            <div class="outside-step">
+                                <div class="outside-step-content">
+                                    <div class="step-title">L2 Email Distribution List:</div>
+                                    <div class="step-value"><a href="mailto:aiooptusl2@amdocs.com">aiooptusl2@amdocs.com</a></div>
+                                    <div class="step-value"><a href="mailto:OptusAMSASSupport@optus.com.au">OptusAMSASSupport@optus.com.au</a></div>
+                                </div>
+                            </div>
+                            <div class="outside-step">
+                                <div class="outside-step-content">
+                                    <p>For <strong class="highlight-yellow">urgent matters</strong> that need attention, please <strong>update</strong> the <strong>Subject Title</strong> of your email:</p>
+                                    <div class="urgent-format">[URGENT ACTION NEEDED] &lt;INCIDENT&gt;</div>
+                                </div>
+                            </div>
+                            <div class="outside-step">
+                                <div class="step-number yellow">2</div>
+                                <div class="outside-step-content">
+                                    <p>In case Acknowledgement of Urgent Matters is not received within <strong>30 mins</strong> from email sent, please follow L2 Escalation Support from step 2</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="l2-footer-note">
+                            <p>Send an <strong>email</strong> to Amdocs L2 Team with Details/Impact and wait for <strong>30 minutes</strong>. If no response received, then follow the L2 <strong>Escalation matrix</strong></p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- MOD Admin Panel -->
+            <section id="modAdminPanel" class="admin-panel hidden">
+                <div class="card">
+                    <div class="section-header">
+                        <h2>Admin: Upload MOD List</h2>
+                        <span class="badge bulk">CSV Upload</span>
+                    </div>
+                    <p class="help-text">Upload or update the MOD master list. The schedule will auto-rotate weekly.</p>
+                    
+                    <div class="bulk-upload-area">
+                        <div class="upload-zone" id="modUploadZone">
+                            <div class="upload-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="17 8 12 3 7 8"></polyline>
+                                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                                </svg>
+                            </div>
+                            <p>Drag and drop your CSV file here, or</p>
+                            <label class="btn btn-outline upload-btn">
+                                Browse Files
+                                <input type="file" id="modCsvFile" accept=".csv" hidden>
+                            </label>
+                        </div>
+                        <div class="upload-actions">
+                            <button type="button" class="btn btn-secondary" onclick="downloadTemplate('mod')">Download CSV Template</button>
+                            <label class="btn btn-secondary">
+                                Import Schedule JSON
+                                <input type="file" id="modImportJsonFile" accept=".json" hidden onchange="importScheduleJSON(event, 'mod')">
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="modUploadedModList" class="uploaded-mod-list hidden">
+                        <div class="section-header">
+                            <h3>MOD Master List</h3>
+                            <span id="modModCount" class="entry-count"></span>
+                        </div>
+                        <div class="mod-lists-container">
+                            <div class="mod-group">
+                                <h4 class="mod-group-title"><span class="badge onshore">Onsite</span> MOD Rotation Order</h4>
+                                <div id="modOnsiteModList" class="mod-rotation-list"></div>
+                            </div>
+                            <div class="mod-group">
+                                <h4 class="mod-group-title"><span class="badge offshore">Offshore</span> MOD Rotation Order</h4>
+                                <div id="modOffshoreModList" class="mod-rotation-list"></div>
+                            </div>
+                        </div>
+                        <p class="help-text" style="margin-top: 1rem;">Drag to reorder MODs.</p>
+                    </div>
+                </div>
+
+                <div class="card" id="modConfigSection" style="display: none;">
+                    <h2>Schedule Configuration</h2>
+                    <div class="form-row">
+                        <div class="form-group"><label for="modStartDate">Start Date</label><input type="date" id="modStartDate" required></div>
+                        <div class="form-group"><label for="modEndDate">End Date</label><input type="date" id="modEndDate" required></div>
+                        <div class="form-group">
+                            <label for="modRotationDays">Days per Rotation</label>
+                            <select id="modRotationDays">
+                                <option value="7" selected>7 days (Weekly)</option>
+                                <option value="5">5 days (Weekdays)</option>
+                                <option value="14">14 days (Bi-weekly)</option>
+                                <option value="1">1 day (Daily)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label for="modOnshoreShiftLabel">Onsite Shift Label</label><input type="text" id="modOnshoreShiftLabel" value="7Am to 7pm AEST"></div>
+                        <div class="form-group"><label for="modOffshoreShiftLabel">Offshore Shift Label</label><input type="text" id="modOffshoreShiftLabel" value="7pm to 7am AEST"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label for="modStartOnsiteIndex">Start Onsite MOD at</label><select id="modStartOnsiteIndex"></select></div>
+                        <div class="form-group"><label for="modStartOffshoreIndex">Start Offshore MOD at</label><select id="modStartOffshoreIndex"></select></div>
+                    </div>
+                    <div class="actions" style="margin-top: 1.5rem; margin-bottom: 0;">
+                        <button type="button" class="btn btn-secondary" onclick="clearAll('mod')">Clear All</button>
+                        <button type="button" class="btn btn-primary" onclick="generateAndSaveSchedule('mod')">Generate & Save Schedule</button>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- ==================== ON-CALL ROSTER SCREEN ==================== -->
+    <div id="oncallScreen" class="main-screen">
+        <div class="container">
+            <header>
+                <h1>On-Call Roster</h1>
+                <p class="subtitle">Application Support - On-Call Schedule</p>
+            </header>
+
+            <!-- On-Call Navigation Tabs -->
+            <nav class="main-nav">
+                <button class="nav-tab active" onclick="showTab('oncall', 'summary')">Summary / Roster</button>
+                <button class="nav-tab" onclick="showTab('oncall', 'l2roster')">L2 Roster</button>
+                <button class="nav-tab" onclick="showTab('oncall', 'contacts')">Contact Details</button>
+                <button class="nav-tab" onclick="showTab('oncall', 'escalation')">Escalation Matrix</button>
+            </nav>
+
+            <!-- On-Call Tab 1: Summary / Roster -->
+            <section id="oncall-summaryTab" class="tab-content active">
+                <div class="card roster-card">
+                    <div class="roster-header">
+                        <div>
+                            <h2>On-Call Summary / Roster</h2>
+                            <p class="schedule-meta">Weekly on-call schedule by application and team</p>
+                        </div>
+                        <div class="roster-actions">
+                            <button class="btn btn-secondary" onclick="toggleRosterEditMode()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                </svg>
+                                <span id="rosterEditModeText">Edit Mode</span>
+                            </button>
+                            <button class="btn btn-primary hidden" id="addRosterRowBtn" onclick="openRosterModal()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"/>
+                                    <line x1="5" y1="12" x2="19" y2="12"/>
+                                </svg>
+                                Add Row
+                            </button>
+                            <button class="btn btn-outline" onclick="exportRosterJSON()">Export</button>
+                            <button class="btn btn-outline" onclick="window.print()">Print</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Week Selector -->
+                    <div class="roster-week-selector">
+                        <label>Week Starting:</label>
+                        <input type="date" id="rosterWeekStart" onchange="renderRosterTable()">
+                        <button class="btn btn-sm btn-outline" onclick="changeRosterWeek(-7)">← Prev</button>
+                        <button class="btn btn-sm btn-outline" onclick="changeRosterWeek(7)">Next →</button>
+                        <button class="btn btn-sm btn-outline" onclick="goToCurrentWeek()">Today</button>
+                    </div>
+                    
+                    <!-- Roster Modal -->
+                    <div id="rosterModal" class="modal hidden">
+                        <div class="modal-content modal-wide">
+                            <div class="modal-header">
+                                <h3 id="rosterModalTitle">Add Roster Entry</h3>
+                                <button class="modal-close" onclick="closeRosterModal()">&times;</button>
+                            </div>
+                            <form id="rosterForm" onsubmit="saveRosterEntry(event)">
+                                <input type="hidden" id="rosterEditIndex" value="">
+                                
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="rosterTime">Time / Shift *</label>
+                                        <input type="text" id="rosterTime" required placeholder="e.g., 02:30 - 16:00 (AEST)">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="rosterApplication">Application *</label>
+                                        <select id="rosterApplication" required>
+                                            <option value="">Select Application</option>
+                                            <option value="Frontend">Frontend</option>
+                                            <option value="Backend">Backend</option>
+                                            <option value="Digital">Digital</option>
+                                            <option value="Infra">Infra</option>
+                                            <option value="B2B">B2B</option>
+                                            <option value="ODS">ODS</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="rosterTeam">Team *</label>
+                                        <input type="text" id="rosterTeam" required placeholder="e.g., ASOM, OMS, CRM/SDP/MCO/WSF">
+                                    </div>
+                                </div>
+                                
+                                <h4 class="form-section-title">Weekly Assignments</h4>
+                                <div class="form-row roster-days-row">
+                                    <div class="form-group">
+                                        <label for="rosterMon">Monday</label>
+                                        <input type="text" id="rosterMon" placeholder="Name">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="rosterTue">Tuesday</label>
+                                        <input type="text" id="rosterTue" placeholder="Name">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="rosterWed">Wednesday</label>
+                                        <input type="text" id="rosterWed" placeholder="Name">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="rosterThu">Thursday</label>
+                                        <input type="text" id="rosterThu" placeholder="Name">
+                                    </div>
+                                </div>
+                                <div class="form-row roster-days-row">
+                                    <div class="form-group">
+                                        <label for="rosterFri">Friday</label>
+                                        <input type="text" id="rosterFri" placeholder="Name">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="rosterSat">Saturday</label>
+                                        <input type="text" id="rosterSat" placeholder="Name">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="rosterSun">Sunday</label>
+                                        <input type="text" id="rosterSun" placeholder="Name">
+                                    </div>
+                                    <div class="form-group"></div>
+                                </div>
+                                
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" onclick="closeRosterModal()">Cancel</button>
+                                    <button type="submit" class="btn btn-primary">Save Entry</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <!-- Roster Table -->
+                    <div class="roster-table-container">
+                        <table class="roster-table" id="rosterTable">
+                            <thead id="rosterTableHead">
+                                <!-- Rendered dynamically -->
+                            </thead>
+                            <tbody id="rosterTableBody">
+                                <!-- Rendered dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- On-Call Tab 2: L2 Roster -->
+            <section id="oncall-l2rosterTab" class="tab-content">
+                <div class="card">
+                    <div class="schedule-display-header">
+                        <div>
+                            <h2>L2 Roster</h2>
+                            <p class="schedule-meta">L2 Support Team Schedule</p>
+                        </div>
+                        <div class="schedule-display-actions">
+                            <button class="btn btn-outline" onclick="exportL2RosterJSON()">Export</button>
+                            <button class="btn btn-secondary" onclick="toggleL2AdminPanel()">Admin Settings</button>
+                        </div>
+                    </div>
+                    
+                    <div id="l2NoScheduleMessage" class="no-schedule-message">
+                        <div class="no-schedule-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                        </div>
+                        <h3>No L2 Roster Available</h3>
+                        <p>Click "Admin Settings" to upload the L2 roster.</p>
+                    </div>
+                    
+                    <div id="l2ScheduleTableContainer" class="hidden">
+                        <div id="l2ScheduleContent" class="schedule-content"></div>
+                    </div>
+                </div>
+                
+                <!-- L2 Admin Panel -->
+                <div id="l2AdminPanel" class="admin-panel hidden" style="margin-top: 1.5rem; padding-top: 0; border-top: none;">
+                    <div class="card">
+                        <div class="section-header">
+                            <h3>Upload L2 Roster</h3>
+                            <span class="badge bulk">CSV Upload</span>
+                        </div>
+                        <div class="bulk-upload-area">
+                            <div class="upload-zone" id="l2UploadZone">
+                                <div class="upload-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="17 8 12 3 7 8"></polyline>
+                                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                                    </svg>
+                                </div>
+                                <p>Drag and drop your L2 roster CSV file here, or</p>
+                                <label class="btn btn-outline upload-btn">
+                                    Browse Files
+                                    <input type="file" id="l2CsvFile" accept=".csv" hidden>
+                                </label>
+                            </div>
+                            <div class="upload-actions">
+                                <button type="button" class="btn btn-secondary" onclick="downloadL2Template()">Download L2 CSV Template</button>
+                            </div>
+                        </div>
+                        
+                        <div id="l2UploadedList" class="uploaded-mod-list hidden">
+                            <div class="section-header">
+                                <h4>L2 Roster List</h4>
+                                <span id="l2ModCount" class="entry-count"></span>
+                            </div>
+                            <div class="mod-lists-container">
+                                <div class="mod-group" style="grid-column: 1 / -1;">
+                                    <div id="l2ModList" class="mod-rotation-list"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="l2ConfigSection" class="hidden" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                            <div class="form-row">
+                                <div class="form-group"><label for="l2StartDate">Start Date</label><input type="date" id="l2StartDate"></div>
+                                <div class="form-group"><label for="l2EndDate">End Date</label><input type="date" id="l2EndDate"></div>
+                                <div class="form-group">
+                                    <label for="l2RotationDays">Days per Rotation</label>
+                                    <select id="l2RotationDays">
+                                        <option value="7" selected>7 days (Weekly)</option>
+                                        <option value="5">5 days (Weekdays)</option>
+                                        <option value="14">14 days (Bi-weekly)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="actions" style="margin-top: 1rem; margin-bottom: 0;">
+                                <button type="button" class="btn btn-primary" onclick="generateL2Schedule()">Generate L2 Schedule</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- On-Call Tab 3: Contact Details -->
+            <section id="oncall-contactsTab" class="tab-content">
+                <div class="card">
+                    <div class="contact-details-header">
+                        <div>
+                            <h2>Contact Details</h2>
+                            <p class="help-text">Complete contact information for all support personnel grouped by team.</p>
+                        </div>
+                        <div class="contact-actions">
+                            <button class="btn btn-secondary" onclick="toggleContactEditMode()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                </svg>
+                                <span id="editModeText">Edit Mode</span>
+                            </button>
+                            <button class="btn btn-primary hidden" id="addContactBtn" onclick="openContactModal()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"/>
+                                    <line x1="5" y1="12" x2="19" y2="12"/>
+                                </svg>
+                                Add Contact
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Contact Modal -->
+                    <div id="contactModal" class="modal hidden">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h3 id="contactModalTitle">Add New Contact</h3>
+                                <button class="modal-close" onclick="closeContactModal()">&times;</button>
+                            </div>
+                            <form id="contactForm" onsubmit="saveContact(event)">
+                                <input type="hidden" id="contactEditIndex" value="">
+                                <input type="hidden" id="contactEditTeam" value="">
+                                
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="contactTeam">Team *</label>
+                                        <select id="contactTeam" required>
+                                            <option value="">Select Team</option>
+                                            <option value="frontend">Frontend Team</option>
+                                            <option value="b2b">B2B Team</option>
+                                            <option value="backend">Backend Team</option>
+                                            <option value="anm">ANM Team</option>
+                                            <option value="digital">Digital Team</option>
+                                            <option value="infra">Infra Team</option>
+                                            <option value="ods">ODS Team</option>
+                                            <option value="sdm">SDM Team</option>
+                                            <option value="senior">Senior Escalation</option>
+                                            <option value="l2">L2 Team</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="contactArea">Application Area</label>
+                                        <input type="text" id="contactArea" placeholder="e.g., CRM/SDP/MCO">
+                                    </div>
+                                </div>
+                                
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="contactName">Name *</label>
+                                        <input type="text" id="contactName" required placeholder="Full Name">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="contactSite">Site *</label>
+                                        <select id="contactSite" required>
+                                            <option value="">Select Site</option>
+                                            <option value="India">India</option>
+                                            <option value="Philippines">Philippines</option>
+                                            <option value="Australia">Australia</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="contactEscalation">Escalation Point</label>
+                                        <select id="contactEscalation">
+                                            <option value="">None</option>
+                                            <option value="First Escalation">First Escalation</option>
+                                            <option value="Second Escalation">Second Escalation</option>
+                                            <option value="Third Escalation">Third Escalation</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="contactPhone">Contact Number</label>
+                                        <input type="text" id="contactPhone" placeholder="+91 XXXXX XXXXX">
+                                    </div>
+                                </div>
+                                
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="contactCPID">CPID</label>
+                                        <input type="text" id="contactCPID" placeholder="e.g., CP970805">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="contactEmail">Optus Email</label>
+                                        <input type="email" id="contactEmail" placeholder="name@ama.optusvendor.com.au">
+                                    </div>
+                                </div>
+                                
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" onclick="closeContactModal()">Cancel</button>
+                                    <button type="submit" class="btn btn-primary">Save Contact</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <!-- Frontend Team -->
+                    <div class="contact-team-section">
+                        <div class="team-header frontend-header" onclick="toggleTeamSection(this)">
+                            <span>Frontend Team</span>
+                            <button class="toggle-btn" title="Hide">
+                                <svg class="eye-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                                <svg class="eye-closed" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                                    <line x1="1" y1="1" x2="23" y2="23"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="team-table-container">
+                            <table class="contact-details-table">
+                                <thead>
+                                    <tr>
+                                        <th>Application Area</th>
+                                        <th>Name</th>
+                                        <th>Site</th>
+                                        <th>Escalation Point</th>
+                                        <th>Contact Number</th>
+                                        <th>CPID</th>
+                                        <th>Optus Email</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td>CRM/SDP/MCO</td><td>Chirag Chourasia</td><td>India</td><td></td><td>+91 96918 86425</td><td>CP970805</td><td><a href="mailto:Chirag.Chourasia@ama.optusvendor.com.au">Chirag.Chourasia@ama.optusvendor.com.au</a></td></tr>
+                                    <tr class="escalation-highlight"><td>CRM/SDP/MCO</td><td>Pankaj Rahate</td><td>India</td><td>First Escalation</td><td>+91 80802 05417</td><td>CP970803</td><td><a href="mailto:Pankaj.Rahate@ama.optusvendor.com.au">Pankaj.Rahate@ama.optusvendor.com.au</a></td></tr>
+                                    <tr class="escalation-highlight"><td>CRM/SDP/MCO</td><td>Prajwal Jilate</td><td>India</td><td>First Escalation</td><td>+91 7499464451</td><td>CP739034</td><td><a href="mailto:Prajwal.Jilate@ama.optusvendor.com.au">Prajwal.Jilate@ama.optusvendor.com.au</a></td></tr>
+                                    <tr><td>CRM/SDP/MCO</td><td>Janica Mae Ong</td><td>Philippines</td><td></td><td>+63 9326271256</td><td>P4014392</td><td><a href="mailto:JanicaMae.Ong@ama.optusvendor.com.au">JanicaMae.Ong@ama.optusvendor.com.au</a></td></tr>
+                                    <tr><td>CRM/SDP/MCO</td><td>Naomi Ruth Pastera</td><td>Philippines</td><td></td><td>+63 936 418 0299</td><td>P4009329</td><td><a href="mailto:NaomiRuth.Pastera@ama.optusvendor.com.au">NaomiRuth.Pastera@ama.optusvendor.com.au</a></td></tr>
+                                    <tr class="escalation-highlight"><td>OMS</td><td>Anurag Bharati</td><td>Australia</td><td>First Escalation</td><td>+61 484920422</td><td>CP640253</td><td><a href="mailto:Anurag.Bharti@ama.optusvendor.com.au">Anurag.Bharti@ama.optusvendor.com.au</a></td></tr>
+                                    <tr><td>OMS/Fallout</td><td>Aditya Manchare</td><td>India</td><td></td><td>+91 9359156094</td><td>P4014121</td><td><a href="mailto:Aditya.Manchare@ama.optusvendor.com.au">Aditya.Manchare@ama.optusvendor.com.au</a></td></tr>
+                                    <tr><td>OMS/ASOM</td><td>Bhomesh Bhoge</td><td>India</td><td></td><td>+91 9130714522</td><td>CP973434</td><td><a href="mailto:Bhomesh.Bhoge@ama.optusvendor.com.au">Bhomesh.Bhoge@ama.optusvendor.com.au</a></td></tr>
+                                    <tr><td>OMS/ASOM</td><td>Prashant Murte</td><td>Australia</td><td></td><td>+61 432 696 107</td><td>CP655676</td><td></td></tr>
+                                    <tr class="escalation-highlight"><td>ASOM/Fallout</td><td>Ganesh Unde</td><td>India</td><td>First Escalation</td><td>+91 83297 27228</td><td>CP702478</td><td><a href="mailto:Ganesh.Unde@ama.optusvendor.com.au">Ganesh.Unde@ama.optusvendor.com.au</a></td></tr>
+                                    <tr><td>ASOM/Fallout</td><td>Yash Todwal</td><td>India</td><td></td><td>+91 8824044624</td><td>P4015301</td><td><a href="mailto:yash.todwal@ama.optusvendor.com.au">yash.todwal@ama.optusvendor.com.au</a></td></tr>
+                                    <tr><td>ASOM/Fallout</td><td>Jerome Cedrick Gaw</td><td>Philippines</td><td></td><td>+63 955 763 1710</td><td>CP975161</td><td><a href="mailto:JeromeCedrick.Gaw@ama.optusvendor.com.au">JeromeCedrick.Gaw@ama.optusvendor.com.au</a></td></tr>
+                                    <tr class="escalation-highlight"><td>MEC</td><td>Chaitanya Vathare</td><td>India</td><td>First Escalation</td><td>+91 98604 05616</td><td>CP745592</td><td><a href="mailto:Chaitanya.Vathare@ama.optusvendor.com.au">Chaitanya.Vathare@ama.optusvendor.com.au</a></td></tr>
+                                    <tr><td>MEC</td><td>Muskan</td><td>India</td><td></td><td>+91 79924 22681</td><td>CP752784</td><td><a href="mailto:Muskan.Na@ama.optusvendor.com.au">Muskan.Na@ama.optusvendor.com.au</a></td></tr>
+                                    <tr class="manager-highlight"><td>Manager</td><td>Ashwani Aggarwal</td><td>Australia</td><td>Second Escalation</td><td>+61 478 015 240</td><td>CP639702</td><td><a href="mailto:Ashwani.Aggarwal@ama.optusvendor.com.au">Ashwani.Aggarwal@ama.optusvendor.com.au</a></td></tr>
+                                    <tr class="manager-highlight"><td>Manager</td><td>Manish Bardiya</td><td>India</td><td>Second Escalation</td><td>+91 90110 13931</td><td>P4000271</td><td><a href="mailto:manisha.bardiya@optus.com.au">manisha.bardiya@optus.com.au</a></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- B2B Team -->
+                    <div class="contact-team-section">
+                        <div class="team-header b2b-header" onclick="toggleTeamSection(this)">
+                            <span>B2B Team</span>
+                            <button class="toggle-btn" title="Hide">
+                                <svg class="eye-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                                <svg class="eye-closed" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                                    <line x1="1" y1="1" x2="23" y2="23"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="team-table-container">
+                            <table class="contact-details-table">
+                                <thead>
+                                    <tr>
+                                        <th>Application Area</th>
+                                        <th>Name</th>
+                                        <th>Site</th>
+                                        <th>Escalation Point</th>
+                                        <th>Contact Number</th>
+                                        <th>CPID</th>
+                                        <th>Optus Email</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="escalation-highlight"><td>Manager</td><td>Praveen Kumar (Gulia)</td><td>Australia</td><td>First Escalation</td><td>+61-435844633</td><td></td><td></td></tr>
+                                    <tr class="manager-highlight"><td>Manager</td><td>Sandeep Mangalni</td><td>India</td><td>Second Escalation</td><td>+91-8390450190</td><td></td><td></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Backend Team -->
+                    <div class="contact-team-section">
+                        <div class="team-header backend-header" onclick="toggleTeamSection(this)">
+                            <span>Backend Team</span>
+                            <button class="toggle-btn" title="Hide">
+                                <svg class="eye-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                                <svg class="eye-closed" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                                    <line x1="1" y1="1" x2="23" y2="23"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="team-table-container">
+                            <table class="contact-details-table">
+                                <thead>
+                                    <tr>
+                                        <th>Application Area</th>
+                                        <th>Name</th>
+                                        <th>Site</th>
+                                        <th>Escalation Point</th>
+                                        <th>Contact Number</th>
+                                        <th>CPID</th>
+                                        <th>Optus Email</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td>TC/RLC</td><td>Vishal Singh</td><td>India</td><td></td><td>+91 9110111879</td><td>P4024376</td><td><a href="mailto:vishal.singh-ama-v@optus.com.au">vishal.singh-ama-v@optus.com.au</a></td></tr>
+                                    <tr class="escalation-highlight"><td>TC/RLC</td><td>Azim Hirani</td><td>India</td><td>First Escalation</td><td>+91 7350739381</td><td>CP706240</td><td><a href="mailto:azim.hirani-ama-v@optus.com.au">azim.hirani-ama-v@optus.com.au</a></td></tr>
+                                    <tr><td>TC/RLC</td><td>Mariel</td><td>Philippines</td><td></td><td>+63 9290308329</td><td>P4009330</td><td><a href="mailto:marieljoy.mendoza-ama-v@optus.com.au">marieljoy.mendoza-ama-v@optus.com.au</a></td></tr>
+                                    <tr class="escalation-highlight"><td>TC/RLC</td><td>Nikhil Dhage</td><td>Australia</td><td>First Escalation</td><td>+919657502106</td><td>CP972156</td><td><a href="mailto:nikhil.dhage-ama-v@optus.com.au">nikhil.dhage-ama-v@optus.com.au</a></td></tr>
+                                    <tr><td>TC/RLC</td><td>Hendry</td><td>Australia</td><td></td><td>+61 424609388</td><td>CP932674</td><td><a href="mailto:hendry.winarto-ama-v@optus.com.au">hendry.winarto-ama-v@optus.com.au</a></td></tr>
+                                    <tr class="escalation-highlight"><td>AR/CM</td><td>Debjyoti</td><td>Australia</td><td>First Escalation</td><td>+91 9564876123 / +61 485599053</td><td>CP768575</td><td><a href="mailto:debjyoti.ghosh-ama-v@optus.com.au">debjyoti.ghosh-ama-v@optus.com.au</a></td></tr>
+                                    <tr><td>AR/CM</td><td>Tanvi</td><td>India</td><td></td><td>+91 9152698688</td><td>P4014393</td><td><a href="mailto:tanvi.chalse-ama-v@optus.com.au">tanvi.chalse-ama-v@optus.com.au</a></td></tr>
+                                    <tr><td>AR/CM</td><td>Kartik Jain</td><td>India</td><td></td><td>+91 796350377449</td><td>P4018006</td><td><a href="mailto:karitik.jain-ama-v@optus.com.au">karitik.jain-ama-v@optus.com.au</a></td></tr>
+                                    <tr class="escalation-highlight"><td>AR/CM</td><td>Aniket Nikram</td><td>India</td><td>First Escalation</td><td>+91 9764235450</td><td>P4014396</td><td><a href="mailto:aniket.nikam-ama-v@optus.com.au">aniket.nikam-ama-v@optus.com.au</a></td></tr>
+                                    <tr><td>AR/CM</td><td>Jerome Saulo</td><td>Philippines</td><td></td><td>+639301026361</td><td>P4013562</td><td><a href="mailto:jerome.saulo-ama-v@optus.com.au">jerome.saulo-ama-v@optus.com.au</a></td></tr>
+                                    <tr class="escalation-highlight"><td>Inv/AMDD</td><td>Prachi Dangore</td><td>India</td><td>First Escalation</td><td>+91 99603 76686</td><td>CP707760</td><td></td></tr>
+                                    <tr><td>Inv/AMDD</td><td>Satyam</td><td>India</td><td></td><td>+91 9764568022</td><td>CP972162</td><td><a href="mailto:satyam.sontakke-ama-v@optus.com.au">satyam.sontakke-ama-v@optus.com.au</a></td></tr>
+                                    <tr><td>Inv/AMDD</td><td>Tejal Godse</td><td>India</td><td></td><td>+917588328498</td><td>P4019517</td><td><a href="mailto:tejal.godse-ama-v@optus.com.au">tejal.godse-ama-v@optus.com.au</a></td></tr>
+                                    <tr><td>Inv/AMDD</td><td>Sanket Awasarkar</td><td>India</td><td></td><td>+918308271974</td><td>CP748234</td><td><a href="mailto:sanket.awasarkar-ama-v@optus.com.au">sanket.awasarkar-ama-v@optus.com.au</a></td></tr>
+                                    <tr class="escalation-highlight"><td>Inv/AMDD</td><td>Akashdeep Kushwaha</td><td>Philippines</td><td>First Escalation</td><td>+91 8437195560 / +63 9692743747</td><td>CP704578</td><td><a href="mailto:akashdeep.kushwaha-ama-v@optus.com.au">akashdeep.kushwaha-ama-v@optus.com.au</a></td></tr>
+                                    <tr><td>Inv/AMDD</td><td>Jon Vincent Pedrosa</td><td>Philippines</td><td></td><td>+639453624978</td><td>P4013437</td><td><a href="mailto:jonvincent.pedrosa-ama-v@optus.com.au">jonvincent.pedrosa-ama-v@optus.com.au</a></td></tr>
+                                    <tr class="manager-highlight"><td>Manager</td><td>Atmaram More</td><td>India</td><td>Second Escalation</td><td>+91 8380043814</td><td>CP737288</td><td><a href="mailto:atmaram.more-ama-v@optus.com.au">atmaram.more-ama-v@optus.com.au</a></td></tr>
+                                    <tr class="manager-highlight"><td>Manager</td><td>Bindiya Phadte</td><td>Australia</td><td>Second Escalation</td><td>+61 414075584</td><td></td><td></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- ANM Team -->
+                    <div class="contact-team-section">
+                        <div class="team-header anm-header" onclick="toggleTeamSection(this)">
+                            <span>ANM Team</span>
+                            <button class="toggle-btn" title="Hide">
+                                <svg class="eye-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                                <svg class="eye-closed" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                                    <line x1="1" y1="1" x2="23" y2="23"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="team-table-container">
+                            <table class="contact-details-table">
+                                <thead>
+                                    <tr>
+                                        <th>Application Area</th>
+                                        <th>Name</th>
+                                        <th>Site</th>
+                                        <th>Escalation Point</th>
+                                        <th>Contact Number</th>
+                                        <th>CPID</th>
+                                        <th>Optus Email</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="escalation-highlight"><td>ANM</td><td>Orit Weitsman</td><td>Australia</td><td>First Escalation</td><td>+61434711810</td><td></td><td></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Digital Team -->
+                    <div class="contact-team-section">
+                        <div class="team-header digital-header" onclick="toggleTeamSection(this)">
+                            <span>Digital Team</span>
+                            <button class="toggle-btn" title="Hide">
+                                <svg class="eye-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                                <svg class="eye-closed" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                                    <line x1="1" y1="1" x2="23" y2="23"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="team-table-container">
+                            <table class="contact-details-table">
+                                <thead>
+                                    <tr>
+                                        <th>Application Area</th>
+                                        <th>Name</th>
+                                        <th>Site</th>
+                                        <th>Escalation Point</th>
+                                        <th>Contact Number</th>
+                                        <th>CPID</th>
+                                        <th>Optus Email</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td>Digital</td><td>Rica Aricayos</td><td>Philippines</td><td></td><td>+639178613885</td><td>P4015349</td><td><a href="mailto:rica.aricayos@ama.optusvendor.com.au">rica.aricayos@ama.optusvendor.com.au</a></td></tr>
+                                    <tr><td>Digital</td><td>Gaurav Bhus</td><td>India</td><td></td><td>(+91) 77964 72756</td><td></td><td></td></tr>
+                                    <tr><td>Digital</td><td>Ankur</td><td>India</td><td></td><td>+918149994372</td><td></td><td></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Infra Team -->
+                    <div class="contact-team-section">
+                        <div class="team-header infra-header" onclick="toggleTeamSection(this)">
+                            <span>Infra Team</span>
+                            <button class="toggle-btn" title="Hide">
+                                <svg class="eye-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                                <svg class="eye-closed" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                                    <line x1="1" y1="1" x2="23" y2="23"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="team-table-container">
+                            <table class="contact-details-table">
+                                <thead>
+                                    <tr>
+                                        <th>Application Area</th>
+                                        <th>Name</th>
+                                        <th>Site</th>
+                                        <th>Escalation Point</th>
+                                        <th>Contact Number</th>
+                                        <th>CPID</th>
+                                        <th>Optus Email</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td>Infra</td><td>Krishna Reddy</td><td>India</td><td></td><td>+918074254103</td><td></td><td></td></tr>
+                                    <tr><td>ODS Infra</td><td>Rahul More</td><td>India</td><td></td><td>+917020890708</td><td></td><td></td></tr>
+                                    <tr><td>Infra</td><td>Prasad Kawar</td><td>India</td><td></td><td>+917507513321</td><td></td><td></td></tr>
+                                    <tr><td>Infra</td><td>Sakshi Patil</td><td>India</td><td></td><td>6362999123</td><td></td><td></td></tr>
+                                    <tr><td>Infra</td><td>Mary Rose Po</td><td>Philippines</td><td></td><td>63-9477435543</td><td></td><td></td></tr>
+                                    <tr><td>Infra</td><td>Shruti Anandas</td><td>India</td><td></td><td>+91 9326305627</td><td></td><td></td></tr>
+                                    <tr><td>Infra</td><td>Ranjith</td><td>Australia</td><td></td><td>+61434338823</td><td></td><td></td></tr>
+                                    <tr class="escalation-highlight"><td>Manager</td><td>Rahul Gupta</td><td>India</td><td>First Escalation</td><td>+917977968156</td><td></td><td></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- ODS Team -->
+                    <div class="contact-team-section">
+                        <div class="team-header ods-header" onclick="toggleTeamSection(this)">
+                            <span>ODS Team</span>
+                            <button class="toggle-btn" title="Hide">
+                                <svg class="eye-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                                <svg class="eye-closed" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                                    <line x1="1" y1="1" x2="23" y2="23"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="team-table-container">
+                            <table class="contact-details-table">
+                                <thead>
+                                    <tr>
+                                        <th>Application Area</th>
+                                        <th>Name</th>
+                                        <th>Site</th>
+                                        <th>Escalation Point</th>
+                                        <th>Contact Number</th>
+                                        <th>CPID</th>
+                                        <th>Optus Email</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td>ODS</td><td>Poojashri Anuse</td><td>Australia</td><td></td><td>+61 481152816</td><td></td><td></td></tr>
+                                    <tr class="manager-highlight"><td>Manager</td><td>Prachi Menon</td><td>India</td><td>Second Escalation</td><td>91 9867043210</td><td></td><td></td></tr>
+                                    <tr class="escalation-highlight"><td>ODS</td><td>Rohan Hembade</td><td>India</td><td>First Escalation</td><td>91 9960345007</td><td></td><td></td></tr>
+                                    <tr><td>ODS</td><td>Suraj Kadam</td><td>India</td><td></td><td>91 9028265183</td><td></td><td></td></tr>
+                                    <tr><td>ODS</td><td>Athena Erish Comillas</td><td>Philippines</td><td></td><td>+639608265998</td><td></td><td></td></tr>
+                                    <tr><td>ODS Infra</td><td>Bhanu Prasad</td><td>India</td><td></td><td>91 9000818949</td><td></td><td></td></tr>
+                                    <tr class="escalation-highlight"><td>ODS Infra Mgr</td><td>Rodel Toledana</td><td>Philippines</td><td>First Escalation</td><td>+639175958402</td><td></td><td></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- SDM Team -->
+                    <div class="contact-team-section">
+                        <div class="team-header sdm-header" onclick="toggleTeamSection(this)">
+                            <span>SDM Team</span>
+                            <button class="toggle-btn" title="Hide">
+                                <svg class="eye-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                                <svg class="eye-closed" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                                    <line x1="1" y1="1" x2="23" y2="23"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="team-table-container">
+                            <table class="contact-details-table">
+                                <thead>
+                                    <tr>
+                                        <th>Application Area</th>
+                                        <th>Name</th>
+                                        <th>Site</th>
+                                        <th>Escalation Point</th>
+                                        <th>Contact Number</th>
+                                        <th>CPID</th>
+                                        <th>Optus Email</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td>Manager</td><td>Makarand Korde</td><td>Australia</td><td></td><td>+61420456799</td><td></td><td></td></tr>
+                                    <tr><td>Manager</td><td>Josie Solar</td><td>Philippines</td><td></td><td>+639178593389</td><td></td><td></td></tr>
+                                    <tr><td>CM/RM</td><td>Abby Adraneda</td><td>Philippines</td><td></td><td>+639988428471</td><td></td><td></td></tr>
+                                    <tr><td>Manager</td><td>Mohit Jindal</td><td>Australia</td><td></td><td>+61435062098</td><td></td><td></td></tr>
+                                    <tr><td>Manager</td><td>Saurabh Kumar Gupta</td><td>India</td><td></td><td>+919561577161</td><td></td><td></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Senior Escalation -->
+                    <div class="contact-team-section">
+                        <div class="team-header senior-header" onclick="toggleTeamSection(this)">
+                            <span>Senior Escalation</span>
+                            <button class="toggle-btn" title="Hide">
+                                <svg class="eye-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                                <svg class="eye-closed" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                                    <line x1="1" y1="1" x2="23" y2="23"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="team-table-container">
+                            <table class="contact-details-table">
+                                <thead>
+                                    <tr>
+                                        <th>Application Area</th>
+                                        <th>Name</th>
+                                        <th>Site</th>
+                                        <th>Escalation Point</th>
+                                        <th>Contact Number</th>
+                                        <th>CPID</th>
+                                        <th>Optus Email</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="third-escalation"><td></td><td>Vikramjeet Saini</td><td>Australia</td><td>Third Escalation</td><td>+61434516369</td><td></td><td></td></tr>
+                                    <tr class="third-escalation"><td></td><td>Sachin Talwar</td><td>Australia</td><td>Third Escalation</td><td>+61435774133</td><td></td><td></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- L2 Team -->
+                    <div class="contact-team-section">
+                        <div class="team-header l2-header" onclick="toggleTeamSection(this)">
+                            <span>L2 Team</span>
+                            <button class="toggle-btn" title="Hide">
+                                <svg class="eye-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                                <svg class="eye-closed" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                                    <line x1="1" y1="1" x2="23" y2="23"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="team-table-container">
+                            <table class="contact-details-table">
+                                <thead>
+                                    <tr>
+                                        <th>Application Area</th>
+                                        <th>Name</th>
+                                        <th>Site</th>
+                                        <th>Escalation Point</th>
+                                        <th>Contact Number</th>
+                                        <th>CPID</th>
+                                        <th>Optus Email</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td>L2</td><td>Hyacin</td><td>Philippines</td><td></td><td>+63 9357100638</td><td></td><td></td></tr>
+                                    <tr><td>L2</td><td>Jeannette</td><td>Philippines</td><td></td><td>+63 9753476982</td><td></td><td></td></tr>
+                                    <tr><td>L2</td><td>MG</td><td>Philippines</td><td></td><td>+63 9183854888</td><td></td><td></td></tr>
+                                    <tr><td>L2</td><td>Risam</td><td>Philippines</td><td></td><td>+639661889778</td><td></td><td></td></tr>
+                                    <tr><td>L2</td><td>Joshua</td><td>Philippines</td><td></td><td>+639304369765</td><td></td><td></td></tr>
+                                    <tr><td>L2</td><td>Marc</td><td>Philippines</td><td></td><td>+639661997523</td><td></td><td></td></tr>
+                                    <tr class="escalation-highlight"><td>L2 Lead</td><td>Neil Natividad</td><td>Philippines</td><td></td><td>+63 9190610170</td><td></td><td></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- On-Call Tab 4: Escalation Matrix -->
+            <section id="oncall-escalationTab" class="tab-content">
+                <div class="card escalation-matrix-card">
+                    <div class="escalation-matrix-header">
+                        <div>
+                            <h2>Escalation Matrix</h2>
+                            <p class="help-text">Contact escalation path per application area. Red cells indicate missing/required information.</p>
+                        </div>
+                        <div class="escalation-actions">
+                            <button class="btn btn-secondary" onclick="toggleEscalationMatrixEditMode()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                </svg>
+                                <span id="escMatrixEditModeText">Edit Mode</span>
+                            </button>
+                            <button class="btn btn-primary hidden" id="addEscalationBtn" onclick="openEscalationModal()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"/>
+                                    <line x1="5" y1="12" x2="19" y2="12"/>
+                                </svg>
+                                Add Row
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Escalation Modal -->
+                    <div id="escalationModal" class="modal hidden">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h3 id="escalationModalTitle">Add Escalation Entry</h3>
+                                <button class="modal-close" onclick="closeEscalationModal()">&times;</button>
+                            </div>
+                            <form id="escalationForm" onsubmit="saveEscalationEntry(event)">
+                                <input type="hidden" id="escEditIndex" value="">
+                                
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="escApplication">Application *</label>
+                                        <select id="escApplication" required>
+                                            <option value="">Select Application</option>
+                                            <option value="Frontend">Frontend</option>
+                                            <option value="B2B">B2B</option>
+                                            <option value="Backend">Backend</option>
+                                            <option value="ANM">ANM</option>
+                                            <option value="Digital">Digital</option>
+                                            <option value="Infra">Infra</option>
+                                            <option value="ODS">ODS</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="escArea">Application Area *</label>
+                                        <input type="text" id="escArea" required placeholder="e.g., CRM/SDP/MCO">
+                                    </div>
+                                </div>
+                                
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="escOnCall">On Call</label>
+                                        <input type="text" id="escOnCall" placeholder="e.g., Software Dev">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="escFirst">First Escalation</label>
+                                        <input type="text" id="escFirst" placeholder="Name(s)">
+                                    </div>
+                                </div>
+                                
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="escSecond">Second Escalation</label>
+                                        <input type="text" id="escSecond" placeholder="Name(s)">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="escThird">Third Escalation</label>
+                                        <input type="text" id="escThird" placeholder="e.g., MOD">
+                                    </div>
+                                </div>
+                                
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="escFourth">Fourth Escalation</label>
+                                        <input type="text" id="escFourth" placeholder="Name">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="escFifth">Fifth Escalation</label>
+                                        <input type="text" id="escFifth" placeholder="Name">
+                                    </div>
+                                </div>
+                                
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" onclick="closeEscalationModal()">Cancel</button>
+                                    <button type="submit" class="btn btn-primary">Save Entry</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <div class="escalation-matrix-container">
+                        <table class="escalation-matrix-table" id="escalationMatrixTable">
+                            <thead>
+                                <tr>
+                                    <th>Application</th>
+                                    <th>Application Area</th>
+                                    <th>On Call</th>
+                                    <th>First Escalation</th>
+                                    <th>Second Escalation</th>
+                                    <th>Third Escalation</th>
+                                    <th>Fourth Escalation</th>
+                                    <th>Fifth Escalation</th>
+                                    <th class="actions-col">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="escalationMatrixBody">
+                                <!-- Rendered dynamically by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- On-Call Admin Panel -->
+            <section id="oncallAdminPanel" class="admin-panel hidden">
+                <div class="card">
+                    <div class="section-header">
+                        <h2>Admin: Upload On-Call Roster</h2>
+                        <span class="badge bulk">CSV Upload</span>
+                    </div>
+                    <p class="help-text">Upload or update the On-Call roster. The schedule will auto-rotate weekly.</p>
+                    
+                    <div class="bulk-upload-area">
+                        <div class="upload-zone" id="oncallUploadZone">
+                            <div class="upload-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="17 8 12 3 7 8"></polyline>
+                                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                                </svg>
+                            </div>
+                            <p>Drag and drop your CSV file here, or</p>
+                            <label class="btn btn-outline upload-btn">
+                                Browse Files
+                                <input type="file" id="oncallCsvFile" accept=".csv" hidden>
+                            </label>
+                        </div>
+                        <div class="upload-actions">
+                            <button type="button" class="btn btn-secondary" onclick="downloadTemplate('oncall')">Download CSV Template</button>
+                            <label class="btn btn-secondary">
+                                Import Schedule JSON
+                                <input type="file" id="oncallImportJsonFile" accept=".json" hidden onchange="importScheduleJSON(event, 'oncall')">
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="oncallUploadedModList" class="uploaded-mod-list hidden">
+                        <div class="section-header">
+                            <h3>On-Call Roster</h3>
+                            <span id="oncallModCount" class="entry-count"></span>
+                        </div>
+                        <div class="mod-lists-container">
+                            <div class="mod-group">
+                                <h4 class="mod-group-title"><span class="badge primary-oncall">Primary</span> On-Call Rotation</h4>
+                                <div id="oncallPrimaryModList" class="mod-rotation-list"></div>
+                            </div>
+                            <div class="mod-group">
+                                <h4 class="mod-group-title"><span class="badge secondary-oncall">Secondary</span> On-Call Rotation</h4>
+                                <div id="oncallSecondaryModList" class="mod-rotation-list"></div>
+                            </div>
+                        </div>
+                        <p class="help-text" style="margin-top: 1rem;">Drag to reorder On-Call personnel.</p>
+                    </div>
+                </div>
+
+                <div class="card" id="oncallConfigSection" style="display: none;">
+                    <h2>Schedule Configuration</h2>
+                    <div class="form-row">
+                        <div class="form-group"><label for="oncallStartDate">Start Date</label><input type="date" id="oncallStartDate" required></div>
+                        <div class="form-group"><label for="oncallEndDate">End Date</label><input type="date" id="oncallEndDate" required></div>
+                        <div class="form-group">
+                            <label for="oncallRotationDays">Days per Rotation</label>
+                            <select id="oncallRotationDays">
+                                <option value="7" selected>7 days (Weekly)</option>
+                                <option value="5">5 days (Weekdays)</option>
+                                <option value="14">14 days (Bi-weekly)</option>
+                                <option value="1">1 day (Daily)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label for="oncallPrimaryShiftLabel">Primary On-Call Label</label><input type="text" id="oncallPrimaryShiftLabel" value="Primary On-Call"></div>
+                        <div class="form-group"><label for="oncallSecondaryShiftLabel">Secondary On-Call Label</label><input type="text" id="oncallSecondaryShiftLabel" value="Secondary On-Call"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label for="oncallStartPrimaryIndex">Start Primary at</label><select id="oncallStartPrimaryIndex"></select></div>
+                        <div class="form-group"><label for="oncallStartSecondaryIndex">Start Secondary at</label><select id="oncallStartSecondaryIndex"></select></div>
+                    </div>
+                    <div class="actions" style="margin-top: 1.5rem; margin-bottom: 0;">
+                        <button type="button" class="btn btn-secondary" onclick="clearAll('oncall')">Clear All</button>
+                        <button type="button" class="btn btn-primary" onclick="generateAndSaveSchedule('oncall')">Generate & Save Schedule</button>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Database Configuration -->
+    <script src="config.js"></script>
+    <!-- Main Application Script -->
+    <script src="script.js"></script>
+</body>
+</html>
