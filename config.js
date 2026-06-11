@@ -2,6 +2,15 @@
 const SUPABASE_URL = 'https://yvbemhhnrgmccasifzey.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl2YmVtaGhucmdtY2Nhc2lmemV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwODg3ODQsImV4cCI6MjA5NjY2NDc4NH0.I2nk7xpCoBewq3_anek_PjOjDW5VC__eIeYJDFSwN0M';
 
+// ==================== Edge Function Configuration ====================
+// Edge Function URL for sending notifications
+const EDGE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/send-oncall-notifications`;
+
+// Check if Edge Function is available (Supabase must be configured)
+function isEdgeFunctionConfigured() {
+    return isSupabaseConfigured();
+}
+
 // REST API helper
 async function supabaseRequest(table, method = 'GET', data = null, query = '') {
     const url = `${SUPABASE_URL}/rest/v1/${table}${query}`;
@@ -78,14 +87,36 @@ const db = {
         const { error } = await supabaseRequest('escalation_matrix', 'DELETE', null, `?id=eq.${id}`);
         return !error;
     },
-    async getRoster() {
-        const { data, error } = await supabaseRequest('roster', 'GET', null, '?order=sort_order');
+    async getRoster(weekStart = null) {
+        let query = '?order=sort_order';
+        if (weekStart) {
+            query += `&week_start=eq.${weekStart}`;
+        }
+        const { data, error } = await supabaseRequest('roster', 'GET', null, query);
         if (error || !data) return null;
-        return data.map(r => ({ time: r.time_shift, app: r.app, team: r.team, days: { mon: r.mon||'', tue: r.tue||'', wed: r.wed||'', thu: r.thu||'', fri: r.fri||'', sat: r.sat||'', sun: r.sun||'' }, _id: r.id }));
+        return data.map(r => ({ time: r.time_shift, app: r.app, team: r.team, days: { mon: r.mon||'', tue: r.tue||'', wed: r.wed||'', thu: r.thu||'', fri: r.fri||'', sat: r.sat||'', sun: r.sun||'' }, _id: r.id, week_start: r.week_start }));
     },
-    async saveRosterEntry(entry, sortOrder) {
-        const { data, error } = await supabaseRequest('roster', 'POST', { time_shift: entry.time, app: entry.app, team: entry.team, mon: entry.days.mon, tue: entry.days.tue, wed: entry.days.wed, thu: entry.days.thu, fri: entry.days.fri, sat: entry.days.sat, sun: entry.days.sun, sort_order: sortOrder });
+    async saveRosterEntry(entry, sortOrder, weekStart) {
+        const { data, error } = await supabaseRequest('roster', 'POST', { time_shift: entry.time, app: entry.app, team: entry.team, mon: entry.days.mon, tue: entry.days.tue, wed: entry.days.wed, thu: entry.days.thu, fri: entry.days.fri, sat: entry.days.sat, sun: entry.days.sun, sort_order: sortOrder, week_start: weekStart });
         return error ? null : data[0];
+    },
+    async saveRosterEntriesBatch(entries, weekStart) {
+        const batchData = entries.map((entry, index) => ({
+            time_shift: entry.time,
+            app: entry.app,
+            team: entry.team,
+            mon: entry.days.mon,
+            tue: entry.days.tue,
+            wed: entry.days.wed,
+            thu: entry.days.thu,
+            fri: entry.days.fri,
+            sat: entry.days.sat,
+            sun: entry.days.sun,
+            sort_order: index,
+            week_start: weekStart
+        }));
+        const { data, error } = await supabaseRequest('roster', 'POST', batchData);
+        return error ? null : data;
     },
     async updateRosterEntry(id, entry) {
         const { data, error } = await supabaseRequest('roster', 'PATCH', { time_shift: entry.time, app: entry.app, team: entry.team, mon: entry.days.mon, tue: entry.days.tue, wed: entry.days.wed, thu: entry.days.thu, fri: entry.days.fri, sat: entry.days.sat, sun: entry.days.sun }, `?id=eq.${id}`);
@@ -95,10 +126,42 @@ const db = {
         const { error } = await supabaseRequest('roster', 'DELETE', null, `?id=eq.${id}`);
         return !error;
     },
+    async copyRosterToWeek(sourceWeek, targetWeek) {
+        const sourceData = await this.getRoster(sourceWeek);
+        if (!sourceData || sourceData.length === 0) return false;
+        for (let i = 0; i < sourceData.length; i++) {
+            const entry = sourceData[i];
+            await this.saveRosterEntry(entry, i, targetWeek);
+        }
+        return true;
+    },
     async updateRosterOrder(orderedIds) {
         for (let i = 0; i < orderedIds.length; i++) {
             await supabaseRequest('roster', 'PATCH', { sort_order: i }, `?id=eq.${orderedIds[i]}`);
         }
+    },
+    // Staff Directory (for email notifications)
+    async getStaffDirectory() {
+        const { data, error } = await supabaseRequest('staff_directory', 'GET', null, '?order=name');
+        if (error || !data) return [];
+        return data.map(s => ({ name: s.name, email: s.email, timezone: s.timezone || 'AEST', _id: s.id }));
+    },
+    async saveStaffEntry(entry) {
+        const { data, error } = await supabaseRequest('staff_directory', 'POST', { name: entry.name, email: entry.email, timezone: entry.timezone || 'AEST' });
+        return error ? null : data[0];
+    },
+    async updateStaffEntry(id, entry) {
+        const { data, error } = await supabaseRequest('staff_directory', 'PATCH', { name: entry.name, email: entry.email, timezone: entry.timezone || 'AEST' }, `?id=eq.${id}`);
+        return error ? null : data;
+    },
+    async deleteStaffEntry(id) {
+        const { error } = await supabaseRequest('staff_directory', 'DELETE', null, `?id=eq.${id}`);
+        return !error;
+    },
+    async getStaffEmailByName(name) {
+        const { data, error } = await supabaseRequest('staff_directory', 'GET', null, `?name=ilike.${encodeURIComponent(name)}&limit=1`);
+        if (error || !data || data.length === 0) return null;
+        return data[0].email;
     }
 };
 

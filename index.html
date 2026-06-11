@@ -382,6 +382,7 @@
                 <button class="nav-tab" onclick="showTab('oncall', 'l2roster')">L2 Roster</button>
                 <button class="nav-tab" onclick="showTab('oncall', 'contacts')">Contact Details</button>
                 <button class="nav-tab" onclick="showTab('oncall', 'escalation')">Escalation Matrix</button>
+                <button class="nav-tab" onclick="showTab('oncall', 'staffdir')">Staff Directory</button>
             </nav>
 
             <!-- On-Call Tab 1: Summary / Roster -->
@@ -409,21 +410,44 @@
                             </button>
                             <button class="btn btn-outline" onclick="exportRosterJSON()">Export</button>
                             <button class="btn btn-outline" onclick="window.print()">Print</button>
+                            <button class="btn btn-success" onclick="sendTodaysNotifications()" id="sendNotificationsBtn">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                                    <polyline points="22,6 12,13 2,6"/>
+                                </svg>
+                                Send Today's Notifications
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Notification Status Modal -->
+                    <div id="notificationStatusModal" class="modal hidden notification-status-modal">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h3>Email Notifications</h3>
+                                <button class="modal-close" onclick="closeNotificationModal()">&times;</button>
+                            </div>
+                            <div id="notificationStatusContent">
+                                <!-- Populated by JavaScript -->
+                            </div>
+                            <div class="modal-footer">
+                                <button class="btn btn-primary" onclick="closeNotificationModal()">Close</button>
+                            </div>
                         </div>
                     </div>
                     
                     <!-- Week Selector -->
                     <div class="roster-week-selector">
                         <label>Week Starting:</label>
-                        <input type="date" id="rosterWeekStart" onchange="renderRosterTable()">
+                        <input type="date" id="rosterWeekStart" onchange="onWeekChange()">
                         <button class="btn btn-sm btn-outline" onclick="changeRosterWeek(-7)">← Prev</button>
                         <button class="btn btn-sm btn-outline" onclick="changeRosterWeek(7)">Next →</button>
-                        <button class="btn btn-sm btn-outline" onclick="goToCurrentWeek()">Today</button>
+                        <button class="btn btn-sm btn-outline" onclick="goToCurrentWeek(); onWeekChange();">Today</button>
                     </div>
                     
                     <!-- Roster Modal -->
                     <div id="rosterModal" class="modal hidden">
-                        <div class="modal-content modal-wide">
+                        <div class="modal-content roster-modal-clean">
                             <div class="modal-header">
                                 <h3 id="rosterModalTitle">Add Roster Entry</h3>
                                 <button class="modal-close" onclick="closeRosterModal()">&times;</button>
@@ -431,65 +455,97 @@
                             <form id="rosterForm" onsubmit="saveRosterEntry(event)">
                                 <input type="hidden" id="rosterEditIndex" value="">
                                 
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label for="rosterTime">Time / Shift *</label>
-                                        <input type="text" id="rosterTime" required placeholder="e.g., 02:30 - 16:00 (AEST)">
+                                <div class="roster-form-body">
+                                    <!-- Row 1: Time/Shift and Application -->
+                                    <div class="roster-form-row">
+                                        <div class="roster-form-field">
+                                            <label for="rosterTime">TIME / SHIFT *</label>
+                                            <input type="text" id="rosterTime" required placeholder="e.g., 07:00 - 16:00 (AEST)">
+                                        </div>
+                                        <div class="roster-form-field">
+                                            <label for="rosterApplication">APPLICATION *</label>
+                                            <select id="rosterApplication" required>
+                                                <option value="">Select Application</option>
+                                                <option value="Frontend">Frontend</option>
+                                                <option value="Backend">Backend</option>
+                                                <option value="Digital">Digital</option>
+                                                <option value="Infra">Infra</option>
+                                                <option value="B2B">B2B</option>
+                                                <option value="ODS">ODS</option>
+                                            </select>
+                                        </div>
                                     </div>
-                                    <div class="form-group">
-                                        <label for="rosterApplication">Application *</label>
-                                        <select id="rosterApplication" required>
-                                            <option value="">Select Application</option>
-                                            <option value="Frontend">Frontend</option>
-                                            <option value="Backend">Backend</option>
-                                            <option value="Digital">Digital</option>
-                                            <option value="Infra">Infra</option>
-                                            <option value="B2B">B2B</option>
-                                            <option value="ODS">ODS</option>
-                                        </select>
+
+                                    <!-- Row 2: Team -->
+                                    <div class="roster-form-row">
+                                        <div class="roster-form-field">
+                                            <label for="rosterTeam">TEAM *</label>
+                                            <input type="text" id="rosterTeam" required placeholder="e.g., ASOM, OMS, CRM/SDP/MCO/WSF">
+                                        </div>
                                     </div>
-                                </div>
-                                
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label for="rosterTeam">Team *</label>
-                                        <input type="text" id="rosterTeam" required placeholder="e.g., ASOM, OMS, CRM/SDP/MCO/WSF">
+
+                                    <!-- Weekly Assignments Header -->
+                                    <div class="roster-assignments-header">
+                                        <span>Weekly Assignments</span>
+                                        <div class="apply-all-container">
+                                            <button type="button" class="btn-clear-all" onclick="clearAllDays()" title="Clear all day assignments">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                </svg>
+                                                Clear All
+                                            </button>
+                                            <label class="apply-all-checkbox">
+                                                <input type="checkbox" id="applyToAllDays" onchange="toggleApplyToAllDays()">
+                                                <span class="checkmark"></span>
+                                                <span class="apply-all-label">Same person for all days</span>
+                                            </label>
+                                        </div>
                                     </div>
-                                </div>
-                                
-                                <h4 class="form-section-title">Weekly Assignments</h4>
-                                <div class="form-row roster-days-row">
-                                    <div class="form-group">
-                                        <label for="rosterMon">Monday</label>
-                                        <input type="text" id="rosterMon" placeholder="Name">
+
+                                    <!-- Row 3: Mon to Thu -->
+                                    <div class="roster-form-row roster-days">
+                                        <div class="roster-form-field autocomplete-field">
+                                            <label for="rosterMon">MONDAY</label>
+                                            <input type="text" id="rosterMon" placeholder="Name" autocomplete="off" oninput="showNameSuggestions(this)" onkeydown="handleSuggestionKeydown(event, this)" onblur="hideSuggestionsDelayed(this)">
+                                            <div class="autocomplete-suggestions" id="rosterMon-suggestions"></div>
+                                        </div>
+                                        <div class="roster-form-field autocomplete-field">
+                                            <label for="rosterTue">TUESDAY</label>
+                                            <input type="text" id="rosterTue" placeholder="Name" autocomplete="off" oninput="showNameSuggestions(this)" onkeydown="handleSuggestionKeydown(event, this)" onblur="hideSuggestionsDelayed(this)">
+                                            <div class="autocomplete-suggestions" id="rosterTue-suggestions"></div>
+                                        </div>
+                                        <div class="roster-form-field autocomplete-field">
+                                            <label for="rosterWed">WEDNESDAY</label>
+                                            <input type="text" id="rosterWed" placeholder="Name" autocomplete="off" oninput="showNameSuggestions(this)" onkeydown="handleSuggestionKeydown(event, this)" onblur="hideSuggestionsDelayed(this)">
+                                            <div class="autocomplete-suggestions" id="rosterWed-suggestions"></div>
+                                        </div>
+                                        <div class="roster-form-field autocomplete-field">
+                                            <label for="rosterThu">THURSDAY</label>
+                                            <input type="text" id="rosterThu" placeholder="Name" autocomplete="off" oninput="showNameSuggestions(this)" onkeydown="handleSuggestionKeydown(event, this)" onblur="hideSuggestionsDelayed(this)">
+                                            <div class="autocomplete-suggestions" id="rosterThu-suggestions"></div>
+                                        </div>
                                     </div>
-                                    <div class="form-group">
-                                        <label for="rosterTue">Tuesday</label>
-                                        <input type="text" id="rosterTue" placeholder="Name">
+
+                                    <!-- Row 4: Fri to Sun -->
+                                    <div class="roster-form-row roster-days">
+                                        <div class="roster-form-field autocomplete-field">
+                                            <label for="rosterFri">FRIDAY</label>
+                                            <input type="text" id="rosterFri" placeholder="Name" autocomplete="off" oninput="showNameSuggestions(this)" onkeydown="handleSuggestionKeydown(event, this)" onblur="hideSuggestionsDelayed(this)">
+                                            <div class="autocomplete-suggestions" id="rosterFri-suggestions"></div>
+                                        </div>
+                                        <div class="roster-form-field autocomplete-field">
+                                            <label for="rosterSat">SATURDAY</label>
+                                            <input type="text" id="rosterSat" placeholder="Name" autocomplete="off" oninput="showNameSuggestions(this)" onkeydown="handleSuggestionKeydown(event, this)" onblur="hideSuggestionsDelayed(this)">
+                                            <div class="autocomplete-suggestions" id="rosterSat-suggestions"></div>
+                                        </div>
+                                        <div class="roster-form-field autocomplete-field">
+                                            <label for="rosterSun">SUNDAY</label>
+                                            <input type="text" id="rosterSun" placeholder="Name" autocomplete="off" oninput="showNameSuggestions(this)" onkeydown="handleSuggestionKeydown(event, this)" onblur="hideSuggestionsDelayed(this)">
+                                            <div class="autocomplete-suggestions" id="rosterSun-suggestions"></div>
+                                        </div>
+                                        <div class="roster-form-field empty"></div>
                                     </div>
-                                    <div class="form-group">
-                                        <label for="rosterWed">Wednesday</label>
-                                        <input type="text" id="rosterWed" placeholder="Name">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="rosterThu">Thursday</label>
-                                        <input type="text" id="rosterThu" placeholder="Name">
-                                    </div>
-                                </div>
-                                <div class="form-row roster-days-row">
-                                    <div class="form-group">
-                                        <label for="rosterFri">Friday</label>
-                                        <input type="text" id="rosterFri" placeholder="Name">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="rosterSat">Saturday</label>
-                                        <input type="text" id="rosterSat" placeholder="Name">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="rosterSun">Sunday</label>
-                                        <input type="text" id="rosterSun" placeholder="Name">
-                                    </div>
-                                    <div class="form-group"></div>
                                 </div>
                                 
                                 <div class="modal-footer">
@@ -630,6 +686,24 @@
                                 Add Contact
                             </button>
                         </div>
+                    </div>
+                    
+                    <!-- Search Box -->
+                    <div class="contact-search-container">
+                        <div class="contact-search-box">
+                            <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
+                            <input type="text" id="contactSearchInput" placeholder="Search contacts by name, area, role, site..." oninput="searchContacts(this.value)">
+                            <button class="search-clear-btn" onclick="clearContactSearch()" title="Clear search">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="search-results-count" id="searchResultsCount"></div>
                     </div>
                     
                     <!-- Contact Modal -->
@@ -1258,6 +1332,240 @@
                 </div>
             </section>
 
+            <!-- On-Call Tab 5: Staff Directory -->
+            <section id="oncall-staffdirTab" class="tab-content">
+                <div class="card staff-directory-card">
+                    <div class="staff-directory-header">
+                        <div>
+                            <h2>Staff Directory</h2>
+                            <p class="help-text">Map staff names to email addresses for automated notifications. Names should match roster entries exactly.</p>
+                        </div>
+                        <div class="staff-actions">
+                            <button class="btn btn-secondary" onclick="openImportFromContactsModal()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                    <circle cx="9" cy="7" r="4"/>
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                                </svg>
+                                Import from Contacts
+                            </button>
+                            <button class="btn btn-primary" onclick="openStaffModal()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"/>
+                                    <line x1="5" y1="12" x2="19" y2="12"/>
+                                </svg>
+                                Add Staff
+                            </button>
+                            <button class="btn btn-outline" onclick="exportStaffJSON()">Export</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Import from Contacts Modal -->
+                    <div id="importContactsModal" class="modal hidden">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h3>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 0.5rem;">
+                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                        <circle cx="9" cy="7" r="4"/>
+                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                                    </svg>
+                                    Import from Contacts
+                                </h3>
+                                <button class="modal-close" onclick="closeImportContactsModal()">&times;</button>
+                            </div>
+                            <div class="import-contacts-body">
+                                <p>Select contacts to add to Staff Directory. Timezone is auto-detected from Site column.</p>
+                                
+                                <div class="import-select-all">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="selectAllContacts" onchange="toggleSelectAllContacts()">
+                                        <span>Select All Available</span>
+                                    </label>
+                                </div>
+                                
+                                <div class="import-contacts-list" id="importContactsList">
+                                    <!-- Populated by JavaScript -->
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" onclick="closeImportContactsModal()">Cancel</button>
+                                <button type="button" class="btn btn-success" onclick="importSelectedContacts()">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="20 6 9 17 4 12"/>
+                                    </svg>
+                                    Import Selected
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Staff Modal -->
+                    <div id="staffModal" class="modal hidden">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h3 id="staffModalTitle">Add Staff Entry</h3>
+                                <button class="modal-close" onclick="closeStaffModal()">&times;</button>
+                            </div>
+                            <form id="staffForm" onsubmit="saveStaffEntry(event)" class="staff-form">
+                                <input type="hidden" id="staffEditIndex" value="">
+                                
+                                <div class="staff-form-section">
+                                    <div class="section-icon">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                                            <circle cx="12" cy="7" r="4"/>
+                                        </svg>
+                                    </div>
+                                    <div class="section-content">
+                                        <label for="staffName">Name</label>
+                                        <input type="text" id="staffName" required placeholder="Enter name exactly as it appears in roster">
+                                        <span class="field-hint">Must match the roster entry (case-insensitive)</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="staff-form-section">
+                                    <div class="section-icon">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                                            <polyline points="22,6 12,13 2,6"/>
+                                        </svg>
+                                    </div>
+                                    <div class="section-content">
+                                        <label for="staffEmail">Email Address</label>
+                                        <input type="email" id="staffEmail" required placeholder="email@amdocs.com">
+                                        <span class="field-hint">Notifications will be sent to this email</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="staff-form-section">
+                                    <div class="section-icon">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <circle cx="12" cy="12" r="10"/>
+                                            <polyline points="12 6 12 12 16 14"/>
+                                        </svg>
+                                    </div>
+                                    <div class="section-content">
+                                        <label>Notification Timezone</label>
+                                        <div class="timezone-options">
+                                            <label class="timezone-option">
+                                                <input type="radio" name="staffTimezone" id="staffTimezoneAEST" value="AEST" checked>
+                                                <div class="timezone-card aest">
+                                                    <span class="tz-flag">AU</span>
+                                                    <div class="tz-details">
+                                                        <span class="tz-name">AEST</span>
+                                                        <span class="tz-desc">8:00 AM</span>
+                                                    </div>
+                                                </div>
+                                            </label>
+                                            <label class="timezone-option">
+                                                <input type="radio" name="staffTimezone" id="staffTimezoneIST" value="IST">
+                                                <div class="timezone-card ist">
+                                                    <span class="tz-flag">IN</span>
+                                                    <div class="tz-details">
+                                                        <span class="tz-name">IST</span>
+                                                        <span class="tz-desc">9:00 AM</span>
+                                                    </div>
+                                                </div>
+                                            </label>
+                                        </div>
+                                        <span class="field-hint">When should this person receive notifications?</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" onclick="closeStaffModal()">Cancel</button>
+                                    <button type="submit" class="btn btn-primary">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="20 6 9 17 4 12"/>
+                                        </svg>
+                                        Save Entry
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <div class="staff-table-container">
+                        <table class="staff-table" id="staffTable">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Timezone</th>
+                                    <th class="actions-col">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="staffTableBody">
+                                <!-- Rendered dynamically by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="staff-info-box">
+                        <div class="info-box-header">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 16v-4"/>
+                                <path d="M12 8h.01"/>
+                            </svg>
+                            <h4>How Email Notifications Work</h4>
+                        </div>
+                        
+                        <div class="info-steps">
+                            <div class="info-step">
+                                <span class="step-num">1</span>
+                                <div class="step-text">
+                                    <strong>Add Staff</strong>
+                                    <p>Add on-call members with their email and timezone (AEST or IST)</p>
+                                </div>
+                            </div>
+                            <div class="info-step">
+                                <span class="step-num">2</span>
+                                <div class="step-text">
+                                    <strong>Name Matching</strong>
+                                    <p>Names must match exactly as they appear in the roster (case-insensitive)</p>
+                                </div>
+                            </div>
+                            <div class="info-step">
+                                <span class="step-num">3</span>
+                                <div class="step-text">
+                                    <strong>Automatic Daily Emails</strong>
+                                    <p>System sends reminders automatically based on timezone</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="schedule-info">
+                            <div class="schedule-item aest">
+                                <span class="schedule-flag">AU</span>
+                                <div class="schedule-details">
+                                    <strong>AEST Team</strong>
+                                    <span>Daily at 8:00 AM AEST</span>
+                                </div>
+                            </div>
+                            <div class="schedule-item ist">
+                                <span class="schedule-flag">IN</span>
+                                <div class="schedule-details">
+                                    <strong>IST Team</strong>
+                                    <span>Daily at 9:00 AM IST</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="manual-option">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                                <polyline points="22,6 12,13 2,6"/>
+                            </svg>
+                            <span>You can also send notifications manually using the <strong>"Send Today's Notifications"</strong> button in the Roster tab</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- On-Call Admin Panel -->
             <section id="oncallAdminPanel" class="admin-panel hidden">
                 <div class="card">
@@ -1342,6 +1650,8 @@
         </div>
     </div>
 
+    <!-- SheetJS for Excel export -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <!-- Database Configuration (REST API - no SDK needed) -->
     <script src="config.js"></script>
     <!-- Main Application Script -->

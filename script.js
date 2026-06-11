@@ -47,6 +47,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     await initializeContactsData();
     await initializeEscalationMatrixData();
     await initializeRosterData();
+    await initializeStaffDirectory();
     
     if (useDatabase) {
         showToast('Connected to database', 'success');
@@ -1145,6 +1146,83 @@ function saveContactsData() {
     localStorage.setItem(STORAGE_KEYS.oncall.contacts, JSON.stringify(contactsData));
 }
 
+// Contact Search Functions
+function searchContacts(searchTerm) {
+    const term = searchTerm.trim().toLowerCase();
+    const resultsCount = document.getElementById('searchResultsCount');
+    const teamSections = document.querySelectorAll('.contact-team-section');
+    
+    if (!term) {
+        // Clear search - show all
+        teamSections.forEach(section => {
+            section.classList.remove('search-hidden');
+            section.style.display = '';
+            const rows = section.querySelectorAll('tbody tr');
+            rows.forEach(row => {
+                row.classList.remove('search-match', 'search-hidden');
+                row.style.display = '';
+            });
+        });
+        resultsCount.textContent = '';
+        resultsCount.classList.remove('has-results');
+        return;
+    }
+    
+    let totalMatches = 0;
+    let teamsWithMatches = 0;
+    
+    teamSections.forEach(section => {
+        const rows = section.querySelectorAll('tbody tr');
+        let sectionMatches = 0;
+        
+        rows.forEach(row => {
+            const cells = row.querySelectorAll('td');
+            let rowText = '';
+            cells.forEach(cell => {
+                rowText += ' ' + cell.textContent.toLowerCase();
+            });
+            
+            if (rowText.includes(term)) {
+                row.classList.add('search-match');
+                row.classList.remove('search-hidden');
+                row.style.display = '';
+                sectionMatches++;
+                totalMatches++;
+            } else {
+                row.classList.remove('search-match');
+                row.classList.add('search-hidden');
+                row.style.display = 'none';
+            }
+        });
+        
+        // Hide section if no matches
+        if (sectionMatches === 0) {
+            section.classList.add('search-hidden');
+            section.style.display = 'none';
+        } else {
+            section.classList.remove('search-hidden');
+            section.style.display = '';
+            teamsWithMatches++;
+        }
+    });
+    
+    // Update results count
+    if (totalMatches > 0) {
+        resultsCount.textContent = `Found ${totalMatches} contact${totalMatches !== 1 ? 's' : ''} in ${teamsWithMatches} team${teamsWithMatches !== 1 ? 's' : ''}`;
+        resultsCount.classList.add('has-results');
+    } else {
+        resultsCount.textContent = 'No contacts found matching your search';
+        resultsCount.classList.remove('has-results');
+    }
+}
+
+function clearContactSearch() {
+    const searchInput = document.getElementById('contactSearchInput');
+    searchInput.value = '';
+    searchContacts('');
+    searchInput.focus();
+}
+
 function renderAllContactTables() {
     const teamConfig = [
         { key: 'frontend', name: 'Frontend Team', headerClass: 'frontend-header' },
@@ -1664,33 +1742,58 @@ let rosterEditMode = false;
 const ROSTER_STORAGE_KEY = 'oncall_roster_data';
 
 async function initializeRosterData() {
+    // Set default week to current Monday first
+    goToCurrentWeek();
+    
+    // Then load data for that week
+    await loadRosterDataForWeek();
+    
+    renderRosterTable();
+}
+
+async function loadRosterDataForWeek() {
+    const weekStart = getCurrentWeekStart();
+    
     if (useDatabase) {
-        const data = await db.getRoster();
+        const data = await db.getRoster(weekStart);
         if (data && data.length > 0) {
             rosterData = data;
         } else {
-            // Initialize with default data
-            rosterData = getDefaultRosterData();
-            for (let i = 0; i < rosterData.length; i++) {
-                await db.saveRosterEntry(rosterData[i], i);
-            }
+            // No data for this week - use default template structure with empty days
+            const templateData = getDefaultRosterData().map(entry => ({
+                time: entry.time,
+                app: entry.app,
+                team: entry.team,
+                days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }
+            }));
+            
+            // Batch insert all entries at once (much faster!)
+            await db.saveRosterEntriesBatch(templateData, weekStart);
+            
             // Reload to get IDs
-            rosterData = await db.getRoster();
+            rosterData = await db.getRoster(weekStart);
         }
     } else {
-        const saved = localStorage.getItem(ROSTER_STORAGE_KEY);
+        const storageKey = `${ROSTER_STORAGE_KEY}_${weekStart}`;
+        const saved = localStorage.getItem(storageKey);
         if (saved) {
             rosterData = JSON.parse(saved);
         } else {
-            rosterData = getDefaultRosterData();
+            // Use default template with empty days
+            rosterData = getDefaultRosterData().map(entry => ({
+                time: entry.time,
+                app: entry.app,
+                team: entry.team,
+                days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }
+            }));
             saveRosterData();
         }
     }
-    
-    // Set default week to current Monday
-    goToCurrentWeek();
-    
-    renderRosterTable();
+}
+
+function getCurrentWeekStart() {
+    const weekStartInput = document.getElementById('rosterWeekStart');
+    return weekStartInput ? weekStartInput.value : formatDateForInput(new Date());
 }
 
 function goToCurrentWeek() {
@@ -1701,35 +1804,58 @@ function goToCurrentWeek() {
     monday.setDate(today.getDate() + diff);
     
     document.getElementById('rosterWeekStart').value = formatDateForInput(monday);
+}
+
+async function onWeekChange() {
+    await loadRosterDataForWeek();
     renderRosterTable();
 }
 
 function getDefaultRosterData() {
     return [
-        { time: '02:30 - 16:00 (AEST) / 21:00 - 02:30 (IST)', app: 'Frontend', team: 'ASOM', days: { mon: 'Anurag', tue: 'Anurag', wed: 'Anurag', thu: 'Anurag', fri: 'Jerome', sat: 'Jerome', sun: 'Jerome' }},
-        { time: '02:30 - 16:00 (AEST) / 21:00 - 02:30 (IST)', app: 'Frontend', team: 'ASOM', days: { mon: 'Jerome', tue: 'Jerome', wed: 'Jerome', thu: 'Jerome', fri: 'Yash', sat: 'Yash', sun: 'Yash' }},
-        { time: '07:00 - 16:00 (AEST) / 02:30 - 10:30 (IST)', app: 'Frontend', team: 'OMS', days: { mon: 'Anurag', tue: 'Anurag', wed: 'Anurag', thu: 'Anurag', fri: 'Anurag', sat: 'Anurag', sun: 'Anurag' }},
-        { time: '16:00 - 02:30 (AEST) / 10:30 - 21:00 (IST)', app: 'Frontend', team: 'OMS', days: { mon: 'Sanket', tue: 'Sanket', wed: 'Sanket', thu: 'Sanket', fri: 'Bhomesh', sat: 'Bhomesh', sun: 'Bhomesh' }},
-        { time: '02:30 - 16:00 (AEST) / 10:30 - 21:00 (IST)', app: 'Frontend', team: 'CRM/SDP/MCO/WSF', days: { mon: 'Chirag', tue: 'Chirag', wed: 'Chirag', thu: 'Chirag', fri: 'Anudhav', sat: 'Anudhav', sun: 'Anudhav' }},
+        // Frontend - ASOM (3 rows)
+        { time: '07:00 - 16:00 (AEST) / 02:30 - 10:30 (IST)', app: 'Frontend', team: 'ASOM', days: { mon: 'Yash', tue: 'Anurag', wed: 'Anurag', thu: 'Anurag', fri: 'Jerome', sat: 'Yash', sun: 'Yash' }},
+        { time: '16:00 - 02:30 (AEST) / 10:30 - 21:00 (IST)', app: 'Frontend', team: 'ASOM', days: { mon: 'Yash', tue: 'Yash', wed: 'Yash', thu: 'Yash', fri: 'Yash', sat: 'Yash', sun: 'Yash' }},
+        { time: '02:30 - 07:00 (AEST) / 21:00 - 02:30 (IST)', app: 'Frontend', team: 'ASOM', days: { mon: 'Yash', tue: 'Yash', wed: 'Yash', thu: 'Yash', fri: 'Yash', sat: 'Yash', sun: 'Yash' }},
+        // Frontend - OMS (3 rows)
+        { time: '07:00 - 16:00 (AEST) / 02:30 - 10:30 (IST)', app: 'Frontend', team: 'OMS', days: { mon: 'Bhomesh', tue: 'Anurag', wed: 'Anurag', thu: 'Anurag', fri: 'Anurag', sat: 'Bhomesh', sun: 'Bhomesh' }},
+        { time: '16:00 - 02:30 (AEST) / 10:30 - 21:00 (IST)', app: 'Frontend', team: 'OMS', days: { mon: 'Bhomesh', tue: 'Bhomesh', wed: 'Bhomesh', thu: 'Bhomesh', fri: 'Bhomesh', sat: 'Bhomesh', sun: 'Bhomesh' }},
+        { time: '02:30 - 07:00 (AEST) /21:00 - 02:30 (IST)', app: 'Frontend', team: 'OMS', days: { mon: 'Bhomesh', tue: 'Bhomesh', wed: 'Bhomesh', thu: 'Bhomesh', fri: 'Bhomesh', sat: 'Bhomesh', sun: 'Bhomesh' }},
+        // Frontend - CRM/SDP/MCO/WSF (3 rows)
+        { time: '07:00 - 16:00 (AEST) / 02:30 - 10:30 (IST)', app: 'Frontend', team: 'CRM/SDP/MCO/WSF', days: { mon: 'Anubhav', tue: 'Anubhav', wed: 'Anubhav', thu: 'Anubhav', fri: 'Anubhav', sat: 'Anudhav', sun: 'Anudhav' }},
         { time: '16:00 - 02:30 (AEST) / 10:30 - 21:00 (IST)', app: 'Frontend', team: 'CRM/SDP/MCO/WSF', days: { mon: 'Anudhav', tue: 'Anudhav', wed: 'Anudhav', thu: 'Anudhav', fri: 'Anudhav', sat: 'Anudhav', sun: 'Anudhav' }},
-        { time: '7AM to 7PM AEST', app: 'Digital', team: 'Digital', days: { mon: 'GAURAV', tue: 'GAURAV', wed: 'Arkay', thu: 'Arkay', fri: 'Arkay', sat: 'Bion', sun: 'Bion' }},
-        { time: '7PM to 7AM AEST', app: 'Digital', team: 'Digital', days: { mon: 'Gourav', tue: 'Gourav', wed: 'Gourav', thu: 'Gourav', fri: 'Gourav', sat: 'Bion', sun: 'Bion' }},
-        { time: 'All Shifts', app: 'Infra', team: 'Infra', days: { mon: 'Krishna Reddy', tue: 'Krishna Reddy', wed: 'Krishna Reddy', thu: 'Krishna Reddy', fri: 'Krishna Reddy', sat: 'Krishna Reddy', sun: 'Krishna Reddy' }},
-        { time: '7M to 7PM AEST', app: 'Backend', team: 'INV/AMDD', days: { mon: 'Akash', tue: 'Akash', wed: 'Akash', thu: 'Akash', fri: 'Sanket', sat: 'Sanket', sun: 'Sanket' }},
+        { time: '02:30 - 07:00 (AEST) / 21:00 - 02:30 (IST)', app: 'Frontend', team: 'CRM/SDP/MCO/WSF', days: { mon: 'Anudhav', tue: 'Anudhav', wed: 'Anudhav', thu: 'Anudhav', fri: 'Anudhav', sat: 'Anudhav', sun: 'Anudhav' }},
+        // Digital (2 rows)
+        { time: '7AM to 7PM AEST', app: 'Digital', team: 'Digital', days: { mon: 'Ankur', tue: 'Ankur', wed: 'Ankur', thu: 'Ankur', fri: 'Bien', sat: 'Bien', sun: 'Bien' }},
+        { time: '7PM to 7AM AEST', app: 'Digital', team: 'Digital', days: { mon: 'Ankur', tue: 'Ankur', wed: 'Ankur', thu: 'Ankur', fri: 'Bien', sat: 'Bien', sun: 'Bien' }},
+        // Infra (1 row)
+        { time: 'All Shifts', app: 'Infra', team: 'Infra', days: { mon: 'Rahul More', tue: 'Rahul More', wed: 'Rahul More', thu: 'Rahul More', fri: 'Rahul More', sat: 'Rahul More', sun: 'Rahul More' }},
+        // Backend - INV/AMDD (2 rows)
+        { time: '7AM to 7PM AEST', app: 'Backend', team: 'INV/AMDD', days: { mon: 'Akash', tue: 'Akash', wed: 'Akash', thu: 'Akash', fri: 'Sanket', sat: 'Sanket', sun: 'Sanket' }},
         { time: '7PM to 7AM AEST', app: 'Backend', team: 'INV/AMDD', days: { mon: 'Akash', tue: 'Akash', wed: 'Deb', thu: 'Deb', fri: 'Deb', sat: 'Deb', sun: 'Deb' }},
+        // Backend - CM/AR/CL (2 rows)
         { time: '7AM to 7PM AEST', app: 'Backend', team: 'CM/AR/CL', days: { mon: 'Tanvi', tue: 'Tanvi', wed: 'Tanvi', thu: 'Tanvi', fri: 'Kartik', sat: 'Kartik', sun: 'Kartik' }},
+        { time: '7PM to 7AM AEST', app: 'Backend', team: 'CM/AR/CL', days: { mon: 'Tanvi', tue: 'Tanvi', wed: 'Tanvi', thu: 'Tanvi', fri: 'Kartik', sat: 'Kartik', sun: 'Kartik' }},
+        // Backend - TC/AEM/OFCA (2 rows)
+        { time: '7AM to 7PM AEST', app: 'Backend', team: 'TC/AEM/OFCA', days: { mon: 'Hendry', tue: 'Hendry', wed: 'Vishala', thu: 'Vishala', fri: 'Mariel', sat: 'Mariel', sun: 'Mariel' }},
         { time: '7PM to 7AM AEST', app: 'Backend', team: 'TC/AEM/OFCA', days: { mon: 'Hendry', tue: 'Hendry', wed: 'Vishala', thu: 'Vishala', fri: 'Mariel', sat: 'Mariel', sun: 'Mariel' }},
+        // Backend - ANM (1 row)
         { time: 'All Shifts', app: 'Backend', team: 'ANM', days: { mon: 'Orit', tue: 'Orit', wed: 'Orit', thu: 'Orit', fri: 'Orit', sat: 'Orit', sun: 'Orit' }},
-        { time: '6AM to 6PM AEST', app: 'Backend', team: 'ODS', days: { mon: 'Suraj', tue: 'Suraj', wed: 'Suraj', thu: 'Suraj', fri: 'Rohan', sat: 'Abhishek', sun: 'Abhishek' }},
-        { time: '6PM to 6AM AEST', app: 'Backend', team: 'ODS', days: { mon: 'Suraj', tue: 'Suraj', wed: 'Suraj', thu: 'Suraj', fri: 'Suraj', sat: 'Rohan', sun: 'Rohan' }},
-        { time: '07:00 - 19:00 (AEST) / 02:30 - 13:30 (IST)', app: 'B2B', team: 'CPQ/COM/LCEP', days: { mon: 'Rahul More', tue: 'Rahul More', wed: 'Rahul More', thu: 'Rahul More', fri: 'Rahul More', sat: 'Rahul More', sun: 'Rahul More' }},
-        { time: '19:00 - 07:30 (AEST) / 13:30 - 02:30 (IST)', app: 'B2B', team: 'CPQ/COM', days: { mon: 'Mak', tue: 'Mak', wed: 'Mak', thu: 'Mak', fri: 'Nikhil', sat: 'Bristi', sun: 'Bristi' }},
-        { time: '7PM to 7 AM AEST', app: 'B2B', team: 'MOD', days: { mon: 'Ashwani', tue: 'Ashwani', wed: 'Ashwani', thu: 'Ashwani', fri: 'Vikram', sat: 'Mak', sun: 'Mak' }}
+        // ODS (3 rows)
+        { time: '6AM to 6PM AEST', app: 'ODS', team: 'ODS', days: { mon: 'Suraj', tue: 'Suraj', wed: 'Suraj', thu: 'Rohan', fri: 'Abhishek', sat: 'Abhishek', sun: 'Abhishek' }},
+        { time: '6PM to 6AM AEST', app: 'ODS', team: 'ODS', days: { mon: 'Suraj', tue: 'Suraj', wed: 'Suraj', thu: 'Rohan', fri: 'Abhishek', sat: 'Abhishek', sun: 'Abhishek' }},
+        { time: 'All Shifts', app: 'ODS', team: 'ODS Infra', days: { mon: 'Rahul More', tue: 'Rahul More', wed: 'Rahul More', thu: 'Rahul More', fri: 'Rahul More', sat: 'Rahul More', sun: 'Rahul More' }},
+        // B2B (3 rows - empty)
+        { time: '07:00 - 19:00 (AEST) / 02:30 - 13:30 (IST)', app: 'B2B', team: 'CPQ/COM/LCEP', days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }},
+        { time: '19:00 - 07:30 (AEST) / 13:30 - 02:30 (IST)', app: 'B2B', team: 'CPQ/COM', days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }},
+        { time: '19:00 - 07:30 (AEST) / 13:30 - 02:30 (IST)', app: 'B2B', team: 'CPQ/COM', days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }}
     ];
 }
 
 function saveRosterData() {
-    localStorage.setItem(ROSTER_STORAGE_KEY, JSON.stringify(rosterData));
+    const weekStart = getCurrentWeekStart();
+    const storageKey = `${ROSTER_STORAGE_KEY}_${weekStart}`;
+    localStorage.setItem(storageKey, JSON.stringify(rosterData));
 }
 
 function renderRosterTable() {
@@ -1833,11 +1959,14 @@ function getTeamClass(team) {
     return 'team-default';
 }
 
-function changeRosterWeek(days) {
+async function changeRosterWeek(days) {
     const input = document.getElementById('rosterWeekStart');
     const current = new Date(input.value);
     current.setDate(current.getDate() + days);
     input.value = formatDateForInput(current);
+    
+    // Load data for the new week
+    await loadRosterDataForWeek();
     renderRosterTable();
 }
 
@@ -1865,9 +1994,21 @@ function openRosterModal(index = -1) {
     const modal = document.getElementById('rosterModal');
     const title = document.getElementById('rosterModalTitle');
     const form = document.getElementById('rosterForm');
+    const applyAllCheckbox = document.getElementById('applyToAllDays');
     
     form.reset();
     document.getElementById('rosterEditIndex').value = index;
+    
+    // Reset checkbox and day input states
+    if (applyAllCheckbox) {
+        applyAllCheckbox.checked = false;
+    }
+    const dayInputIds = ['rosterTue', 'rosterWed', 'rosterThu', 'rosterFri', 'rosterSat', 'rosterSun'];
+    dayInputIds.forEach(id => {
+        const input = document.getElementById(id);
+        input.disabled = false;
+        input.style.backgroundColor = '';
+    });
     
     if (index >= 0 && rosterData[index]) {
         const entry = rosterData[index];
@@ -1882,6 +2023,16 @@ function openRosterModal(index = -1) {
         document.getElementById('rosterFri').value = entry.days?.fri || '';
         document.getElementById('rosterSat').value = entry.days?.sat || '';
         document.getElementById('rosterSun').value = entry.days?.sun || '';
+        
+        // Check if all days have the same value - auto-check the checkbox
+        const days = entry.days || {};
+        const allValues = [days.mon, days.tue, days.wed, days.thu, days.fri, days.sat, days.sun].filter(v => v);
+        if (allValues.length > 0 && allValues.every(v => v === allValues[0])) {
+            if (applyAllCheckbox) {
+                applyAllCheckbox.checked = true;
+                toggleApplyToAllDays();
+            }
+        }
     } else {
         title.textContent = 'Add Roster Entry';
     }
@@ -1891,12 +2042,210 @@ function openRosterModal(index = -1) {
 
 function closeRosterModal() {
     document.getElementById('rosterModal').classList.add('hidden');
+    // Reset the apply to all checkbox
+    const applyAllCheckbox = document.getElementById('applyToAllDays');
+    if (applyAllCheckbox) {
+        applyAllCheckbox.checked = false;
+    }
+}
+
+function toggleApplyToAllDays() {
+    const isChecked = document.getElementById('applyToAllDays').checked;
+    const monInput = document.getElementById('rosterMon');
+    const dayInputs = ['rosterTue', 'rosterWed', 'rosterThu', 'rosterFri', 'rosterSat', 'rosterSun'];
+    
+    if (isChecked) {
+        const monValue = monInput.value.trim();
+        if (monValue) {
+            // Apply Monday's value to all other days
+            dayInputs.forEach(id => {
+                document.getElementById(id).value = monValue;
+            });
+        }
+        // Disable other day inputs when checked
+        dayInputs.forEach(id => {
+            document.getElementById(id).disabled = true;
+            document.getElementById(id).style.backgroundColor = '#e2e8f0';
+        });
+        // Add event listener to Monday to sync changes
+        monInput.addEventListener('input', syncMondayToAllDays);
+    } else {
+        // Re-enable all day inputs
+        dayInputs.forEach(id => {
+            document.getElementById(id).disabled = false;
+            document.getElementById(id).style.backgroundColor = '';
+        });
+        // Remove the sync event listener
+        monInput.removeEventListener('input', syncMondayToAllDays);
+    }
+}
+
+function syncMondayToAllDays() {
+    const monValue = document.getElementById('rosterMon').value;
+    const dayInputs = ['rosterTue', 'rosterWed', 'rosterThu', 'rosterFri', 'rosterSat', 'rosterSun'];
+    dayInputs.forEach(id => {
+        document.getElementById(id).value = monValue;
+    });
+}
+
+function clearAllDays() {
+    const dayInputs = ['rosterMon', 'rosterTue', 'rosterWed', 'rosterThu', 'rosterFri', 'rosterSat', 'rosterSun'];
+    dayInputs.forEach(id => {
+        const input = document.getElementById(id);
+        input.value = '';
+        input.disabled = false;
+        input.style.backgroundColor = '';
+    });
+    
+    // Uncheck the "Same person for all days" checkbox
+    const applyAllCheckbox = document.getElementById('applyToAllDays');
+    if (applyAllCheckbox) {
+        applyAllCheckbox.checked = false;
+    }
+}
+
+// Autocomplete functions for roster name inputs
+function getAllContactNames() {
+    const names = new Set();
+    if (contactsData) {
+        for (const [team, contacts] of Object.entries(contactsData)) {
+            for (const contact of contacts) {
+                if (contact.name) {
+                    names.add(contact.name.trim());
+                }
+            }
+        }
+    }
+    return Array.from(names).sort((a, b) => a.localeCompare(b));
+}
+
+function showNameSuggestions(input) {
+    const value = input.value.trim().toLowerCase();
+    const suggestionsId = input.id + '-suggestions';
+    const suggestionsDiv = document.getElementById(suggestionsId);
+    
+    if (!suggestionsDiv) return;
+    
+    if (value.length === 0) {
+        suggestionsDiv.classList.remove('show');
+        suggestionsDiv.innerHTML = '';
+        return;
+    }
+    
+    const allNames = getAllContactNames();
+    const matches = allNames.filter(name => 
+        name.toLowerCase().includes(value)
+    ).slice(0, 8); // Limit to 8 suggestions
+    
+    if (matches.length === 0) {
+        suggestionsDiv.innerHTML = '<div class="autocomplete-no-match">No matching contacts</div>';
+        suggestionsDiv.classList.add('show');
+        return;
+    }
+    
+    suggestionsDiv.innerHTML = matches.map(name => {
+        // Highlight matching text
+        const lowerName = name.toLowerCase();
+        const matchIndex = lowerName.indexOf(value);
+        const before = name.substring(0, matchIndex);
+        const match = name.substring(matchIndex, matchIndex + value.length);
+        const after = name.substring(matchIndex + value.length);
+        return `<div class="autocomplete-item" onmousedown="selectSuggestion('${input.id}', '${name.replace(/'/g, "\\'")}')">${before}<span class="match">${match}</span>${after}</div>`;
+    }).join('');
+    
+    suggestionsDiv.classList.add('show');
+}
+
+function selectSuggestion(inputId, name) {
+    const input = document.getElementById(inputId);
+    input.value = name;
+    
+    const suggestionsDiv = document.getElementById(inputId + '-suggestions');
+    if (suggestionsDiv) {
+        suggestionsDiv.classList.remove('show');
+        suggestionsDiv.innerHTML = '';
+    }
+    
+    // If "Same person for all days" is checked, sync to all days
+    const applyAllCheckbox = document.getElementById('applyToAllDays');
+    if (applyAllCheckbox && applyAllCheckbox.checked && inputId === 'rosterMon') {
+        syncMondayToAllDays();
+    }
+    
+    input.focus();
+}
+
+function hideSuggestionsDelayed(input) {
+    // Delay to allow click on suggestion
+    setTimeout(() => {
+        const suggestionsDiv = document.getElementById(input.id + '-suggestions');
+        if (suggestionsDiv) {
+            suggestionsDiv.classList.remove('show');
+        }
+    }, 200);
+}
+
+function handleSuggestionKeydown(event, input) {
+    const suggestionsDiv = document.getElementById(input.id + '-suggestions');
+    if (!suggestionsDiv || !suggestionsDiv.classList.contains('show')) {
+        return;
+    }
+    
+    const items = suggestionsDiv.querySelectorAll('.autocomplete-item');
+    if (items.length === 0) return;
+    
+    let highlightedIndex = -1;
+    items.forEach((item, index) => {
+        if (item.classList.contains('highlighted')) {
+            highlightedIndex = index;
+        }
+    });
+    
+    switch (event.key) {
+        case 'ArrowDown':
+            event.preventDefault();
+            // Move to next item
+            if (highlightedIndex >= 0) {
+                items[highlightedIndex].classList.remove('highlighted');
+            }
+            highlightedIndex = (highlightedIndex + 1) % items.length;
+            items[highlightedIndex].classList.add('highlighted');
+            items[highlightedIndex].scrollIntoView({ block: 'nearest' });
+            break;
+            
+        case 'ArrowUp':
+            event.preventDefault();
+            // Move to previous item
+            if (highlightedIndex >= 0) {
+                items[highlightedIndex].classList.remove('highlighted');
+            }
+            highlightedIndex = highlightedIndex <= 0 ? items.length - 1 : highlightedIndex - 1;
+            items[highlightedIndex].classList.add('highlighted');
+            items[highlightedIndex].scrollIntoView({ block: 'nearest' });
+            break;
+            
+        case 'Enter':
+            event.preventDefault();
+            // Select highlighted item
+            if (highlightedIndex >= 0) {
+                const selectedItem = items[highlightedIndex];
+                const name = selectedItem.textContent;
+                selectSuggestion(input.id, name);
+            }
+            break;
+            
+        case 'Escape':
+            // Close suggestions
+            suggestionsDiv.classList.remove('show');
+            break;
+    }
 }
 
 async function saveRosterEntry(event) {
     event.preventDefault();
     
     const editIndex = parseInt(document.getElementById('rosterEditIndex').value);
+    const weekStart = getCurrentWeekStart();
     
     const entry = {
         time: document.getElementById('rosterTime').value.trim(),
@@ -1919,10 +2268,10 @@ async function saveRosterEntry(event) {
             await db.updateRosterEntry(id, entry);
             showToast('Roster entry updated');
         } else {
-            await db.saveRosterEntry(entry, rosterData.length);
+            await db.saveRosterEntry(entry, rosterData.length, weekStart);
             showToast('Roster entry added');
         }
-        rosterData = await db.getRoster();
+        rosterData = await db.getRoster(weekStart);
     } else {
         if (editIndex >= 0) {
             rosterData[editIndex] = entry;
@@ -1945,10 +2294,12 @@ function editRosterEntry(index) {
 async function deleteRosterEntry(index) {
     if (!confirm('Are you sure you want to delete this roster entry?')) return;
     
+    const weekStart = getCurrentWeekStart();
+    
     if (useDatabase) {
         const id = rosterData[index]._id;
         await db.deleteRosterEntry(id);
-        rosterData = await db.getRoster();
+        rosterData = await db.getRoster(weekStart);
     } else {
         rosterData.splice(index, 1);
         saveRosterData();
@@ -1958,15 +2309,86 @@ async function deleteRosterEntry(index) {
     showToast('Roster entry deleted');
 }
 
-function exportRosterJSON() {
+function exportRosterExcel() {
     if (!rosterData || rosterData.length === 0) {
         showToast('No roster data to export', 'error');
         return;
     }
     
-    const jsonContent = JSON.stringify(rosterData, null, 2);
-    downloadFile(jsonContent, `OnCall_Roster_${formatDateForInput(new Date())}.json`, 'application/json');
-    showToast('Roster exported');
+    // Check if SheetJS is loaded
+    if (typeof XLSX === 'undefined') {
+        showToast('Excel library not loaded. Please refresh and try again.', 'error');
+        return;
+    }
+    
+    // Get the selected week start date
+    const weekStartInput = document.getElementById('rosterWeekStart');
+    const weekStart = weekStartInput ? new Date(weekStartInput.value) : new Date();
+    
+    // Calculate dates for each day of the week
+    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const dates = [];
+    for (let i = 0; i < 7; i++) {
+        const d = new Date(weekStart);
+        d.setDate(weekStart.getDate() + i);
+        const dateStr = `${d.getDate()}-${d.toLocaleString('default', { month: 'short' })}`;
+        dates.push(`${dayNames[i]} (${dateStr})`);
+    }
+    
+    // Prepare data for Excel with dates in headers
+    const exportData = rosterData.map(r => {
+        const row = {
+            'Time / Shift': r.time,
+            'Application': r.app,
+            'Team': r.team
+        };
+        row[dates[0]] = r.days?.mon || '';
+        row[dates[1]] = r.days?.tue || '';
+        row[dates[2]] = r.days?.wed || '';
+        row[dates[3]] = r.days?.thu || '';
+        row[dates[4]] = r.days?.fri || '';
+        row[dates[5]] = r.days?.sat || '';
+        row[dates[6]] = r.days?.sun || '';
+        return row;
+    });
+    
+    // Create workbook and worksheet
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    
+    // Set column widths
+    ws['!cols'] = [
+        { wch: 35 },  // Time / Shift
+        { wch: 12 },  // Application
+        { wch: 18 },  // Team
+        { wch: 15 },  // Mon
+        { wch: 15 },  // Tue
+        { wch: 15 },  // Wed
+        { wch: 15 },  // Thu
+        { wch: 15 },  // Fri
+        { wch: 15 },  // Sat
+        { wch: 15 }   // Sun
+    ];
+    
+    // Format week range for filename and sheet name
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    const weekRange = `${formatDateForInput(weekStart)}_to_${formatDateForInput(weekEnd)}`;
+    
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(wb, ws, 'On-Call Roster');
+    
+    // Generate filename with week range
+    const filename = `OnCall_Roster_${weekRange}.xlsx`;
+    
+    // Download the file
+    XLSX.writeFile(wb, filename);
+    showToast('Roster exported to Excel');
+}
+
+// Keep old function name for backward compatibility
+function exportRosterJSON() {
+    exportRosterExcel();
 }
 
 // Roster Drag and Drop
@@ -2070,4 +2492,464 @@ async function handleRosterDrop(event) {
     document.querySelectorAll('.roster-table tbody tr').forEach(row => {
         row.classList.remove('drag-over', 'drag-over-bottom');
     });
+}
+
+// ==================== STAFF DIRECTORY ====================
+let staffData = [];
+
+async function initializeStaffDirectory() {
+    if (useDatabase) {
+        const data = await db.getStaffDirectory();
+        if (data && data.length > 0) {
+            staffData = data;
+        }
+    }
+    renderStaffTable();
+}
+
+function renderStaffTable() {
+    const tbody = document.getElementById('staffTableBody');
+    if (!tbody) return;
+    
+    if (!staffData || staffData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:2rem;color:#666;">No staff entries yet. Click "Add Staff" to add name-to-email mappings.</td></tr>';
+        return;
+    }
+    
+    let html = '';
+    staffData.forEach((staff, idx) => {
+        const timezone = staff.timezone || 'AEST';
+        const tzBadgeClass = timezone === 'IST' ? 'tz-ist' : 'tz-aest';
+        html += `
+            <tr>
+                <td>${escapeHtml(staff.name)}</td>
+                <td><a href="mailto:${escapeHtml(staff.email)}">${escapeHtml(staff.email)}</a></td>
+                <td><span class="tz-badge ${tzBadgeClass}">${timezone}</span></td>
+                <td class="actions-col">
+                    <button class="action-btn edit-btn" onclick="editStaffEntry(${idx})" title="Edit">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                    </button>
+                    <button class="action-btn delete-btn" onclick="deleteStaffEntry(${idx})" title="Delete">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        </svg>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    tbody.innerHTML = html;
+}
+
+function openStaffModal(index = -1) {
+    const modal = document.getElementById('staffModal');
+    const title = document.getElementById('staffModalTitle');
+    const form = document.getElementById('staffForm');
+    
+    form.reset();
+    document.getElementById('staffEditIndex').value = index;
+    
+    if (index >= 0 && staffData[index]) {
+        const staff = staffData[index];
+        title.textContent = 'Edit Staff Entry';
+        document.getElementById('staffName').value = staff.name || '';
+        document.getElementById('staffEmail').value = staff.email || '';
+        // Set timezone radio button
+        const tz = staff.timezone || 'AEST';
+        const tzRadio = document.querySelector(`input[name="staffTimezone"][value="${tz}"]`);
+        if (tzRadio) tzRadio.checked = true;
+    } else {
+        title.textContent = 'Add Staff Entry';
+        // Default to AEST
+        document.getElementById('staffTimezoneAEST').checked = true;
+    }
+    
+    modal.classList.remove('hidden');
+}
+
+function closeStaffModal() {
+    document.getElementById('staffModal').classList.add('hidden');
+}
+
+async function saveStaffEntry(event) {
+    event.preventDefault();
+    
+    const editIndex = parseInt(document.getElementById('staffEditIndex').value);
+    const selectedTimezone = document.querySelector('input[name="staffTimezone"]:checked');
+    const entry = {
+        name: document.getElementById('staffName').value.trim(),
+        email: document.getElementById('staffEmail').value.trim(),
+        timezone: selectedTimezone ? selectedTimezone.value : 'AEST'
+    };
+    
+    if (useDatabase) {
+        if (editIndex >= 0 && staffData[editIndex]) {
+            const id = staffData[editIndex]._id;
+            await db.updateStaffEntry(id, entry);
+            showToast('Staff entry updated');
+        } else {
+            await db.saveStaffEntry(entry);
+            showToast('Staff entry added');
+        }
+        staffData = await db.getStaffDirectory();
+    } else {
+        if (editIndex >= 0) {
+            staffData[editIndex] = entry;
+            showToast('Staff entry updated');
+        } else {
+            staffData.push(entry);
+            showToast('Staff entry added');
+        }
+        localStorage.setItem('staff_directory', JSON.stringify(staffData));
+    }
+    
+    renderStaffTable();
+    closeStaffModal();
+}
+
+function editStaffEntry(index) {
+    openStaffModal(index);
+}
+
+async function deleteStaffEntry(index) {
+    if (!confirm('Are you sure you want to delete this staff entry?')) return;
+    
+    if (useDatabase) {
+        const id = staffData[index]._id;
+        await db.deleteStaffEntry(id);
+        staffData = await db.getStaffDirectory();
+    } else {
+        staffData.splice(index, 1);
+        localStorage.setItem('staff_directory', JSON.stringify(staffData));
+    }
+    
+    renderStaffTable();
+    showToast('Staff entry deleted');
+}
+
+function exportStaffExcel() {
+    if (!staffData || staffData.length === 0) {
+        showToast('No staff data to export', 'error');
+        return;
+    }
+    
+    // Check if SheetJS is loaded
+    if (typeof XLSX === 'undefined') {
+        showToast('Excel library not loaded. Please refresh and try again.', 'error');
+        return;
+    }
+    
+    // Prepare data for Excel
+    const exportData = staffData.map(s => ({
+        'Name': s.name,
+        'Email': s.email,
+        'Timezone': s.timezone || 'AEST'
+    }));
+    
+    // Create workbook and worksheet
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    
+    // Set column widths
+    ws['!cols'] = [
+        { wch: 25 },  // Name
+        { wch: 35 },  // Email
+        { wch: 10 }   // Timezone
+    ];
+    
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(wb, ws, 'Staff Directory');
+    
+    // Generate filename with date
+    const filename = `Staff_Directory_${formatDateForInput(new Date())}.xlsx`;
+    
+    // Download the file
+    XLSX.writeFile(wb, filename);
+    showToast('Staff directory exported to Excel');
+}
+
+// Keep old function name for backward compatibility
+function exportStaffJSON() {
+    exportStaffExcel();
+}
+
+function importStaffCSV() {
+    document.getElementById('staffCSVInput').click();
+}
+
+// Import from Contacts Modal
+function getTimezoneFromSite(site) {
+    if (!site) return 'AEST';
+    const siteLower = site.toLowerCase();
+    if (siteLower.includes('india')) {
+        return 'IST';
+    }
+    // Philippines, Australia, or any other site defaults to AEST
+    return 'AEST';
+}
+
+function openImportFromContactsModal() {
+    const modal = document.getElementById('importContactsModal');
+    const list = document.getElementById('importContactsList');
+    
+    // Get all contacts with emails
+    const contactsWithEmail = [];
+    
+    if (contactsData) {
+        for (const [team, contacts] of Object.entries(contactsData)) {
+            contacts.forEach(contact => {
+                if (contact.email && contact.name) {
+                    const timezone = getTimezoneFromSite(contact.site);
+                    contactsWithEmail.push({
+                        name: contact.name,
+                        email: contact.email,
+                        team: team,
+                        area: contact.area || '',
+                        site: contact.site || '',
+                        timezone: timezone
+                    });
+                }
+            });
+        }
+    }
+    
+    if (contactsWithEmail.length === 0) {
+        list.innerHTML = '<div style="padding:2rem;text-align:center;color:#666;">No contacts with email addresses found.<br>Add contacts with emails in the Contact Details tab first.</div>';
+        modal.classList.remove('hidden');
+        return;
+    }
+    
+    // Sort by name
+    contactsWithEmail.sort((a, b) => a.name.localeCompare(b.name));
+    
+    // Check which are already in staff directory
+    const existingNames = staffData.map(s => s.name.toLowerCase());
+    
+    let html = '';
+    contactsWithEmail.forEach((contact, idx) => {
+        const isAlreadyAdded = existingNames.includes(contact.name.toLowerCase());
+        const disabledAttr = isAlreadyAdded ? 'disabled' : '';
+        const itemClass = isAlreadyAdded ? 'import-contact-item already-added' : 'import-contact-item';
+        const tzBadgeClass = contact.timezone === 'IST' ? 'tz-ist' : 'tz-aest';
+        
+        html += `
+            <div class="${itemClass}">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="importContact" value="${idx}" data-name="${escapeHtml(contact.name)}" data-email="${escapeHtml(contact.email)}" data-site="${escapeHtml(contact.site)}" data-timezone="${contact.timezone}" ${disabledAttr}>
+                    <div class="contact-info">
+                        <span class="name">${escapeHtml(contact.name)}</span>
+                        <span class="email">${escapeHtml(contact.email)}</span>
+                        <div class="contact-meta">
+                            <span class="team-badge">${escapeHtml(contact.team.toUpperCase())}${contact.area ? ' - ' + escapeHtml(contact.area) : ''}</span>
+                            <span class="tz-badge ${tzBadgeClass}">${contact.timezone}</span>
+                        </div>
+                    </div>
+                </label>
+            </div>
+        `;
+    });
+    
+    list.innerHTML = html;
+    document.getElementById('selectAllContacts').checked = false;
+    modal.classList.remove('hidden');
+}
+
+function closeImportContactsModal() {
+    document.getElementById('importContactsModal').classList.add('hidden');
+}
+
+function toggleSelectAllContacts() {
+    const selectAll = document.getElementById('selectAllContacts').checked;
+    const checkboxes = document.querySelectorAll('#importContactsList input[type="checkbox"]:not(:disabled)');
+    checkboxes.forEach(cb => cb.checked = selectAll);
+}
+
+async function importSelectedContacts() {
+    const checkboxes = document.querySelectorAll('#importContactsList input[type="checkbox"]:checked');
+    
+    if (checkboxes.length === 0) {
+        showToast('Please select at least one contact to import', 'error');
+        return;
+    }
+    
+    let imported = 0;
+    let aestCount = 0;
+    let istCount = 0;
+    
+    for (const cb of checkboxes) {
+        const name = cb.dataset.name;
+        const email = cb.dataset.email;
+        const timezone = cb.dataset.timezone || 'AEST';
+        
+        if (name && email) {
+            const entry = { name, email, timezone };
+            if (useDatabase) {
+                await db.saveStaffEntry(entry);
+            } else {
+                staffData.push(entry);
+            }
+            imported++;
+            if (timezone === 'IST') istCount++;
+            else aestCount++;
+        }
+    }
+    
+    if (useDatabase) {
+        staffData = await db.getStaffDirectory();
+    } else {
+        localStorage.setItem('staff_directory', JSON.stringify(staffData));
+    }
+    
+    renderStaffTable();
+    closeImportContactsModal();
+    
+    // Show summary
+    let summary = `Imported ${imported} staff: `;
+    if (aestCount > 0) summary += `${aestCount} AEST`;
+    if (aestCount > 0 && istCount > 0) summary += ', ';
+    if (istCount > 0) summary += `${istCount} IST`;
+    showToast(summary);
+}
+
+// ==================== EMAIL NOTIFICATIONS (Supabase Edge Function + Resend) ====================
+
+// Send notifications via Supabase Edge Function
+async function sendTodaysNotifications() {
+    // Check if Edge Function is configured
+    if (typeof isEdgeFunctionConfigured !== 'function' || !isEdgeFunctionConfigured()) {
+        showNotificationModal({
+            error: true,
+            message: 'Supabase is not configured properly.',
+            instructions: [
+                '1. Make sure Supabase URL and Key are set in config.js',
+                '2. Deploy the Edge Function to Supabase',
+                '3. Set the RESEND_API_KEY secret in Supabase'
+            ]
+        });
+        return;
+    }
+    
+    const btn = document.getElementById('sendNotificationsBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span>Sending notifications...</span>';
+    
+    try {
+        // Call the Edge Function
+        const response = await fetch(EDGE_FUNCTION_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'Failed to send notifications');
+        }
+        
+        // Show results
+        showNotificationResults(data.results || []);
+        
+    } catch (error) {
+        showNotificationModal({
+            error: true,
+            message: error.message || 'Failed to send notifications',
+            instructions: [
+                'Check that the Edge Function is deployed',
+                'Verify RESEND_API_KEY is set in Supabase secrets',
+                'Check browser console for more details'
+            ]
+        });
+        console.error('Notification error:', error);
+    } finally {
+        // Reset button
+        btn.disabled = false;
+        btn.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                <polyline points="22,6 12,13 2,6"/>
+            </svg>
+            Send Today's Notifications
+        `;
+    }
+}
+
+function showNotificationModal(config) {
+    const modal = document.getElementById('notificationStatusModal');
+    const content = document.getElementById('notificationStatusContent');
+    
+    let html = '';
+    
+    if (config.error) {
+        html = `
+            <div style="padding: 1rem;">
+                <div style="color: #ef4444; font-weight: 500; margin-bottom: 1rem;">
+                    ⚠️ ${config.message}
+                </div>
+                <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; font-size: 0.9rem;">
+                    <strong>Setup Instructions:</strong>
+                    <ol style="margin: 0.5rem 0 0 1.5rem; padding: 0;">
+                        ${config.instructions.map(i => `<li style="margin: 0.5rem 0;">${i}</li>`).join('')}
+                    </ol>
+                </div>
+            </div>
+        `;
+    }
+    
+    content.innerHTML = html;
+    modal.classList.remove('hidden');
+}
+
+function showNotificationResults(results) {
+    const modal = document.getElementById('notificationStatusModal');
+    const content = document.getElementById('notificationStatusContent');
+    
+    const successCount = results.filter(r => r.success).length;
+    const errorCount = results.filter(r => !r.success).length;
+    
+    let html = `
+        <div class="notification-summary">
+            <div class="summary-stat success">
+                <div class="number">${successCount}</div>
+                <div class="label">Sent</div>
+            </div>
+            <div class="summary-stat error">
+                <div class="number">${errorCount}</div>
+                <div class="label">Failed</div>
+            </div>
+        </div>
+        <div class="notification-results">
+    `;
+    
+    results.forEach(r => {
+        const statusClass = r.success ? 'success' : 'error';
+        const statusIcon = r.success ? '✓' : '✕';
+        const errorMsg = r.error ? `<div style="color:#ef4444;font-size:0.75rem;">${r.error}</div>` : '';
+        
+        html += `
+            <div class="notification-item ${statusClass}">
+                <div class="status-icon">${statusIcon}</div>
+                <div class="details">
+                    <div class="name">${escapeHtml(r.name)}</div>
+                    <div class="email">${r.email ? escapeHtml(r.email) : 'No email found'}</div>
+                    ${errorMsg}
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    
+    content.innerHTML = html;
+    modal.classList.remove('hidden');
+}
+
+function closeNotificationModal() {
+    document.getElementById('notificationStatusModal').classList.add('hidden');
 }
