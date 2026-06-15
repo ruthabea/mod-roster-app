@@ -2241,8 +2241,35 @@ function handleSuggestionKeydown(event, input) {
     }
 }
 
+function submitRosterForm() {
+    const form = document.getElementById('rosterForm');
+    // Validate required fields
+    const time = document.getElementById('rosterTime').value.trim();
+    const app = document.getElementById('rosterApplication').value;
+    const team = document.getElementById('rosterTeam').value.trim();
+    
+    if (!time) {
+        alert('Please enter Time / Shift');
+        document.getElementById('rosterTime').focus();
+        return;
+    }
+    if (!app) {
+        alert('Please select an Application');
+        document.getElementById('rosterApplication').focus();
+        return;
+    }
+    if (!team) {
+        alert('Please enter Team');
+        document.getElementById('rosterTeam').focus();
+        return;
+    }
+    
+    // Call the save function
+    saveRosterEntry();
+}
+
 async function saveRosterEntry(event) {
-    event.preventDefault();
+    if (event) event.preventDefault();
     
     const editIndex = parseInt(document.getElementById('rosterEditIndex').value);
     const weekStart = getCurrentWeekStart();
