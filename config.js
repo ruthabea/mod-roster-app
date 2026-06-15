@@ -158,6 +158,34 @@ const db = {
         const { error } = await supabaseRequest('staff_directory', 'DELETE', null, `?id=eq.${id}`);
         return !error;
     },
+    // MOD Personnel
+    async getModPersonnel() {
+        const { data, error } = await supabaseRequest('mod_personnel', 'GET', null, '?order=sort_order');
+        if (error || !data) return { onsite: [], offshore: [] };
+        const result = { onsite: [], offshore: [] };
+        data.forEach(p => {
+            const person = { name: p.name, email: p.email || '', phone: p.phone || '', _id: p.id };
+            if (p.type === 'onsite') result.onsite.push(person);
+            else if (p.type === 'offshore') result.offshore.push(person);
+        });
+        return result;
+    },
+    async saveModPersonnel(type, entry, sortOrder = 0) {
+        const { data, error } = await supabaseRequest('mod_personnel', 'POST', { 
+            type, name: entry.name, email: entry.email, phone: entry.phone, sort_order: sortOrder 
+        });
+        return error ? null : data[0];
+    },
+    async updateModPersonnel(id, entry) {
+        const { data, error } = await supabaseRequest('mod_personnel', 'PATCH', { 
+            name: entry.name, email: entry.email, phone: entry.phone 
+        }, `?id=eq.${id}`);
+        return error ? null : data;
+    },
+    async deleteModPersonnel(id) {
+        const { error } = await supabaseRequest('mod_personnel', 'DELETE', null, `?id=eq.${id}`);
+        return !error;
+    },
     async getStaffEmailByName(name) {
         const { data, error } = await supabaseRequest('staff_directory', 'GET', null, `?name=ilike.${encodeURIComponent(name)}&limit=1`);
         if (error || !data || data.length === 0) return null;

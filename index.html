@@ -83,21 +83,86 @@
             <!-- MOD Tab 2: Details -->
             <section id="mod-detailsTab" class="tab-content">
                 <div class="card">
-                    <h2>MOD Details</h2>
-                    <p class="help-text">Complete contact information for all Manager On Duty personnel.</p>
-                    
-                    <div id="modNoDetailsMessage" class="no-schedule-message">
-                        <h3>No MOD Data Available</h3>
-                        <p>Generate a schedule first to see MOD details.</p>
+                    <div class="mod-details-header">
+                        <div>
+                            <h2>MOD Details</h2>
+                            <p class="help-text">Complete contact information for all Manager On Duty personnel.</p>
+                        </div>
+                        <div class="mod-details-actions">
+                            <button class="btn btn-secondary" onclick="toggleModDetailsEditMode()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                </svg>
+                                <span id="modDetailsEditModeText">Edit Mode</span>
+                            </button>
+                            <button class="btn btn-primary hidden" id="addModPersonnelBtn" onclick="openModPersonnelModal()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"/>
+                                    <line x1="5" y1="12" x2="19" y2="12"/>
+                                </svg>
+                                Add MOD Personnel
+                            </button>
+                        </div>
                     </div>
                     
-                    <div id="modDetailsContent" class="hidden">
+                    <!-- MOD Personnel Modal -->
+                    <div id="modPersonnelModal" class="modal hidden">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h3 id="modPersonnelModalTitle">Add MOD Personnel</h3>
+                                <button class="modal-close" onclick="closeModPersonnelModal()">&times;</button>
+                            </div>
+                            <form id="modPersonnelForm" onsubmit="saveModPersonnel(event)">
+                                <input type="hidden" id="modPersonnelEditIndex" value="">
+                                <input type="hidden" id="modPersonnelEditType" value="">
+                                
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="modPersonnelType">Type *</label>
+                                        <select id="modPersonnelType" required>
+                                            <option value="">Select Type</option>
+                                            <option value="onsite">Onsite</option>
+                                            <option value="offshore">Offshore</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="modPersonnelName">Name *</label>
+                                        <input type="text" id="modPersonnelName" required placeholder="Full Name">
+                                    </div>
+                                </div>
+                                
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="modPersonnelEmail">Email</label>
+                                        <input type="email" id="modPersonnelEmail" placeholder="email@amdocs.com">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="modPersonnelPhone">Phone</label>
+                                        <input type="text" id="modPersonnelPhone" placeholder="+61 XXX XXX XXX">
+                                    </div>
+                                </div>
+                                
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" onclick="closeModPersonnelModal()">Cancel</button>
+                                    <button type="submit" class="btn btn-primary">Save</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <div id="modDetailsContent">
                         <div class="details-section">
                             <h3><span class="badge onshore">Onsite</span> MOD Personnel</h3>
                             <div class="table-container">
-                                <table class="details-table">
+                                <table class="details-table" id="modOnsiteTable">
                                     <thead>
-                                        <tr><th>Name</th><th>Email</th><th>Phone</th></tr>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Email</th>
+                                            <th>Phone</th>
+                                            <th class="actions-col hidden">Actions</th>
+                                        </tr>
                                     </thead>
                                     <tbody id="modOnsiteDetailsBody"></tbody>
                                 </table>
@@ -106,9 +171,14 @@
                         <div class="details-section">
                             <h3><span class="badge offshore">Offshore</span> MOD Personnel</h3>
                             <div class="table-container">
-                                <table class="details-table">
+                                <table class="details-table" id="modOffshoreTable">
                                     <thead>
-                                        <tr><th>Name</th><th>Email</th><th>Phone</th></tr>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Email</th>
+                                            <th>Phone</th>
+                                            <th class="actions-col hidden">Actions</th>
+                                        </tr>
                                     </thead>
                                     <tbody id="modOffshoreDetailsBody"></tbody>
                                 </table>
@@ -550,7 +620,7 @@
                                 
                                 <div class="modal-footer">
                                     <button type="button" class="btn btn-secondary" onclick="closeRosterModal()">Cancel</button>
-                                    <button type="button" class="btn btn-primary" onclick="submitRosterForm()">Save Entry</button>
+                                    <button type="submit" class="btn btn-primary">Save Entry</button>
                                 </div>
                             </form>
                         </div>

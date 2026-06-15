@@ -44,6 +44,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     loadAllData();
     initializeFileUploads();
     initializeDatePickers();
+    await initializeModPersonnelData();
     await initializeContactsData();
     await initializeEscalationMatrixData();
     await initializeRosterData();
@@ -94,6 +95,195 @@ function showTab(screen, tabName) {
     if (tabName === 'details' || tabName === 'contacts') {
         displayDetails(screen);
     }
+}
+
+// ==================== MOD DETAILS CRUD ====================
+let modDetailsEditMode = false;
+let modPersonnelData = {
+    onsite: [],
+    offshore: []
+};
+
+// Initialize MOD Personnel Data
+async function initializeModPersonnelData() {
+    if (useDatabase) {
+        modPersonnelData = await db.getModPersonnel();
+    } else {
+        const saved = localStorage.getItem('mod_personnel_data');
+        if (saved) {
+            modPersonnelData = JSON.parse(saved);
+        } else {
+            // Default data
+            modPersonnelData = {
+                onsite: [
+                    { name: 'Vikramjeet Saini', email: 'VSAINI@amdocs.com', phone: '+61 434516369' },
+                    { name: 'Sachin Banjara', email: 'SBanjara@amdocs.com', phone: '+61 478 016 068' }
+                ],
+                offshore: [
+                    { name: 'Ashwani Aggarwal', email: 'Ashwani.Aggarwal@ama.optusvendor.com.au', phone: '+61 478 015 240' },
+                    { name: 'Mak John Tadulan', email: 'MakJohn.Tadulan@ama.optusvendor.com.au', phone: '+63 917 847 2898' }
+                ]
+            };
+            saveModPersonnelData();
+        }
+    }
+    renderModPersonnelTables();
+}
+
+function saveModPersonnelData() {
+    if (!useDatabase) {
+        localStorage.setItem('mod_personnel_data', JSON.stringify(modPersonnelData));
+    }
+}
+
+function renderModPersonnelTables() {
+    renderModPersonnelTable('onsite');
+    renderModPersonnelTable('offshore');
+}
+
+function renderModPersonnelTable(type) {
+    const tbody = document.getElementById(`mod${type.charAt(0).toUpperCase() + type.slice(1)}DetailsBody`);
+    if (!tbody) return;
+    
+    const data = modPersonnelData[type] || [];
+    
+    if (data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#64748b;padding:2rem;">No ${type} MOD personnel added yet.</td></tr>`;
+        return;
+    }
+    
+    tbody.innerHTML = data.map((person, index) => `
+        <tr>
+            <td>${escapeHtml(person.name)}</td>
+            <td>${person.email ? `<a href="mailto:${escapeHtml(person.email)}">${escapeHtml(person.email)}</a>` : '-'}</td>
+            <td>${person.phone || '-'}</td>
+            <td class="actions-col">
+                <div class="action-btns">
+                    <button class="btn-icon btn-edit" onclick="editModPersonnel('${type}', ${index})" title="Edit">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                    </button>
+                    <button class="btn-icon btn-delete" onclick="deleteModPersonnel('${type}', ${index})" title="Delete">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function toggleModDetailsEditMode() {
+    modDetailsEditMode = !modDetailsEditMode;
+    
+    const editModeText = document.getElementById('modDetailsEditModeText');
+    const addBtn = document.getElementById('addModPersonnelBtn');
+    const tables = document.querySelectorAll('#mod-detailsTab .details-table');
+    
+    if (modDetailsEditMode) {
+        editModeText.textContent = 'Exit Edit Mode';
+        addBtn.classList.remove('hidden');
+        tables.forEach(t => t.classList.add('edit-mode'));
+    } else {
+        editModeText.textContent = 'Edit Mode';
+        addBtn.classList.add('hidden');
+        tables.forEach(t => t.classList.remove('edit-mode'));
+    }
+}
+
+function openModPersonnelModal(type = '', index = -1) {
+    const modal = document.getElementById('modPersonnelModal');
+    const title = document.getElementById('modPersonnelModalTitle');
+    const form = document.getElementById('modPersonnelForm');
+    
+    form.reset();
+    document.getElementById('modPersonnelEditIndex').value = index;
+    document.getElementById('modPersonnelEditType').value = type;
+    
+    if (index >= 0 && type && modPersonnelData[type] && modPersonnelData[type][index]) {
+        const person = modPersonnelData[type][index];
+        title.textContent = 'Edit MOD Personnel';
+        document.getElementById('modPersonnelType').value = type;
+        document.getElementById('modPersonnelType').disabled = true;
+        document.getElementById('modPersonnelName').value = person.name || '';
+        document.getElementById('modPersonnelEmail').value = person.email || '';
+        document.getElementById('modPersonnelPhone').value = person.phone || '';
+    } else {
+        title.textContent = 'Add MOD Personnel';
+        document.getElementById('modPersonnelType').disabled = false;
+    }
+    
+    modal.classList.remove('hidden');
+}
+
+function closeModPersonnelModal() {
+    document.getElementById('modPersonnelModal').classList.add('hidden');
+    document.getElementById('modPersonnelType').disabled = false;
+}
+
+async function saveModPersonnel(event) {
+    event.preventDefault();
+    
+    const editIndex = parseInt(document.getElementById('modPersonnelEditIndex').value);
+    const editType = document.getElementById('modPersonnelEditType').value;
+    const type = document.getElementById('modPersonnelType').value;
+    
+    const person = {
+        name: document.getElementById('modPersonnelName').value.trim(),
+        email: document.getElementById('modPersonnelEmail').value.trim(),
+        phone: document.getElementById('modPersonnelPhone').value.trim()
+    };
+    
+    if (useDatabase) {
+        if (editIndex >= 0 && editType && modPersonnelData[editType][editIndex]) {
+            const id = modPersonnelData[editType][editIndex]._id;
+            await db.updateModPersonnel(id, person);
+            showToast('MOD personnel updated');
+        } else {
+            await db.saveModPersonnel(type, person, modPersonnelData[type]?.length || 0);
+            showToast('MOD personnel added');
+        }
+        modPersonnelData = await db.getModPersonnel();
+    } else {
+        if (editIndex >= 0 && editType) {
+            modPersonnelData[editType][editIndex] = person;
+            showToast('MOD personnel updated');
+        } else {
+            if (!modPersonnelData[type]) {
+                modPersonnelData[type] = [];
+            }
+            modPersonnelData[type].push(person);
+            showToast('MOD personnel added');
+        }
+        saveModPersonnelData();
+    }
+    
+    renderModPersonnelTables();
+    closeModPersonnelModal();
+}
+
+function editModPersonnel(type, index) {
+    openModPersonnelModal(type, index);
+}
+
+async function deleteModPersonnel(type, index) {
+    if (!confirm('Are you sure you want to delete this MOD personnel?')) return;
+    
+    if (useDatabase) {
+        const id = modPersonnelData[type][index]._id;
+        await db.deleteModPersonnel(id);
+        modPersonnelData = await db.getModPersonnel();
+    } else {
+        modPersonnelData[type].splice(index, 1);
+        saveModPersonnelData();
+    }
+    
+    renderModPersonnelTables();
+    showToast('MOD personnel deleted');
 }
 
 // Load all saved data

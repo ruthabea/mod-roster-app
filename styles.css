@@ -1077,6 +1077,32 @@ header h1 {
     display: block;
 }
 
+/* MOD Details Header */
+.mod-details-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.mod-details-header h2 {
+    margin-bottom: 0.25rem;
+}
+
+.mod-details-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.mod-details-actions .btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
 /* Details Section */
 .details-section {
     margin-bottom: 2rem;
@@ -1126,6 +1152,54 @@ header h1 {
 
 .details-table a:hover {
     text-decoration: underline;
+}
+
+.details-table .actions-col {
+    width: 100px;
+    text-align: center;
+}
+
+.details-table .action-btns {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+}
+
+.details-table .action-btns .btn-icon {
+    padding: 0.35rem;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.details-table .action-btns .btn-edit {
+    background: #dbeafe;
+    color: #2563eb;
+}
+
+.details-table .action-btns .btn-edit:hover {
+    background: #bfdbfe;
+}
+
+.details-table .action-btns .btn-delete {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.details-table .action-btns .btn-delete:hover {
+    background: #fecaca;
+}
+
+.details-table.edit-mode .actions-col {
+    display: table-cell !important;
+}
+
+.details-table:not(.edit-mode) .actions-col {
+    display: none;
 }
 
 /* Escalation Table */
