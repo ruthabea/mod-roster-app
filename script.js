@@ -107,7 +107,19 @@ let modPersonnelData = {
 // Initialize MOD Personnel Data
 async function initializeModPersonnelData() {
     if (useDatabase) {
-        modPersonnelData = await db.getModPersonnel();
+        try {
+            const dbData = await db.getModPersonnel();
+            console.log('MOD Personnel from DB:', dbData);
+            if (dbData && (dbData.onsite.length > 0 || dbData.offshore.length > 0)) {
+                modPersonnelData = dbData;
+            } else {
+                console.log('No MOD personnel in database, using empty state');
+                modPersonnelData = { onsite: [], offshore: [] };
+            }
+        } catch (err) {
+            console.error('Error loading MOD personnel from database:', err);
+            modPersonnelData = { onsite: [], offshore: [] };
+        }
     } else {
         const saved = localStorage.getItem('mod_personnel_data');
         if (saved) {
@@ -239,15 +251,41 @@ async function saveModPersonnel(event) {
     };
     
     if (useDatabase) {
-        if (editIndex >= 0 && editType && modPersonnelData[editType][editIndex]) {
-            const id = modPersonnelData[editType][editIndex]._id;
-            await db.updateModPersonnel(id, person);
-            showToast('MOD personnel updated');
-        } else {
-            await db.saveModPersonnel(type, person, modPersonnelData[type]?.length || 0);
-            showToast('MOD personnel added');
+        try {
+            if (editIndex >= 0 && editType && modPersonnelData[editType] && modPersonnelData[editType][editIndex]) {
+                const id = modPersonnelData[editType][editIndex]._id;
+                await db.updateModPersonnel(id, person);
+                showToast('MOD personnel updated');
+            } else {
+                const result = await db.saveModPersonnel(type, person, modPersonnelData[type]?.length || 0);
+                console.log('Save result:', result);
+                showToast('MOD personnel added');
+            }
+            // Reload data from database
+            const freshData = await db.getModPersonnel();
+            console.log('Fresh data from DB:', freshData);
+            if (freshData && (freshData.onsite.length > 0 || freshData.offshore.length > 0)) {
+                modPersonnelData = freshData;
+            } else {
+                // Fallback: add locally if DB fetch returns empty
+                if (!modPersonnelData[type]) modPersonnelData[type] = [];
+                if (editIndex >= 0 && editType) {
+                    modPersonnelData[editType][editIndex] = person;
+                } else {
+                    modPersonnelData[type].push(person);
+                }
+            }
+        } catch (err) {
+            console.error('Error saving to database:', err);
+            // Fallback to local storage
+            if (!modPersonnelData[type]) modPersonnelData[type] = [];
+            if (editIndex >= 0 && editType) {
+                modPersonnelData[editType][editIndex] = person;
+            } else {
+                modPersonnelData[type].push(person);
+            }
+            showToast('Saved locally (database error)');
         }
-        modPersonnelData = await db.getModPersonnel();
     } else {
         if (editIndex >= 0 && editType) {
             modPersonnelData[editType][editIndex] = person;
@@ -508,15 +546,32 @@ function generateScheduleHTMLFromSaved(screen, data) {
             <tbody>
     `;
     
+    // Helper to get week number of the year
+    function getWeekNumber(date) {
+        const d = new Date(date);
+        d.setHours(0, 0, 0, 0);
+        d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+        const yearStart = new Date(d.getFullYear(), 0, 1);
+        return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    }
+    
     data.entries.forEach((entry, index) => {
+        const entryDate = new Date(entry.date);
+        const weekNum = getWeekNumber(entryDate);
+        const weekClass = `week-bg-${(weekNum % 4) + 1}`;
+        
         const primaryColorClass = entry.primaryName ? getColorClass(screen, entry.primaryName) : '';
         const secondaryColorClass = entry.secondaryName ? getColorClass(screen, entry.secondaryName) : '';
         
+        // Strip email from display (show only name)
+        const primaryDisplayName = (entry.primaryDisplay || '').split('<')[0].trim();
+        const secondaryDisplayName = (entry.secondaryDisplay || '').split('<')[0].trim();
+        
         html += `
-            <tr>
-                <td class="date-cell">${formatDateShort(new Date(entry.date))}</td>
-                <td class="onsite-cell ${primaryColorClass}">${escapeHtml(entry.primaryDisplay || '')}</td>
-                <td class="offshore-cell ${secondaryColorClass}">${escapeHtml(entry.secondaryDisplay || '')}</td>
+            <tr class="${weekClass}">
+                <td class="date-cell">${formatDateShort(entryDate)}</td>
+                <td class="onsite-cell ${primaryColorClass}">${escapeHtml(primaryDisplayName)}</td>
+                <td class="offshore-cell ${secondaryColorClass}">${escapeHtml(secondaryDisplayName)}</td>
                 ${showActions ? `
                 <td class="actions-cell">
                     <div class="action-btns">
@@ -918,9 +973,9 @@ function generateAndSaveSchedule(screen) {
         entries.push({
             date: currentDate.toISOString(),
             primaryName: primaryPerson ? primaryPerson.name : '',
-            primaryDisplay: primaryPerson ? `${primaryPerson.name}${primaryPerson.email ? ` <${primaryPerson.email}>` : ''}` : '',
+            primaryDisplay: primaryPerson ? primaryPerson.name : '',
             secondaryName: secondaryPerson ? secondaryPerson.name : '',
-            secondaryDisplay: secondaryPerson ? `${secondaryPerson.name}${secondaryPerson.email ? ` <${secondaryPerson.email}>` : ''}` : ''
+            secondaryDisplay: secondaryPerson ? secondaryPerson.name : ''
         });
         
         currentDate.setDate(currentDate.getDate() + 1);
@@ -1059,15 +1114,53 @@ function saveEscalationContacts(screen) {
 // Export/Import
 function exportScheduleJSON(screen) {
     const data = appData[screen].savedSchedule;
-    if (!data) {
+    if (!data || !data.entries || data.entries.length === 0) {
         showToast('No schedule to export', 'error');
         return;
     }
     
-    const jsonContent = JSON.stringify(data, null, 2);
-    const fileName = `${screen === 'mod' ? 'MOD' : 'OnCall'}_Schedule_${formatDateForInput(new Date())}.json`;
-    downloadFile(jsonContent, fileName, 'application/json');
-    showToast('Schedule exported');
+    // Prepare data for Excel export
+    const excelData = data.entries.map(entry => {
+        const date = new Date(entry.date);
+        const primaryDisplay = entry.primaryDisplay || '';
+        const secondaryDisplay = entry.secondaryDisplay || '';
+        
+        // Extract name and email
+        const primaryName = primaryDisplay.split('<')[0].trim();
+        const primaryEmail = primaryDisplay.includes('<') ? primaryDisplay.match(/<(.+?)>/)?.[1] || '' : '';
+        const secondaryName = secondaryDisplay.split('<')[0].trim();
+        const secondaryEmail = secondaryDisplay.includes('<') ? secondaryDisplay.match(/<(.+?)>/)?.[1] || '' : '';
+        
+        return {
+            'Date': formatDateShort(date),
+            'Day': date.toLocaleDateString('en-US', { weekday: 'long' }),
+            [screen === 'mod' ? 'Onsite MOD' : 'Primary On-Call']: primaryName,
+            [screen === 'mod' ? 'Onsite Email' : 'Primary Email']: primaryEmail,
+            [screen === 'mod' ? 'Offshore MOD' : 'Secondary On-Call']: secondaryName,
+            [screen === 'mod' ? 'Offshore Email' : 'Secondary Email']: secondaryEmail
+        };
+    });
+    
+    // Create workbook and worksheet
+    const ws = XLSX.utils.json_to_sheet(excelData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Schedule');
+    
+    // Auto-size columns
+    const colWidths = [
+        { wch: 12 },  // Date
+        { wch: 12 },  // Day
+        { wch: 25 },  // Onsite/Primary Name
+        { wch: 30 },  // Onsite/Primary Email
+        { wch: 25 },  // Offshore/Secondary Name
+        { wch: 30 }   // Offshore/Secondary Email
+    ];
+    ws['!cols'] = colWidths;
+    
+    // Generate filename and download
+    const fileName = `${screen === 'mod' ? 'MOD' : 'OnCall'}_Schedule_${formatDateForInput(new Date())}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+    showToast('Schedule exported to Excel');
 }
 
 function importScheduleJSON(event, screen) {

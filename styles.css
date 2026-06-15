@@ -1596,7 +1596,170 @@ header h1 {
     }
 }
 
-/* Escalation Table */
+/* MOD Escalation Card */
+.mod-escalation-card {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    border: 1px solid #e2e8f0;
+    padding: 1.75rem;
+}
+
+.mod-escalation-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 2px solid #e2e8f0;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.mod-escalation-header h2 {
+    margin-bottom: 0.35rem;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.mod-escalation-header .help-text {
+    font-size: 0.875rem;
+    color: #64748b;
+    margin: 0;
+}
+
+.mod-escalation-actions {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.mod-escalation-actions .btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+}
+
+.mod-escalation-container {
+    overflow-x: auto;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* MOD Escalation Table */
+.mod-escalation-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.9rem;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.mod-escalation-table th {
+    background: linear-gradient(135deg, #4f46e5, #6366f1);
+    color: white;
+    font-weight: 600;
+    padding: 1rem 1.25rem;
+    text-align: left;
+    border: none;
+    border-bottom: 2px solid #4338ca;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.03em;
+}
+
+.mod-escalation-table th:first-child {
+    border-top-left-radius: 12px;
+}
+
+.mod-escalation-table th:last-child {
+    border-top-right-radius: 12px;
+}
+
+.mod-escalation-table th.level-col { width: 80px; text-align: center; }
+.mod-escalation-table th.name-col { width: 200px; }
+.mod-escalation-table th.role-col { width: 220px; }
+
+.mod-escalation-table td {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: middle;
+    background: white;
+}
+
+.mod-escalation-table tbody tr:last-child td:first-child {
+    border-bottom-left-radius: 12px;
+}
+
+.mod-escalation-table tbody tr:last-child td:last-child {
+    border-bottom-right-radius: 12px;
+}
+
+.mod-escalation-table tbody tr:hover td {
+    background-color: #f8fafc;
+}
+
+.mod-escalation-table .escalation-level {
+    text-align: center;
+}
+
+.level-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.4rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.level-1-badge {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+}
+
+.level-2-badge {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
+}
+
+.level-3-badge {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+}
+
+.mod-escalation-table .name-cell {
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.mod-escalation-table .role-cell {
+    color: #64748b;
+    font-size: 0.85rem;
+}
+
+.mod-escalation-table .email-cell a {
+    color: #4f46e5;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.mod-escalation-table .email-cell a:hover {
+    text-decoration: underline;
+}
+
+.mod-escalation-table .phone-cell {
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-size: 0.85rem;
+    color: #475569;
+}
+
+/* Legacy escalation table styles */
 .escalation-table {
     width: 100%;
     border-collapse: collapse;
@@ -1617,34 +1780,6 @@ header h1 {
     font-size: 0.85rem;
 }
 
-.escalation-table th:first-child {
-    width: 120px;
-}
-
-.escalation-row td {
-    vertical-align: middle;
-}
-
-.escalation-level {
-    font-weight: 600;
-    white-space: nowrap;
-}
-
-.escalation-row.level-1 .escalation-level {
-    background-color: #c6efce;
-    color: #006100;
-}
-
-.escalation-row.level-2 .escalation-level {
-    background-color: #ffeb9c;
-    color: #9c5700;
-}
-
-.escalation-row.level-3 .escalation-level {
-    background-color: #ffc7ce;
-    color: #9c0006;
-}
-
 .escalation-table a {
     color: var(--primary-color);
     text-decoration: none;
@@ -1656,6 +1791,7 @@ header h1 {
 
 .escalation-edit-section {
     margin-top: 1rem;
+    display: none;
 }
 
 .escalation-edit-form {
@@ -2320,7 +2456,11 @@ header h1 {
 
 /* Schedule Display Card */
 .schedule-display-card {
-    border: 2px solid var(--primary-color);
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    border: 1px solid #e2e8f0;
+    padding: 1.75rem;
 }
 
 .schedule-display-header {
@@ -2328,18 +2468,36 @@ header h1 {
     justify-content: space-between;
     align-items: flex-start;
     margin-bottom: 1.5rem;
-    padding-bottom: 1rem;
-    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 1.25rem;
+    border-bottom: 2px solid #e2e8f0;
     flex-wrap: wrap;
     gap: 1rem;
 }
 
 .schedule-display-header h2 {
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.35rem;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.schedule-display-actions {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.schedule-display-actions .btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
 }
 
 .schedule-meta {
     font-size: 0.875rem;
+    color: #64748b;
     color: var(--text-secondary);
     margin: 0;
 }
@@ -2430,52 +2588,132 @@ header h1 {
     overflow-x: auto;
 }
 
-/* MOD Schedule Table - Excel-like styling */
+/* MOD Schedule Table - Enhanced styling */
 .mod-schedule-table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     font-size: 0.9rem;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 .mod-schedule-table th {
-    background-color: #4472c4;
+    background: linear-gradient(135deg, #4f46e5, #6366f1);
     color: white;
     font-weight: 600;
-    padding: 0.75rem 1rem;
+    padding: 1rem 1.25rem;
     text-align: center;
-    border: 1px solid #2f5496;
+    border: none;
+    border-bottom: 2px solid #4338ca;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.03em;
+}
+
+.mod-schedule-table th:first-child {
+    border-top-left-radius: 12px;
+}
+
+.mod-schedule-table th:last-child {
+    border-top-right-radius: 12px;
 }
 
 .mod-schedule-table th.days-header {
-    background-color: #4472c4;
-    width: 80px;
+    width: 100px;
 }
 
 .mod-schedule-table th.onsite-header {
-    background-color: #4472c4;
+    background: linear-gradient(135deg, #059669, #10b981);
+    border-bottom-color: #047857;
 }
 
 .mod-schedule-table th.offshore-header {
-    background-color: #4472c4;
+    background: linear-gradient(135deg, #0891b2, #06b6d4);
+    border-bottom-color: #0e7490;
 }
 
 .mod-schedule-table td {
-    padding: 0.6rem 0.75rem;
-    border: 1px solid #b4c6e7;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid #e2e8f0;
+    border-right: 1px solid #f1f5f9;
     vertical-align: middle;
+    background: white;
+}
+
+.mod-schedule-table td:last-child {
+    border-right: none;
+}
+
+.mod-schedule-table tbody tr:nth-child(even) td {
+    background: #f8fafc;
+}
+
+.mod-schedule-table tbody tr:hover td {
+    background-color: #eef2ff;
+}
+
+.mod-schedule-table tbody tr:last-child td:first-child {
+    border-bottom-left-radius: 12px;
+}
+
+.mod-schedule-table tbody tr:last-child td:last-child {
+    border-bottom-right-radius: 12px;
 }
 
 .mod-schedule-table td.date-cell {
-    font-weight: 600;
+    font-weight: 700;
     text-align: center;
-    background-color: #d9e2f3;
+    background: linear-gradient(135deg, #f1f5f9, #e2e8f0) !important;
     white-space: nowrap;
+    color: #334155;
+    font-size: 0.85rem;
 }
 
 .mod-schedule-table td.onsite-cell,
 .mod-schedule-table td.offshore-cell {
-    font-size: 0.85rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-align: center;
+}
+
+/* Weekly alternating background colors */
+.mod-schedule-table tr.week-bg-1 td {
+    background-color: #fef3c7 !important; /* Light yellow */
+}
+.mod-schedule-table tr.week-bg-1:hover td {
+    background-color: #fde68a !important;
+}
+
+.mod-schedule-table tr.week-bg-2 td {
+    background-color: #d1fae5 !important; /* Light green */
+}
+.mod-schedule-table tr.week-bg-2:hover td {
+    background-color: #a7f3d0 !important;
+}
+
+.mod-schedule-table tr.week-bg-3 td {
+    background-color: #dbeafe !important; /* Light blue */
+}
+.mod-schedule-table tr.week-bg-3:hover td {
+    background-color: #bfdbfe !important;
+}
+
+.mod-schedule-table tr.week-bg-4 td {
+    background-color: #fce7f3 !important; /* Light pink */
+}
+.mod-schedule-table tr.week-bg-4:hover td {
+    background-color: #fbcfe8 !important;
+}
+
+/* Keep date cell distinct */
+.mod-schedule-table tr.week-bg-1 td.date-cell,
+.mod-schedule-table tr.week-bg-2 td.date-cell,
+.mod-schedule-table tr.week-bg-3 td.date-cell,
+.mod-schedule-table tr.week-bg-4 td.date-cell {
+    background: linear-gradient(135deg, #f1f5f9, #e2e8f0) !important;
 }
 
 /* Color palette for MOD persons - matching the image */
@@ -2601,12 +2839,20 @@ header h1 {
     }
 
     .mod-schedule-table {
-        font-size: 0.75rem;
+        font-size: 0.8rem;
     }
 
     .mod-schedule-table th,
     .mod-schedule-table td {
-        padding: 0.4rem;
+        padding: 0.6rem 0.5rem;
+    }
+    
+    .mod-schedule-table th {
+        font-size: 0.7rem;
+    }
+    
+    .schedule-display-card {
+        padding: 1rem;
     }
 }
 
