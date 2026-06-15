@@ -160,7 +160,7 @@
                     
                     <!-- MOD Personnel Modal -->
                     <div id="modPersonnelModal" class="modal hidden">
-                        <div class="modal-content">
+                        <div class="modal-content mod-personnel-modal-content">
                             <div class="modal-header">
                                 <h3 id="modPersonnelModalTitle">Add MOD Personnel</h3>
                                 <button class="modal-close" onclick="closeModPersonnelModal()">&times;</button>
@@ -169,7 +169,7 @@
                                 <input type="hidden" id="modPersonnelEditIndex" value="">
                                 <input type="hidden" id="modPersonnelEditType" value="">
                                 
-                                <div class="form-row">
+                                <div class="personnel-form-grid">
                                     <div class="form-group">
                                         <label for="modPersonnelType">Type *</label>
                                         <select id="modPersonnelType" required>
@@ -182,9 +182,6 @@
                                         <label for="modPersonnelName">Name *</label>
                                         <input type="text" id="modPersonnelName" required placeholder="Full Name">
                                     </div>
-                                </div>
-                                
-                                <div class="form-row">
                                     <div class="form-group">
                                         <label for="modPersonnelEmail">Email</label>
                                         <input type="email" id="modPersonnelEmail" placeholder="email@amdocs.com">
@@ -1362,7 +1359,7 @@
                     
                     <!-- Escalation Modal -->
                     <div id="escalationModal" class="modal hidden">
-                        <div class="modal-content">
+                        <div class="modal-content escalation-modal-content">
                             <div class="modal-header">
                                 <h3 id="escalationModalTitle">Add Escalation Entry</h3>
                                 <button class="modal-close" onclick="closeEscalationModal()">&times;</button>
@@ -1370,7 +1367,7 @@
                             <form id="escalationForm" onsubmit="saveEscalationEntry(event)">
                                 <input type="hidden" id="escEditIndex" value="">
                                 
-                                <div class="form-row">
+                                <div class="esc-form-grid">
                                     <div class="form-group">
                                         <label for="escApplication">Application *</label>
                                         <select id="escApplication" required>
@@ -1388,9 +1385,6 @@
                                         <label for="escArea">Application Area *</label>
                                         <input type="text" id="escArea" required placeholder="e.g., CRM/SDP/MCO">
                                     </div>
-                                </div>
-                                
-                                <div class="form-row">
                                     <div class="form-group">
                                         <label for="escOnCall">On Call</label>
                                         <input type="text" id="escOnCall" placeholder="e.g., Software Dev">
@@ -1399,9 +1393,6 @@
                                         <label for="escFirst">First Escalation</label>
                                         <input type="text" id="escFirst" placeholder="Name(s)">
                                     </div>
-                                </div>
-                                
-                                <div class="form-row">
                                     <div class="form-group">
                                         <label for="escSecond">Second Escalation</label>
                                         <input type="text" id="escSecond" placeholder="Name(s)">
@@ -1410,9 +1401,6 @@
                                         <label for="escThird">Third Escalation</label>
                                         <input type="text" id="escThird" placeholder="e.g., MOD">
                                     </div>
-                                </div>
-                                
-                                <div class="form-row">
                                     <div class="form-group">
                                         <label for="escFourth">Fourth Escalation</label>
                                         <input type="text" id="escFourth" placeholder="Name">
