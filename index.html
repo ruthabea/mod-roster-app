@@ -55,9 +55,61 @@
                             <p id="modScheduleInfo" class="schedule-meta"></p>
                         </div>
                         <div class="schedule-display-actions">
+                            <button class="btn btn-secondary" onclick="toggleModScheduleEditMode()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                </svg>
+                                <span id="modScheduleEditModeText">Edit Mode</span>
+                            </button>
+                            <button class="btn btn-primary hidden" id="addModScheduleEntryBtn" onclick="openModScheduleModal()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"/>
+                                    <line x1="5" y1="12" x2="19" y2="12"/>
+                                </svg>
+                                Add Entry
+                            </button>
                             <button class="btn btn-outline" onclick="exportScheduleJSON('mod')">Export</button>
                             <button class="btn btn-outline" onclick="window.print()">Print</button>
                             <button class="btn btn-secondary" id="modAdminToggleBtn" onclick="toggleAdminPanel('mod')">Admin Settings</button>
+                        </div>
+                    </div>
+                    
+                    <!-- MOD Schedule Entry Modal -->
+                    <div id="modScheduleModal" class="modal hidden">
+                        <div class="modal-content mod-schedule-modal-content">
+                            <div class="modal-header">
+                                <h3 id="modScheduleModalTitle">Add Schedule Entry</h3>
+                                <button class="modal-close" onclick="closeModScheduleModal()">&times;</button>
+                            </div>
+                            <form id="modScheduleForm" onsubmit="saveModScheduleEntry(event)">
+                                <input type="hidden" id="modScheduleEditIndex" value="">
+                                
+                                <div class="form-group">
+                                    <label for="modScheduleDate">Date *</label>
+                                    <input type="date" id="modScheduleDate" required>
+                                </div>
+                                
+                                <div class="schedule-form-grid">
+                                    <div class="form-group">
+                                        <label for="modScheduleOnsite">Onsite MOD</label>
+                                        <select id="modScheduleOnsite">
+                                            <option value="">Select Onsite MOD</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="modScheduleOffshore">Offshore MOD</label>
+                                        <select id="modScheduleOffshore">
+                                            <option value="">Select Offshore MOD</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" onclick="closeModScheduleModal()">Cancel</button>
+                                    <button type="submit" class="btn btn-primary">Save Entry</button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                     
@@ -71,7 +123,7 @@
                             </svg>
                         </div>
                         <h3>No Schedule Available</h3>
-                        <p>Click "Admin Settings" to upload the MOD list and generate a schedule.</p>
+                        <p>Click "Add Entry" to manually add schedule entries, or use "Admin Settings" to upload MOD list.</p>
                     </div>
                     
                     <div id="modScheduleTableContainer" class="hidden">

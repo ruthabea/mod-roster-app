@@ -1202,6 +1202,135 @@ header h1 {
     display: none;
 }
 
+/* MOD Schedule Table Actions */
+.mod-schedule-table .actions-header {
+    width: 80px;
+    text-align: center;
+}
+
+.mod-schedule-table .actions-cell {
+    text-align: center;
+    padding: 0.5rem;
+}
+
+.mod-schedule-table .action-btns {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+}
+
+.mod-schedule-table .action-btns .btn-icon {
+    padding: 0.35rem;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.mod-schedule-table .action-btns .btn-edit {
+    background: #dbeafe;
+    color: #2563eb;
+}
+
+.mod-schedule-table .action-btns .btn-edit:hover {
+    background: #bfdbfe;
+}
+
+.mod-schedule-table .action-btns .btn-delete {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.mod-schedule-table .action-btns .btn-delete:hover {
+    background: #fecaca;
+}
+
+/* MOD Schedule Modal */
+.mod-schedule-modal-content {
+    max-width: 500px;
+    width: 95%;
+}
+
+.mod-schedule-modal-content .modal-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.mod-schedule-modal-content .modal-header h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+#modScheduleForm {
+    padding: 1.25rem;
+}
+
+#modScheduleForm > .form-group {
+    margin-bottom: 1rem;
+}
+
+.schedule-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+#modScheduleForm .form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+#modScheduleForm .form-group label {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.35rem;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+#modScheduleForm input,
+#modScheduleForm select {
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    background-color: var(--bg-secondary);
+    width: 100%;
+    box-sizing: border-box;
+}
+
+#modScheduleForm input:focus,
+#modScheduleForm select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+#modScheduleForm .modal-footer {
+    padding: 1rem 0 0 0;
+    margin-top: 1rem;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+}
+
+@media (max-width: 480px) {
+    .schedule-form-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .mod-schedule-modal-content {
+        max-width: 100%;
+    }
+}
+
 /* Escalation Table */
 .escalation-table {
     width: 100%;

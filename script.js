@@ -286,6 +286,145 @@ async function deleteModPersonnel(type, index) {
     showToast('MOD personnel deleted');
 }
 
+// ==================== MOD SCHEDULE CRUD ====================
+let modScheduleEditMode = false;
+
+function toggleModScheduleEditMode() {
+    modScheduleEditMode = !modScheduleEditMode;
+    
+    const editModeText = document.getElementById('modScheduleEditModeText');
+    const addBtn = document.getElementById('addModScheduleEntryBtn');
+    const table = document.querySelector('#modScheduleContent .mod-schedule-table');
+    
+    if (modScheduleEditMode) {
+        editModeText.textContent = 'Exit Edit Mode';
+        addBtn.classList.remove('hidden');
+        if (table) table.classList.add('edit-mode');
+        // Re-render with edit buttons
+        displaySavedSchedule('mod');
+    } else {
+        editModeText.textContent = 'Edit Mode';
+        addBtn.classList.add('hidden');
+        if (table) table.classList.remove('edit-mode');
+        displaySavedSchedule('mod');
+    }
+}
+
+function openModScheduleModal(index = -1) {
+    const modal = document.getElementById('modScheduleModal');
+    const title = document.getElementById('modScheduleModalTitle');
+    const form = document.getElementById('modScheduleForm');
+    
+    form.reset();
+    document.getElementById('modScheduleEditIndex').value = index;
+    
+    // Populate dropdowns with MOD personnel
+    populateModScheduleDropdowns();
+    
+    const data = appData.mod.savedSchedule;
+    
+    if (index >= 0 && data && data.entries && data.entries[index]) {
+        const entry = data.entries[index];
+        title.textContent = 'Edit Schedule Entry';
+        document.getElementById('modScheduleDate').value = entry.date;
+        document.getElementById('modScheduleOnsite').value = entry.primaryName || '';
+        document.getElementById('modScheduleOffshore').value = entry.secondaryName || '';
+    } else {
+        title.textContent = 'Add Schedule Entry';
+        // Set default date to today
+        document.getElementById('modScheduleDate').value = formatDateForInput(new Date());
+    }
+    
+    modal.classList.remove('hidden');
+}
+
+function closeModScheduleModal() {
+    document.getElementById('modScheduleModal').classList.add('hidden');
+}
+
+function populateModScheduleDropdowns() {
+    const onsiteSelect = document.getElementById('modScheduleOnsite');
+    const offshoreSelect = document.getElementById('modScheduleOffshore');
+    
+    // Clear existing options
+    onsiteSelect.innerHTML = '<option value="">Select Onsite MOD</option>';
+    offshoreSelect.innerHTML = '<option value="">Select Offshore MOD</option>';
+    
+    // Add onsite MOD options
+    if (modPersonnelData.onsite) {
+        modPersonnelData.onsite.forEach(person => {
+            onsiteSelect.innerHTML += `<option value="${escapeHtml(person.name)}">${escapeHtml(person.name)}</option>`;
+        });
+    }
+    
+    // Add offshore MOD options
+    if (modPersonnelData.offshore) {
+        modPersonnelData.offshore.forEach(person => {
+            offshoreSelect.innerHTML += `<option value="${escapeHtml(person.name)}">${escapeHtml(person.name)}</option>`;
+        });
+    }
+}
+
+function saveModScheduleEntry(event) {
+    event.preventDefault();
+    
+    const editIndex = parseInt(document.getElementById('modScheduleEditIndex').value);
+    const date = document.getElementById('modScheduleDate').value;
+    const onsiteName = document.getElementById('modScheduleOnsite').value;
+    const offshoreName = document.getElementById('modScheduleOffshore').value;
+    
+    // Initialize schedule data if not exists
+    if (!appData.mod.savedSchedule) {
+        appData.mod.savedSchedule = {
+            entries: [],
+            primaryShiftLabel: '7am to 7pm AEST',
+            secondaryShiftLabel: '7pm to 7am AEST',
+            primaryMods: modPersonnelData.onsite || [],
+            secondaryMods: modPersonnelData.offshore || []
+        };
+    }
+    
+    const entry = {
+        date: date,
+        primaryName: onsiteName,
+        primaryDisplay: onsiteName,
+        secondaryName: offshoreName,
+        secondaryDisplay: offshoreName
+    };
+    
+    if (editIndex >= 0) {
+        // Edit existing entry
+        appData.mod.savedSchedule.entries[editIndex] = entry;
+        showToast('Schedule entry updated');
+    } else {
+        // Add new entry
+        appData.mod.savedSchedule.entries.push(entry);
+        // Sort by date
+        appData.mod.savedSchedule.entries.sort((a, b) => new Date(a.date) - new Date(b.date));
+        showToast('Schedule entry added');
+    }
+    
+    // Save to storage
+    saveScheduleToStorage('mod', appData.mod.savedSchedule);
+    displaySavedSchedule('mod');
+    closeModScheduleModal();
+}
+
+function editModScheduleEntry(index) {
+    openModScheduleModal(index);
+}
+
+function deleteModScheduleEntry(index) {
+    if (!confirm('Are you sure you want to delete this schedule entry?')) return;
+    
+    if (appData.mod.savedSchedule && appData.mod.savedSchedule.entries) {
+        appData.mod.savedSchedule.entries.splice(index, 1);
+        saveScheduleToStorage('mod', appData.mod.savedSchedule);
+        displaySavedSchedule('mod');
+        showToast('Schedule entry deleted');
+    }
+}
+
 // Load all saved data
 function loadAllData() {
     ['mod', 'oncall'].forEach(screen => {
@@ -353,19 +492,23 @@ function generateScheduleHTMLFromSaved(screen, data) {
     const primaryHeader = screen === 'mod' ? 'Onsite MOD' : 'Primary On-Call';
     const secondaryHeader = screen === 'mod' ? 'Offshore MOD' : 'Secondary On-Call';
     
+    // Check if MOD schedule edit mode is active
+    const showActions = screen === 'mod' && modScheduleEditMode;
+    
     let html = `
-        <table class="mod-schedule-table">
+        <table class="mod-schedule-table ${showActions ? 'edit-mode' : ''}">
             <thead>
                 <tr>
                     <th class="days-header">Days</th>
                     <th class="onsite-header">${primaryHeader}<br>(${escapeHtml(primaryLabel)})</th>
                     <th class="offshore-header">${secondaryHeader}<br>(${escapeHtml(secondaryLabel)})</th>
+                    ${showActions ? '<th class="actions-header">Actions</th>' : ''}
                 </tr>
             </thead>
             <tbody>
     `;
     
-    data.entries.forEach(entry => {
+    data.entries.forEach((entry, index) => {
         const primaryColorClass = entry.primaryName ? getColorClass(screen, entry.primaryName) : '';
         const secondaryColorClass = entry.secondaryName ? getColorClass(screen, entry.secondaryName) : '';
         
@@ -374,6 +517,24 @@ function generateScheduleHTMLFromSaved(screen, data) {
                 <td class="date-cell">${formatDateShort(new Date(entry.date))}</td>
                 <td class="onsite-cell ${primaryColorClass}">${escapeHtml(entry.primaryDisplay || '')}</td>
                 <td class="offshore-cell ${secondaryColorClass}">${escapeHtml(entry.secondaryDisplay || '')}</td>
+                ${showActions ? `
+                <td class="actions-cell">
+                    <div class="action-btns">
+                        <button class="btn-icon btn-edit" onclick="editModScheduleEntry(${index})" title="Edit">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                            </svg>
+                        </button>
+                        <button class="btn-icon btn-delete" onclick="deleteModScheduleEntry(${index})" title="Delete">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"/>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            </svg>
+                        </button>
+                    </div>
+                </td>
+                ` : ''}
             </tr>
         `;
     });
