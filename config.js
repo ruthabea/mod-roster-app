@@ -11,6 +11,13 @@ function isEdgeFunctionConfigured() {
     return isSupabaseConfigured();
 }
 
+// ==================== Microsoft Teams Webhook Configuration ====================
+const TEAMS_WEBHOOK_URL = 'https://defaultc8eca3ca127646d59d9da0f2a02892.0f.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/80248d0c8ba840349e5490613b5e1bcc/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=O1TuPnDfLKEQrHQJLa43E9Og1xdeUejNbwCdihry1f0';
+
+function isTeamsConfigured() {
+    return TEAMS_WEBHOOK_URL && TEAMS_WEBHOOK_URL.length > 0;
+}
+
 // REST API helper
 async function supabaseRequest(table, method = 'GET', data = null, query = '') {
     const url = `${SUPABASE_URL}/rest/v1/${table}${query}`;
