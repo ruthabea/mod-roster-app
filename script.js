@@ -3288,156 +3288,81 @@ async function importSelectedContacts() {
 
 // ==================== TEAMS NOTIFICATIONS ====================
 
-// Send notification to Microsoft Teams
-async function sendTeamsNotification() {
-    if (typeof isTeamsConfigured !== 'function' || !isTeamsConfigured()) {
-        showToast('Teams webhook not configured', 'error');
+// Send email notifications via Supabase Edge Function (Microsoft Graph API)
+async function sendEmailNotifications() {
+    // Check if Edge Function is configured
+    if (typeof isEdgeFunctionConfigured !== 'function' || !isEdgeFunctionConfigured()) {
+        showNotificationModal({
+            error: true,
+            message: 'Supabase Edge Function is not configured.',
+            instructions: [
+                '1. Make sure Supabase URL and Key are set in config.js',
+                '2. Deploy the Edge Function to Supabase',
+                '3. Set Microsoft Graph API secrets in Supabase'
+            ]
+        });
         return;
     }
     
-    const btn = document.getElementById('sendTeamsNotificationBtn');
+    const btn = document.getElementById('sendEmailNotificationBtn');
     if (btn) {
         btn.disabled = true;
-        btn.innerHTML = '<span>Sending to Teams...</span>';
+        btn.innerHTML = '<span>Sending emails...</span>';
     }
     
     try {
-        // Get today's MOD schedule
-        const today = new Date();
-        const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-        const todayDay = dayNames[today.getDay()];
-        const todayFormatted = today.toLocaleDateString('en-US', { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-        });
-        
-        // Get MOD Schedule data
-        const modData = appData.mod.savedSchedule;
-        let onsiteMod = 'Not scheduled';
-        let offshoreMod = 'Not scheduled';
-        
-        if (modData && modData.entries) {
-            const todayEntry = modData.entries.find(entry => {
-                const entryDate = new Date(entry.date);
-                return entryDate.toDateString() === today.toDateString();
-            });
-            
-            if (todayEntry) {
-                onsiteMod = (todayEntry.primaryDisplay || '').split('<')[0].trim() || 'Not scheduled';
-                offshoreMod = (todayEntry.secondaryDisplay || '').split('<')[0].trim() || 'Not scheduled';
-            }
-        }
-        
-        // Get On-Call Roster data for today
-        const weekStart = getCurrentWeekStart();
-        let onCallInfo = [];
-        
-        if (rosterData && rosterData.length > 0) {
-            rosterData.forEach(row => {
-                const personToday = row.days ? row.days[todayDay] : '';
-                if (personToday && personToday.trim()) {
-                    onCallInfo.push({
-                        app: row.application || '',
-                        team: row.team || '',
-                        person: personToday.trim()
-                    });
-                }
-            });
-        }
-        
-        // Build Teams message (Adaptive Card format for Power Automate)
-        const teamsMessage = {
-            "type": "message",
-            "attachments": [
-                {
-                    "contentType": "application/vnd.microsoft.card.adaptive",
-                    "content": {
-                        "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
-                        "type": "AdaptiveCard",
-                        "version": "1.4",
-                        "body": [
-                            {
-                                "type": "TextBlock",
-                                "size": "Large",
-                                "weight": "Bolder",
-                                "text": "🔔 MOD & On-Call Reminder",
-                                "color": "Accent"
-                            },
-                            {
-                                "type": "TextBlock",
-                                "text": `📅 ${todayFormatted}`,
-                                "wrap": true,
-                                "spacing": "Small"
-                            },
-                            {
-                                "type": "Container",
-                                "style": "emphasis",
-                                "items": [
-                                    {
-                                        "type": "TextBlock",
-                                        "text": "**MOD Schedule**",
-                                        "weight": "Bolder",
-                                        "spacing": "Medium"
-                                    },
-                                    {
-                                        "type": "FactSet",
-                                        "facts": [
-                                            { "title": "👤 Onsite MOD:", "value": onsiteMod },
-                                            { "title": "👤 Offshore MOD:", "value": offshoreMod }
-                                        ]
-                                    }
-                                ]
-                            },
-                            {
-                                "type": "TextBlock",
-                                "text": "Have a great shift! 💪",
-                                "wrap": true,
-                                "spacing": "Medium"
-                            }
-                        ]
-                    }
-                }
-            ]
-        };
-        
-        // Send to Teams webhook
-        const response = await fetch(TEAMS_WEBHOOK_URL, {
+        // Call the Edge Function to send email notifications
+        const response = await fetch(EDGE_FUNCTION_URL, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(teamsMessage)
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+            }
         });
         
-        if (response.ok) {
-            showToast('Notification sent to Teams!', 'success');
-        } else {
-            const errorText = await response.text();
-            console.error('Teams response:', errorText);
-            throw new Error('Failed to send to Teams');
+        const data = await response.json();
+        
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'Failed to send email notifications');
+        }
+        
+        // Show results in modal
+        showNotificationResults(data.results || []);
+        
+        // Also show a toast with summary
+        const summary = data.summary;
+        if (summary) {
+            showToast(`Emails sent: ${summary.sent}/${summary.total} successful`, 'success');
         }
         
     } catch (error) {
-        console.error('Teams notification error:', error);
-        showToast('Failed to send Teams notification', 'error');
+        showNotificationModal({
+            error: true,
+            message: error.message || 'Failed to send email notifications',
+            instructions: [
+                'Check that the Edge Function is deployed',
+                'Verify Microsoft Graph API secrets are set in Supabase',
+                'Check browser console for more details'
+            ]
+        });
+        console.error('Email notification error:', error);
     } finally {
         if (btn) {
             btn.disabled = false;
             btn.innerHTML = `
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                    <polyline points="22,6 12,13 2,6"/>
                 </svg>
-                Send to Teams
+                Send Email Notifications
             `;
         }
     }
 }
 
-// ==================== EMAIL NOTIFICATIONS (Supabase Edge Function + Resend) ====================
+// ==================== EMAIL NOTIFICATIONS (Supabase Edge Function + Microsoft Graph API) ====================
 
-// Send notifications via Supabase Edge Function
+// Send notifications via Supabase Edge Function (legacy function - use sendEmailNotifications instead)
 async function sendTodaysNotifications() {
     // Check if Edge Function is configured
     if (typeof isEdgeFunctionConfigured !== 'function' || !isEdgeFunctionConfigured()) {
@@ -3447,7 +3372,7 @@ async function sendTodaysNotifications() {
             instructions: [
                 '1. Make sure Supabase URL and Key are set in config.js',
                 '2. Deploy the Edge Function to Supabase',
-                '3. Set the RESEND_API_KEY secret in Supabase'
+                '3. Set Microsoft Graph API secrets in Supabase'
             ]
         });
         return;
@@ -3482,7 +3407,7 @@ async function sendTodaysNotifications() {
             message: error.message || 'Failed to send notifications',
             instructions: [
                 'Check that the Edge Function is deployed',
-                'Verify RESEND_API_KEY is set in Supabase secrets',
+                'Verify Microsoft Graph API secrets are set in Supabase',
                 'Check browser console for more details'
             ]
         });
@@ -3495,7 +3420,7 @@ async function sendTodaysNotifications() {
                 <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
                 <polyline points="22,6 12,13 2,6"/>
             </svg>
-            Send Today's Notifications
+            Send Email Notifications
         `;
     }
 }
