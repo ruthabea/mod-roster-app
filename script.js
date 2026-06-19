@@ -3822,7 +3822,7 @@ function filterAcknowledgements() {
     
     // Filter by app
     if (appFilter) {
-        filtered = filtered.filter(ack => ack.app_name === appFilter);
+        filtered = filtered.filter(ack => (ack.app_name || ack.app) === appFilter);
     }
     
     // Filter by status
@@ -3890,7 +3890,7 @@ function renderAcknowledgements(data) {
         return `
             <tr>
                 <td><span class="ack-person-name">${escapeHtml(ack.person_name || '-')}</span></td>
-                <td><span class="ack-app-badge">${escapeHtml(ack.app_name || '-')}</span></td>
+                <td><span class="ack-app-badge">${escapeHtml(ack.app_name || ack.app || '-')}</span></td>
                 <td>${typeBadge}</td>
                 <td>${weekDisplay}</td>
                 <td>${sentTime}</td>
