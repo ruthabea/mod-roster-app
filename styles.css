@@ -3898,3 +3898,358 @@ header h1 {
         display: none;
     }
 }
+
+/* ============================================
+   ACKNOWLEDGEMENT TRACKER STYLES
+   ============================================ */
+
+.ack-tracker-card {
+    padding: 1.5rem;
+}
+
+.ack-tracker-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.ack-tracker-header h2 {
+    margin: 0 0 0.25rem 0;
+    font-size: 1.5rem;
+    color: #1e293b;
+}
+
+.ack-tracker-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+/* Filters */
+.ack-filters {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.ack-filters .filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 150px;
+}
+
+.ack-filters .filter-group label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.ack-filters .filter-group input,
+.ack-filters .filter-group select {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    background: white;
+}
+
+.ack-filters .filter-group input:focus,
+.ack-filters .filter-group select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+/* Stats Cards */
+.ack-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.ack-stat-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem;
+    background: white;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.ack-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.ack-stat-card .stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.ack-stat-card.total .stat-icon {
+    background: #e0e7ff;
+    color: #4f46e5;
+}
+
+.ack-stat-card.acknowledged .stat-icon {
+    background: #dcfce7;
+    color: #16a34a;
+}
+
+.ack-stat-card.pending .stat-icon {
+    background: #fef3c7;
+    color: #d97706;
+}
+
+.ack-stat-card.rate .stat-icon {
+    background: #e0f2fe;
+    color: #0284c7;
+}
+
+.ack-stat-card .stat-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.ack-stat-card .stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #1e293b;
+    line-height: 1.2;
+}
+
+.ack-stat-card .stat-label {
+    font-size: 0.8rem;
+    color: #64748b;
+    margin-top: 0.125rem;
+}
+
+/* Acknowledgement Table */
+.ack-table-container {
+    overflow-x: auto;
+    margin-bottom: 1.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+}
+
+.ack-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.ack-table th {
+    background: #f8fafc;
+    padding: 0.875rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: #475569;
+    border-bottom: 2px solid #e2e8f0;
+    white-space: nowrap;
+}
+
+.ack-table td {
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid #f1f5f9;
+    color: #334155;
+}
+
+.ack-table tbody tr:hover {
+    background: #f8fafc;
+}
+
+.ack-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Status Badges */
+.ack-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.ack-status-badge.acknowledged {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.ack-status-badge.pending {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.ack-status-badge svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* Type Badges */
+.ack-type-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.ack-type-badge.daily {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.ack-type-badge.weekly {
+    background: #f3e8ff;
+    color: #7c3aed;
+}
+
+/* Empty State */
+.ack-empty-state {
+    padding: 3rem 2rem;
+    text-align: center;
+    color: #94a3b8;
+}
+
+.ack-empty-state svg {
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.ack-empty-state p {
+    font-size: 1.1rem;
+    color: #64748b;
+    margin-bottom: 0.5rem;
+}
+
+.ack-empty-state .empty-hint {
+    font-size: 0.875rem;
+    color: #94a3b8;
+}
+
+/* Loading State */
+.ack-loading {
+    padding: 3rem 2rem;
+    text-align: center;
+    color: #64748b;
+}
+
+.ack-loading .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #e2e8f0;
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    margin: 0 auto 1rem;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Info Box */
+.ack-info-box {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1.5rem;
+}
+
+.ack-info-box .info-box-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+
+.ack-info-box .info-box-header svg {
+    color: #4f46e5;
+}
+
+.ack-info-box .info-box-header h4 {
+    margin: 0;
+    font-size: 1rem;
+    color: #1e293b;
+}
+
+/* Person Name Cell */
+.ack-person-name {
+    font-weight: 500;
+    color: #1e293b;
+}
+
+.ack-app-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.ack-app-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    background: #f1f5f9;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #475569;
+}
+
+/* Timestamp styling */
+.ack-timestamp {
+    font-size: 0.8rem;
+    color: #64748b;
+}
+
+.ack-timestamp.na {
+    color: #94a3b8;
+    font-style: italic;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .ack-filters {
+        flex-direction: column;
+    }
+    
+    .ack-filters .filter-group {
+        width: 100%;
+    }
+    
+    .ack-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .ack-table {
+        font-size: 0.8rem;
+    }
+    
+    .ack-table th,
+    .ack-table td {
+        padding: 0.625rem 0.5rem;
+    }
+}

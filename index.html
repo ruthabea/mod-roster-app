@@ -517,6 +517,7 @@
                 <button class="nav-tab" onclick="showTab('oncall', 'contacts')">Contact Details</button>
                 <button class="nav-tab" onclick="showTab('oncall', 'escalation')">Escalation Matrix</button>
                 <button class="nav-tab" onclick="showTab('oncall', 'staffdir')">Staff Directory</button>
+                <button class="nav-tab" onclick="showTab('oncall', 'acktracker')">Acknowledgement Tracker</button>
             </nav>
 
             <!-- On-Call Tab 1: Summary / Roster -->
@@ -1709,6 +1710,181 @@
                                 <polyline points="22,6 12,13 2,6"/>
                             </svg>
                             <span>You can also send notifications manually using the <strong>"Send Today's Notifications"</strong> button in the Roster tab</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- On-Call Tab 6: Acknowledgement Tracker -->
+            <section id="oncall-acktrackerTab" class="tab-content">
+                <div class="card ack-tracker-card">
+                    <div class="ack-tracker-header">
+                        <div>
+                            <h2>Acknowledgement Tracker</h2>
+                            <p class="help-text">Track which on-call personnel have acknowledged their notification emails in real-time.</p>
+                        </div>
+                        <div class="ack-tracker-actions">
+                            <button class="btn btn-primary" onclick="refreshAcknowledgements()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M23 4v6h-6"/>
+                                    <path d="M1 20v-6h6"/>
+                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                                </svg>
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Filters -->
+                    <div class="ack-filters">
+                        <div class="filter-group">
+                            <label for="ackFilterWeek">Week</label>
+                            <input type="week" id="ackFilterWeek" onchange="filterAcknowledgements()">
+                        </div>
+                        <div class="filter-group">
+                            <label for="ackFilterApp">Application</label>
+                            <select id="ackFilterApp" onchange="filterAcknowledgements()">
+                                <option value="">All Applications</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="ackFilterStatus">Status</label>
+                            <select id="ackFilterStatus" onchange="filterAcknowledgements()">
+                                <option value="">All Status</option>
+                                <option value="acknowledged">Acknowledged</option>
+                                <option value="pending">Pending</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="ackFilterType">Type</label>
+                            <select id="ackFilterType" onchange="filterAcknowledgements()">
+                                <option value="">All Types</option>
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Summary Stats -->
+                    <div class="ack-stats">
+                        <div class="ack-stat-card total">
+                            <div class="stat-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                    <circle cx="9" cy="7" r="4"/>
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                                </svg>
+                            </div>
+                            <div class="stat-content">
+                                <span class="stat-value" id="ackStatTotal">0</span>
+                                <span class="stat-label">Total Notifications</span>
+                            </div>
+                        </div>
+                        <div class="ack-stat-card acknowledged">
+                            <div class="stat-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                                    <polyline points="22 4 12 14.01 9 11.01"/>
+                                </svg>
+                            </div>
+                            <div class="stat-content">
+                                <span class="stat-value" id="ackStatAcknowledged">0</span>
+                                <span class="stat-label">Acknowledged</span>
+                            </div>
+                        </div>
+                        <div class="ack-stat-card pending">
+                            <div class="stat-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <polyline points="12 6 12 12 16 14"/>
+                                </svg>
+                            </div>
+                            <div class="stat-content">
+                                <span class="stat-value" id="ackStatPending">0</span>
+                                <span class="stat-label">Pending</span>
+                            </div>
+                        </div>
+                        <div class="ack-stat-card rate">
+                            <div class="stat-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="20" x2="18" y2="10"/>
+                                    <line x1="12" y1="20" x2="12" y2="4"/>
+                                    <line x1="6" y1="20" x2="6" y2="14"/>
+                                </svg>
+                            </div>
+                            <div class="stat-content">
+                                <span class="stat-value" id="ackStatRate">0%</span>
+                                <span class="stat-label">Ack. Rate</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Acknowledgement Table -->
+                    <div class="ack-table-container">
+                        <table class="ack-table" id="ackTable">
+                            <thead>
+                                <tr>
+                                    <th>Person</th>
+                                    <th>Application</th>
+                                    <th>Type</th>
+                                    <th>Week</th>
+                                    <th>Notification Sent</th>
+                                    <th>Status</th>
+                                    <th>Acknowledged At</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ackTableBody">
+                                <!-- Rendered dynamically by JavaScript -->
+                            </tbody>
+                        </table>
+                        <div id="ackEmptyState" class="ack-empty-state hidden">
+                            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                                <line x1="16" y1="2" x2="16" y2="6"/>
+                                <line x1="8" y1="2" x2="8" y2="6"/>
+                                <line x1="3" y1="10" x2="21" y2="10"/>
+                            </svg>
+                            <p>No acknowledgement records found</p>
+                            <span class="empty-hint">Records will appear here when on-call notifications are sent</span>
+                        </div>
+                        <div id="ackLoading" class="ack-loading hidden">
+                            <div class="spinner"></div>
+                            <p>Loading acknowledgements...</p>
+                        </div>
+                    </div>
+
+                    <div class="ack-info-box">
+                        <div class="info-box-header">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 16v-4"/>
+                                <path d="M12 8h.01"/>
+                            </svg>
+                            <h4>How Acknowledgement Tracking Works</h4>
+                        </div>
+                        <div class="info-steps">
+                            <div class="info-step">
+                                <span class="step-num">1</span>
+                                <div class="step-text">
+                                    <strong>Notification Sent</strong>
+                                    <p>When daily/weekly notifications are sent, an acknowledgement record is created</p>
+                                </div>
+                            </div>
+                            <div class="info-step">
+                                <span class="step-num">2</span>
+                                <div class="step-text">
+                                    <strong>Person Acknowledges</strong>
+                                    <p>On-call personnel click "Acknowledge Receipt" button in their email</p>
+                                </div>
+                            </div>
+                            <div class="info-step">
+                                <span class="step-num">3</span>
+                                <div class="step-text">
+                                    <strong>Real-time Update</strong>
+                                    <p>Status updates here immediately - click Refresh to see latest</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -3700,3 +3700,249 @@ function showNotificationResults(results) {
 function closeNotificationModal() {
     document.getElementById('notificationStatusModal').classList.add('hidden');
 }
+
+// ============================================
+// ACKNOWLEDGEMENT TRACKER FUNCTIONS
+// ============================================
+
+let acknowledgementData = [];
+
+async function initializeAcknowledgementTracker() {
+    // Set default week filter to current week
+    const weekInput = document.getElementById('ackFilterWeek');
+    if (weekInput) {
+        const now = new Date();
+        const year = now.getFullYear();
+        const weekNum = getWeekNumber(now);
+        weekInput.value = `${year}-W${String(weekNum).padStart(2, '0')}`;
+    }
+    
+    // Populate app filter from roster data
+    populateAckAppFilter();
+    
+    // Load initial data
+    await refreshAcknowledgements();
+}
+
+function getWeekNumber(date) {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
+
+function populateAckAppFilter() {
+    const select = document.getElementById('ackFilterApp');
+    if (!select) return;
+    
+    // Get unique apps from roster data
+    const apps = new Set();
+    if (rosterData && rosterData.length > 0) {
+        rosterData.forEach(item => {
+            if (item.app) apps.add(item.app);
+        });
+    }
+    
+    // Clear existing options except "All"
+    select.innerHTML = '<option value="">All Applications</option>';
+    
+    // Add app options
+    apps.forEach(app => {
+        const option = document.createElement('option');
+        option.value = app;
+        option.textContent = app;
+        select.appendChild(option);
+    });
+}
+
+async function refreshAcknowledgements() {
+    if (!useDatabase) {
+        showToast('Database not configured', 'error');
+        return;
+    }
+    
+    const tableBody = document.getElementById('ackTableBody');
+    const emptyState = document.getElementById('ackEmptyState');
+    const loading = document.getElementById('ackLoading');
+    
+    // Show loading
+    if (tableBody) tableBody.innerHTML = '';
+    if (emptyState) emptyState.classList.add('hidden');
+    if (loading) loading.classList.remove('hidden');
+    
+    try {
+        // Fetch acknowledgements from Supabase
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/acknowledgements?order=created_at.desc`, {
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to fetch acknowledgements');
+        }
+        
+        acknowledgementData = await response.json();
+        
+        // Apply filters and render
+        filterAcknowledgements();
+        
+    } catch (error) {
+        console.error('Error fetching acknowledgements:', error);
+        showToast('Failed to load acknowledgements', 'error');
+        if (loading) loading.classList.add('hidden');
+        if (emptyState) {
+            emptyState.querySelector('p').textContent = 'Failed to load data';
+            emptyState.classList.remove('hidden');
+        }
+    }
+}
+
+function filterAcknowledgements() {
+    const weekFilter = document.getElementById('ackFilterWeek')?.value || '';
+    const appFilter = document.getElementById('ackFilterApp')?.value || '';
+    const statusFilter = document.getElementById('ackFilterStatus')?.value || '';
+    const typeFilter = document.getElementById('ackFilterType')?.value || '';
+    
+    let filtered = [...acknowledgementData];
+    
+    // Filter by week
+    if (weekFilter) {
+        const [year, week] = weekFilter.split('-W');
+        filtered = filtered.filter(ack => {
+            if (!ack.week_start) return false;
+            const ackDate = new Date(ack.week_start);
+            const ackYear = ackDate.getFullYear();
+            const ackWeek = getWeekNumber(ackDate);
+            return ackYear === parseInt(year) && ackWeek === parseInt(week);
+        });
+    }
+    
+    // Filter by app
+    if (appFilter) {
+        filtered = filtered.filter(ack => ack.app_name === appFilter);
+    }
+    
+    // Filter by status
+    if (statusFilter === 'acknowledged') {
+        filtered = filtered.filter(ack => ack.acknowledged === true);
+    } else if (statusFilter === 'pending') {
+        filtered = filtered.filter(ack => ack.acknowledged !== true);
+    }
+    
+    // Filter by type
+    if (typeFilter) {
+        filtered = filtered.filter(ack => ack.notification_type === typeFilter);
+    }
+    
+    // Render filtered data
+    renderAcknowledgements(filtered);
+    updateAckStats(filtered);
+}
+
+function renderAcknowledgements(data) {
+    const tableBody = document.getElementById('ackTableBody');
+    const emptyState = document.getElementById('ackEmptyState');
+    const loading = document.getElementById('ackLoading');
+    
+    if (loading) loading.classList.add('hidden');
+    
+    if (!data || data.length === 0) {
+        if (tableBody) tableBody.innerHTML = '';
+        if (emptyState) emptyState.classList.remove('hidden');
+        return;
+    }
+    
+    if (emptyState) emptyState.classList.add('hidden');
+    
+    const rows = data.map(ack => {
+        const statusBadge = ack.acknowledged 
+            ? `<span class="ack-status-badge acknowledged">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                    <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                Acknowledged
+               </span>`
+            : `<span class="ack-status-badge pending">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12 6 12 12 16 14"/>
+                </svg>
+                Pending
+               </span>`;
+        
+        const typeBadge = `<span class="ack-type-badge ${ack.notification_type || 'daily'}">${ack.notification_type || 'daily'}</span>`;
+        
+        const weekDisplay = ack.week_start 
+            ? formatWeekDisplay(ack.week_start) 
+            : '-';
+        
+        const sentTime = ack.created_at 
+            ? `<span class="ack-timestamp">${formatDateTime(ack.created_at)}</span>` 
+            : '-';
+        
+        const ackTime = ack.acknowledged_at 
+            ? `<span class="ack-timestamp">${formatDateTime(ack.acknowledged_at)}</span>` 
+            : `<span class="ack-timestamp na">-</span>`;
+        
+        return `
+            <tr>
+                <td><span class="ack-person-name">${escapeHtml(ack.person_name || '-')}</span></td>
+                <td><span class="ack-app-badge">${escapeHtml(ack.app_name || '-')}</span></td>
+                <td>${typeBadge}</td>
+                <td>${weekDisplay}</td>
+                <td>${sentTime}</td>
+                <td>${statusBadge}</td>
+                <td>${ackTime}</td>
+            </tr>
+        `;
+    }).join('');
+    
+    if (tableBody) tableBody.innerHTML = rows;
+}
+
+function formatWeekDisplay(dateStr) {
+    const date = new Date(dateStr);
+    const endDate = new Date(date);
+    endDate.setDate(endDate.getDate() + 6);
+    
+    const options = { month: 'short', day: 'numeric' };
+    return `${date.toLocaleDateString('en-US', options)} - ${endDate.toLocaleDateString('en-US', options)}`;
+}
+
+function formatDateTime(dateStr) {
+    const date = new Date(dateStr);
+    const dateOpts = { month: 'short', day: 'numeric', year: 'numeric' };
+    const timeOpts = { hour: '2-digit', minute: '2-digit' };
+    return `${date.toLocaleDateString('en-US', dateOpts)} ${date.toLocaleTimeString('en-US', timeOpts)}`;
+}
+
+function updateAckStats(data) {
+    const total = data.length;
+    const acknowledged = data.filter(a => a.acknowledged === true).length;
+    const pending = total - acknowledged;
+    const rate = total > 0 ? Math.round((acknowledged / total) * 100) : 0;
+    
+    const totalEl = document.getElementById('ackStatTotal');
+    const ackEl = document.getElementById('ackStatAcknowledged');
+    const pendingEl = document.getElementById('ackStatPending');
+    const rateEl = document.getElementById('ackStatRate');
+    
+    if (totalEl) totalEl.textContent = total;
+    if (ackEl) ackEl.textContent = acknowledged;
+    if (pendingEl) pendingEl.textContent = pending;
+    if (rateEl) rateEl.textContent = `${rate}%`;
+}
+
+// Initialize tracker when tab is shown
+const originalShowTab = showTab;
+showTab = function(screen, tab) {
+    originalShowTab(screen, tab);
+    
+    // Initialize acknowledgement tracker when that tab is shown
+    if (screen === 'oncall' && tab === 'acktracker') {
+        initializeAcknowledgementTracker();
+    }
+};
