@@ -37,6 +37,7 @@ interface StaffEntry {
   name: string;
   email: string;
   timezone?: string;
+  mobile?: string;
 }
 
 interface NotificationResult {
@@ -47,6 +48,7 @@ interface NotificationResult {
   app?: string;
   team?: string;
   time?: string;
+  mobile?: string;
 }
 
 interface Manager {
@@ -242,23 +244,22 @@ serve(async (req) => {
 
     console.log(`Found ${roster?.length || 0} roster entries for week ${weekStartStr}`);
 
-    // Fetch staff directory (filtered by timezone if specified)
-    let staffQuery = supabase.from("staff_directory").select("*");
-    
-    if (targetTimezone) {
-      staffQuery = staffQuery.eq("timezone", targetTimezone);
-    }
-    
-    const { data: staff, error: staffError } = await staffQuery;
+    // Fetch ALL staff directory (don't filter by timezone - we need all emails for lookup)
+    const { data: staff, error: staffError } = await supabase
+      .from("staff_directory")
+      .select("*");
 
     if (staffError) {
       throw new Error(`Failed to fetch staff: ${staffError.message}`);
     }
 
-    // Build staff lookup map (case-insensitive)
-    const staffMap = new Map<string, string>();
+    // Build staff lookup map (case-insensitive) - stores email and mobile
+    const staffMap = new Map<string, { email: string; mobile: string }>();
     (staff as StaffEntry[]).forEach((s) => {
-      staffMap.set(s.name.toLowerCase(), s.email);
+      staffMap.set(s.name.toLowerCase(), { 
+        email: s.email, 
+        mobile: s.mobile || '' 
+      });
     });
 
     // Get today's on-call people (avoid duplicates)
@@ -282,9 +283,9 @@ serve(async (req) => {
     const results: NotificationResult[] = [];
 
     for (const person of onCallPeople) {
-      const email = staffMap.get(person.name.toLowerCase());
+      const staffInfo = staffMap.get(person.name.toLowerCase());
 
-      if (!email) {
+      if (!staffInfo) {
         results.push({
           name: person.name,
           email: null,
@@ -293,9 +294,12 @@ serve(async (req) => {
           app: person.app,
           team: person.team,
           time: person.time,
+          mobile: '',
         });
         continue;
       }
+
+      const { email, mobile } = staffInfo;
 
       // In test mode, skip individual notifications but still build results for manager summary
       if (testMode) {
@@ -306,6 +310,7 @@ serve(async (req) => {
           app: person.app,
           team: person.team,
           time: person.time,
+          mobile: mobile,
         });
         console.log(`[TEST MODE] Skipped individual notification to: ${person.name} (${email})`);
         continue;
@@ -392,6 +397,7 @@ serve(async (req) => {
           app: person.app,
           team: person.team,
           time: person.time,
+          mobile: mobile,
         });
       } catch (emailError) {
         results.push({
@@ -402,6 +408,7 @@ serve(async (req) => {
           app: person.app,
           team: person.team,
           time: person.time,
+          mobile: mobile,
         });
       }
     }
@@ -420,7 +427,7 @@ serve(async (req) => {
     const managerResults: { name: string; email: string; success: boolean; error?: string }[] = [];
 
     if (!managersError && managers && managers.length > 0) {
-      console.log(`Sending summary to ${managers.length} managers`);
+      console.log(`Sending summary to ${managers.length} managers in ONE email`);
 
       // Build the on-call roster table rows
       const rosterTableRows = results.map((r, index) => `
@@ -430,11 +437,17 @@ serve(async (req) => {
           <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #475569;">${r.team || '-'}</td>
           <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 12px; color: #64748b;">${getShiftTimeDisplay(r.time || '')}</td>
           <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 12px; color: #0369a1;"><a href="mailto:${r.email}" style="color: #0369a1; text-decoration: none;">${r.email || 'N/A'}</a></td>
+          <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 12px; color: #475569;">${r.mobile || '-'}</td>
           <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: center; font-size: 13px;">
             ${r.success ? '<span style="color: #059669;">✅ Sent</span>' : '<span style="color: #dc2626;">❌ Failed</span>'}
           </td>
         </tr>
       `).join('');
+      
+      // Build list of all manager emails for single email
+      const managerEmails = (managers as Manager[]).map(m => ({
+        emailAddress: { address: m.email }
+      }));
 
       // Build summary email HTML for managers (email-client compatible - using tables instead of flexbox)
       const managerSubject = `📋 Daily On-Call Summary - ${todayFormatted}`;
@@ -446,6 +459,7 @@ serve(async (req) => {
               <td style="padding: 24px; color: white;">
                 <h2 style="margin: 0; font-size: 24px;">📋 Daily On-Call Summary</h2>
                 <p style="margin: 8px 0 0 0; opacity: 0.9; font-size: 14px;">${todayFormatted} | ${timezoneLabel}</p>
+                <p style="margin: 8px 0 0 0; font-size: 13px;"><a href="https://nickofficialwork.github.io/MOD-On-Call-Roster/" style="color: #fef3c7; text-decoration: underline;">📌 OPTUS/ON-Call Roster</a></p>
               </td>
             </tr>
           </table>
@@ -501,6 +515,7 @@ serve(async (req) => {
                     <th style="padding: 12px 10px; text-align: left; font-weight: 600; color: white; font-size: 13px; border-bottom: 2px solid #3730a3;">Team</th>
                     <th style="padding: 12px 10px; text-align: left; font-weight: 600; color: white; font-size: 13px; border-bottom: 2px solid #3730a3;">Shift Time</th>
                     <th style="padding: 12px 10px; text-align: left; font-weight: 600; color: white; font-size: 13px; border-bottom: 2px solid #3730a3;">Email</th>
+                    <th style="padding: 12px 10px; text-align: left; font-weight: 600; color: white; font-size: 13px; border-bottom: 2px solid #3730a3;">Mobile</th>
                     <th style="padding: 12px 10px; text-align: center; font-weight: 600; color: white; font-size: 13px; border-bottom: 2px solid #3730a3;">Status</th>
                   </tr>
                   ${rosterTableRows}
@@ -539,25 +554,64 @@ serve(async (req) => {
         </div>
       `;
 
-      // Send to each manager
-      for (const manager of managers as Manager[]) {
-        try {
-          await sendEmailViaGraph(accessToken, manager.email, managerSubject, managerHtmlContent);
+      // Send ONE email to ALL managers (with CC to L2 team)
+      try {
+        const sendMailUrl = `https://graph.microsoft.com/v1.0/users/${MS_SENDER_EMAIL}/sendMail`;
+        
+        const emailPayload = {
+          message: {
+            subject: managerSubject,
+            body: {
+              contentType: "HTML",
+              content: managerHtmlContent,
+            },
+            toRecipients: managerEmails, // All managers in one email
+            ccRecipients: [
+              {
+                emailAddress: {
+                  address: "OPTUSL2@amdocs.com"
+                }
+              }
+            ],
+          },
+          saveToSentItems: true,
+        };
+
+        const response = await fetch(sendMailUrl, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(emailPayload),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.text();
+          throw new Error(`Failed to send manager email: ${errorData}`);
+        }
+
+        // Mark all managers as successful
+        for (const manager of managers as Manager[]) {
           managerResults.push({
             name: manager.name,
             email: manager.email,
             success: true,
           });
-          console.log(`Summary sent to manager: ${manager.name} (${manager.email})`);
-        } catch (managerEmailError) {
+        }
+        console.log(`Summary sent to ${managers.length} managers in ONE email: ${(managers as Manager[]).map(m => m.email).join(', ')}`);
+        
+      } catch (managerEmailError) {
+        // Mark all managers as failed
+        for (const manager of managers as Manager[]) {
           managerResults.push({
             name: manager.name,
             email: manager.email,
             success: false,
             error: managerEmailError instanceof Error ? managerEmailError.message : "Unknown error",
           });
-          console.error(`Failed to send summary to manager ${manager.name}:`, managerEmailError);
         }
+        console.error(`Failed to send summary to managers:`, managerEmailError);
       }
     } else {
       console.log("No active managers found or error fetching managers");

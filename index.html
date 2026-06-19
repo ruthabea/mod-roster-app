@@ -1482,6 +1482,14 @@
                                 </svg>
                                 Add Staff
                             </button>
+                            <button class="btn btn-outline" onclick="syncMobileFromContactsManual()" title="Sync mobile numbers from Contact Details">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M23 4v6h-6"/>
+                                    <path d="M1 20v-6h6"/>
+                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                                </svg>
+                                Sync Mobile
+                            </button>
                             <button class="btn btn-outline" onclick="exportStaffJSON()">Export</button>
                         </div>
                     </div>
@@ -1568,6 +1576,20 @@
                                 <div class="staff-form-section">
                                     <div class="section-icon">
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+                                            <line x1="12" y1="18" x2="12.01" y2="18"/>
+                                        </svg>
+                                    </div>
+                                    <div class="section-content">
+                                        <label for="staffMobile">Mobile Number</label>
+                                        <input type="tel" id="staffMobile" placeholder="+61 412 345 678">
+                                        <span class="field-hint">Optional - displayed in manager summary emails</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="staff-form-section">
+                                    <div class="section-icon">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <circle cx="12" cy="12" r="10"/>
                                             <polyline points="12 6 12 12 16 14"/>
                                         </svg>
@@ -1619,6 +1641,7 @@
                                 <tr>
                                     <th>Name</th>
                                     <th>Email</th>
+                                    <th>Mobile</th>
                                     <th>Timezone</th>
                                     <th class="actions-col">Actions</th>
                                 </tr>

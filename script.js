@@ -2975,7 +2975,66 @@ async function initializeStaffDirectory() {
             staffData = data;
         }
     }
+    // Sync mobile numbers from contacts if available
+    await syncMobileFromContacts();
     renderStaffTable();
+}
+
+// Sync mobile numbers from Contact Details to Staff Directory
+async function syncMobileFromContacts() {
+    if (!contactsData || !staffData || staffData.length === 0) return 0;
+    
+    // Build a map of name -> phone from contacts (case-insensitive)
+    const contactPhoneMap = new Map();
+    for (const [team, contacts] of Object.entries(contactsData)) {
+        for (const contact of contacts) {
+            if (contact.name && contact.phone) {
+                contactPhoneMap.set(contact.name.toLowerCase().trim(), contact.phone);
+            }
+        }
+    }
+    
+    // Update staff entries with mobile from contacts if not already set
+    let updatedCount = 0;
+    for (let i = 0; i < staffData.length; i++) {
+        const staff = staffData[i];
+        if (!staff.mobile || staff.mobile === '-' || staff.mobile === '') {
+            const phone = contactPhoneMap.get(staff.name.toLowerCase().trim());
+            if (phone) {
+                staff.mobile = phone;
+                updatedCount++;
+                
+                // Update in database if using database
+                if (useDatabase && staff._id) {
+                    await db.updateStaffEntry(staff._id, {
+                        name: staff.name,
+                        email: staff.email,
+                        mobile: phone,
+                        timezone: staff.timezone
+                    });
+                }
+            }
+        }
+    }
+    
+    // Save to localStorage if not using database
+    if (updatedCount > 0 && !useDatabase) {
+        localStorage.setItem('staff_directory', JSON.stringify(staffData));
+    }
+    
+    return updatedCount;
+}
+
+// Manual sync with user feedback
+async function syncMobileFromContactsManual() {
+    const count = await syncMobileFromContacts();
+    renderStaffTable();
+    
+    if (count > 0) {
+        showToast(`Synced ${count} mobile number${count > 1 ? 's' : ''} from Contact Details`);
+    } else {
+        showToast('No new mobile numbers to sync', 'info');
+    }
 }
 
 function renderStaffTable() {
@@ -2983,7 +3042,7 @@ function renderStaffTable() {
     if (!tbody) return;
     
     if (!staffData || staffData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:2rem;color:#666;">No staff entries yet. Click "Add Staff" to add name-to-email mappings.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:2rem;color:#666;">No staff entries yet. Click "Add Staff" to add name-to-email mappings.</td></tr>';
         return;
     }
     
@@ -2991,10 +3050,12 @@ function renderStaffTable() {
     staffData.forEach((staff, idx) => {
         const timezone = staff.timezone || 'AEST';
         const tzBadgeClass = timezone === 'IST' ? 'tz-ist' : 'tz-aest';
+        const mobile = staff.mobile || '-';
         html += `
             <tr>
                 <td>${escapeHtml(staff.name)}</td>
                 <td><a href="mailto:${escapeHtml(staff.email)}">${escapeHtml(staff.email)}</a></td>
+                <td>${escapeHtml(mobile)}</td>
                 <td><span class="tz-badge ${tzBadgeClass}">${timezone}</span></td>
                 <td class="actions-col">
                     <button class="action-btn edit-btn" onclick="editStaffEntry(${idx})" title="Edit">
@@ -3029,6 +3090,7 @@ function openStaffModal(index = -1) {
         title.textContent = 'Edit Staff Entry';
         document.getElementById('staffName').value = staff.name || '';
         document.getElementById('staffEmail').value = staff.email || '';
+        document.getElementById('staffMobile').value = staff.mobile || '';
         // Set timezone radio button
         const tz = staff.timezone || 'AEST';
         const tzRadio = document.querySelector(`input[name="staffTimezone"][value="${tz}"]`);
@@ -3054,6 +3116,7 @@ async function saveStaffEntry(event) {
     const entry = {
         name: document.getElementById('staffName').value.trim(),
         email: document.getElementById('staffEmail').value.trim(),
+        mobile: document.getElementById('staffMobile').value.trim(),
         timezone: selectedTimezone ? selectedTimezone.value : 'AEST'
     };
     
@@ -3178,6 +3241,7 @@ function openImportFromContactsModal() {
                     contactsWithEmail.push({
                         name: contact.name,
                         email: contact.email,
+                        phone: contact.phone || '',
                         team: team,
                         area: contact.area || '',
                         site: contact.site || '',
@@ -3210,7 +3274,7 @@ function openImportFromContactsModal() {
         html += `
             <div class="${itemClass}">
                 <label class="checkbox-label">
-                    <input type="checkbox" name="importContact" value="${idx}" data-name="${escapeHtml(contact.name)}" data-email="${escapeHtml(contact.email)}" data-site="${escapeHtml(contact.site)}" data-timezone="${contact.timezone}" ${disabledAttr}>
+                    <input type="checkbox" name="importContact" value="${idx}" data-name="${escapeHtml(contact.name)}" data-email="${escapeHtml(contact.email)}" data-phone="${escapeHtml(contact.phone)}" data-site="${escapeHtml(contact.site)}" data-timezone="${contact.timezone}" ${disabledAttr}>
                     <div class="contact-info">
                         <span class="name">${escapeHtml(contact.name)}</span>
                         <span class="email">${escapeHtml(contact.email)}</span>
@@ -3254,10 +3318,11 @@ async function importSelectedContacts() {
     for (const cb of checkboxes) {
         const name = cb.dataset.name;
         const email = cb.dataset.email;
+        const phone = cb.dataset.phone || '';
         const timezone = cb.dataset.timezone || 'AEST';
         
         if (name && email) {
-            const entry = { name, email, timezone };
+            const entry = { name, email, mobile: phone, timezone };
             if (useDatabase) {
                 await db.saveStaffEntry(entry);
             } else {
