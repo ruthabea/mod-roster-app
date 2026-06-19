@@ -5,6 +5,140 @@ const STORAGE_KEYS = {
     l2: { schedule: 'l2_schedule_data' }
 };
 
+// Check for acknowledgement redirect parameters
+function checkAcknowledgementStatus() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const ackStatus = urlParams.get('ack');
+    const personName = urlParams.get('name');
+    const errorMsg = urlParams.get('msg');
+    
+    if (!ackStatus) return;
+    
+    // Remove URL parameters without refreshing
+    window.history.replaceState({}, document.title, window.location.pathname);
+    
+    // Show appropriate modal
+    let title, message, icon, iconColor;
+    
+    switch (ackStatus) {
+        case 'success':
+            title = 'Acknowledgement Confirmed';
+            message = `Thank you${personName ? ', ' + decodeURIComponent(personName) : ''}! Your on-call notification has been successfully acknowledged.`;
+            icon = '✓';
+            iconColor = '#27ae60';
+            break;
+        case 'already':
+            title = 'Already Acknowledged';
+            message = `This on-call notification was already acknowledged${personName ? ' by ' + decodeURIComponent(personName) : ''}.`;
+            icon = '✓';
+            iconColor = '#3498db';
+            break;
+        case 'error':
+            title = 'Acknowledgement Error';
+            const errorMessages = {
+                'config': 'Server configuration error.',
+                'invalid': 'Invalid acknowledgement link.',
+                'notfound': 'Acknowledgement record not found.',
+                'update': 'Failed to update acknowledgement status.',
+                'exception': 'An unexpected error occurred.'
+            };
+            message = errorMessages[errorMsg] || 'An error occurred processing your acknowledgement.';
+            icon = '✗';
+            iconColor = '#e74c3c';
+            break;
+        default:
+            return;
+    }
+    
+    showAcknowledgementModal(title, message, icon, iconColor);
+}
+
+function showAcknowledgementModal(title, message, icon, iconColor) {
+    // Create modal overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'ack-modal-overlay';
+    overlay.innerHTML = `
+        <div class="ack-modal">
+            <div class="ack-modal-icon" style="color: ${iconColor}">${icon}</div>
+            <h2 class="ack-modal-title">${title}</h2>
+            <p class="ack-modal-message">${message}</p>
+            <button class="btn btn-primary ack-modal-btn" onclick="closeAcknowledgementModal()">Close</button>
+        </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    
+    // Add styles if not already added
+    if (!document.getElementById('ack-modal-styles')) {
+        const styles = document.createElement('style');
+        styles.id = 'ack-modal-styles';
+        styles.textContent = `
+            .ack-modal-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.6);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+                animation: fadeIn 0.3s ease;
+            }
+            .ack-modal {
+                background: white;
+                border-radius: 16px;
+                padding: 40px;
+                max-width: 450px;
+                width: 90%;
+                text-align: center;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                animation: slideUp 0.3s ease;
+            }
+            .ack-modal-icon {
+                font-size: 64px;
+                margin-bottom: 20px;
+            }
+            .ack-modal-title {
+                font-size: 24px;
+                font-weight: 600;
+                color: #2c3e50;
+                margin-bottom: 16px;
+            }
+            .ack-modal-message {
+                font-size: 16px;
+                color: #666;
+                line-height: 1.6;
+                margin-bottom: 30px;
+            }
+            .ack-modal-btn {
+                padding: 12px 40px;
+                font-size: 16px;
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+            @keyframes slideUp {
+                from { transform: translateY(20px); opacity: 0; }
+                to { transform: translateY(0); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(styles);
+    }
+    
+    // Close on overlay click
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) closeAcknowledgementModal();
+    });
+}
+
+function closeAcknowledgementModal() {
+    const overlay = document.querySelector('.ack-modal-overlay');
+    if (overlay) overlay.remove();
+}
+
 // Contact details data
 let contactsData = null;
 let contactEditMode = false;
@@ -33,6 +167,9 @@ const useDatabase = typeof isSupabaseConfigured === 'function' && isSupabaseConf
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async function() {
+    // Check for acknowledgement redirect (from email link)
+    checkAcknowledgementStatus();
+    
     // Show loading indicator if using database
     if (useDatabase) {
         console.log('Using Supabase database');
