@@ -28,6 +28,22 @@
             </span>
             On-Call Roster
         </button>
+        <button class="main-screen-tab" onclick="switchMainScreen('vacation')">
+            <span class="main-tab-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 4H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path>
+                    <path d="M16 2v4"></path>
+                    <path d="M8 2v4"></path>
+                    <path d="M3 10h18"></path>
+                    <path d="M8 14h.01"></path>
+                    <path d="M12 14h.01"></path>
+                    <path d="M16 14h.01"></path>
+                    <path d="M8 18h.01"></path>
+                    <path d="M12 18h.01"></path>
+                </svg>
+            </span>
+            Vacation Requests
+        </button>
     </div>
 
     <!-- ==================== MOD SCHEDULE SCREEN ==================== -->
@@ -1971,6 +1987,366 @@
                     </div>
                 </div>
             </section>
+        </div>
+    </div>
+
+    <!-- ==================== VACATION REQUESTS SCREEN ==================== -->
+    <div id="vacationScreen" class="main-screen">
+        <div class="container">
+            <header>
+                <h1>Vacation Requests</h1>
+                <p class="subtitle">Leave Management - Submit and Track Time Off Requests</p>
+            </header>
+
+            <!-- Vacation Navigation Tabs -->
+            <nav class="main-nav">
+                <button class="nav-tab active" onclick="showTab('vacation', 'submit')">Submit Request</button>
+                <button class="nav-tab" onclick="showTab('vacation', 'myrequests')">My Requests</button>
+                <button class="nav-tab" onclick="showTab('vacation', 'approvals')">Pending Approvals</button>
+                <button class="nav-tab" onclick="showTab('vacation', 'calendar')">Leave Calendar</button>
+            </nav>
+
+            <!-- Vacation Tab 1: Submit Request -->
+            <section id="vacation-submitTab" class="tab-content active">
+                <div class="card">
+                    <h2>Submit Leave Request</h2>
+                    <p class="help-text">Fill out the form below to submit a new leave request.</p>
+                    
+                    <form id="vacationRequestForm" class="vacation-form" onsubmit="submitVacationRequest(event)">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="vacationEmployeeName">Employee Name *</label>
+                                <select id="vacationEmployeeName" required>
+                                    <option value="">Select your name</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="vacationEmployeeEmail">Email *</label>
+                                <input type="email" id="vacationEmployeeEmail" required readonly placeholder="Auto-filled based on selection">
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="vacationManagerEmail">Manager Email *</label>
+                                <select id="vacationManagerEmail" required>
+                                    <option value="">Select your manager</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="vacationManagerEmailCustom">Or enter manually</label>
+                                <input type="email" id="vacationManagerEmailCustom" placeholder="manager@amdocs.com">
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="vacationStartDate">Start Date *</label>
+                                <input type="date" id="vacationStartDate" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="vacationEndDate">End Date *</label>
+                                <input type="date" id="vacationEndDate" required>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="vacationType">Leave Type *</label>
+                                <select id="vacationType" required>
+                                    <option value="Vacation">Vacation</option>
+                                    <option value="Sick Leave">Sick Leave</option>
+                                    <option value="Personal Leave">Personal Leave</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="vacationDuration">Duration</label>
+                                <input type="text" id="vacationDuration" readonly placeholder="Auto-calculated">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="vacationReason">Reason (Optional)</label>
+                            <textarea id="vacationReason" rows="3" placeholder="Provide additional details if needed..."></textarea>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="reset" class="btn btn-secondary">Clear Form</button>
+                            <button type="submit" class="btn btn-primary">Submit Request</button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Vacation Tab 2: My Requests -->
+            <section id="vacation-myrequestsTab" class="tab-content">
+                <div class="card">
+                    <div class="vacation-header">
+                        <div>
+                            <h2>My Leave Requests</h2>
+                            <p class="help-text">View and track the status of your submitted leave requests.</p>
+                        </div>
+                        <div class="vacation-filters">
+                            <select id="myRequestsFilterStatus" onchange="filterMyVacationRequests()">
+                                <option value="">All Status</option>
+                                <option value="pending">Pending</option>
+                                <option value="approved">Approved</option>
+                                <option value="rejected">Rejected</option>
+                                <option value="cancelled">Cancelled</option>
+                            </select>
+                            <select id="myRequestsFilterName" onchange="filterMyVacationRequests()">
+                                <option value="">Select Your Name</option>
+                            </select>
+                            <button class="btn btn-secondary" onclick="loadMyVacationRequests()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M23 4v6h-6"></path>
+                                    <path d="M1 20v-6h6"></path>
+                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                                </svg>
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="myVacationRequestsLoading" class="loading-state">
+                        <div class="spinner"></div>
+                        <p>Loading your requests...</p>
+                    </div>
+                    
+                    <div id="myVacationRequestsEmpty" class="empty-state hidden">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                            <polyline points="10 9 9 9 8 9"></polyline>
+                        </svg>
+                        <h3>No Requests Found</h3>
+                        <p>You haven't submitted any leave requests yet.</p>
+                    </div>
+                    
+                    <div id="myVacationRequestsTable" class="vacation-table-container hidden">
+                        <table class="data-table vacation-requests-table">
+                            <thead>
+                                <tr>
+                                    <th>Submitted</th>
+                                    <th>Type</th>
+                                    <th>Start Date</th>
+                                    <th>End Date</th>
+                                    <th>Duration</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="myVacationRequestsBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Vacation Tab 3: Pending Approvals (Manager View) -->
+            <section id="vacation-approvalsTab" class="tab-content">
+                <div class="card">
+                    <div class="vacation-header">
+                        <div>
+                            <h2>Pending Approvals</h2>
+                            <p class="help-text">Review and approve/reject leave requests from team members.</p>
+                        </div>
+                        <div class="vacation-filters">
+                            <select id="approvalsFilterStatus" onchange="filterPendingApprovals()">
+                                <option value="pending">Pending</option>
+                                <option value="">All Status</option>
+                                <option value="approved">Approved</option>
+                                <option value="rejected">Rejected</option>
+                            </select>
+                            <button class="btn btn-secondary" onclick="loadPendingApprovals()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M23 4v6h-6"></path>
+                                    <path d="M1 20v-6h6"></path>
+                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                                </svg>
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Approval Stats -->
+                    <div class="vacation-stats">
+                        <div class="vacation-stat-card pending">
+                            <div class="stat-number" id="pendingApprovalsCount">0</div>
+                            <div class="stat-label">Pending</div>
+                        </div>
+                        <div class="vacation-stat-card approved">
+                            <div class="stat-number" id="approvedRequestsCount">0</div>
+                            <div class="stat-label">Approved (This Month)</div>
+                        </div>
+                        <div class="vacation-stat-card rejected">
+                            <div class="stat-number" id="rejectedRequestsCount">0</div>
+                            <div class="stat-label">Rejected (This Month)</div>
+                        </div>
+                    </div>
+                    
+                    <div id="pendingApprovalsLoading" class="loading-state">
+                        <div class="spinner"></div>
+                        <p>Loading pending approvals...</p>
+                    </div>
+                    
+                    <div id="pendingApprovalsEmpty" class="empty-state hidden">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                        </svg>
+                        <h3>All Caught Up!</h3>
+                        <p>There are no pending leave requests to review.</p>
+                    </div>
+                    
+                    <div id="pendingApprovalsTable" class="vacation-table-container hidden">
+                        <table class="data-table vacation-requests-table">
+                            <thead>
+                                <tr>
+                                    <th>Employee</th>
+                                    <th>Type</th>
+                                    <th>Dates</th>
+                                    <th>Duration</th>
+                                    <th>Reason</th>
+                                    <th>Submitted</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pendingApprovalsBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Vacation Tab 4: Leave Calendar -->
+            <section id="vacation-calendarTab" class="tab-content">
+                <div class="card">
+                    <div class="vacation-header">
+                        <div>
+                            <h2>Leave Calendar</h2>
+                            <p class="help-text">View approved leaves across the team.</p>
+                        </div>
+                        <div class="vacation-filters">
+                            <input type="month" id="calendarMonth" onchange="loadLeaveCalendar()">
+                            <button class="btn btn-secondary" onclick="loadLeaveCalendar()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M23 4v6h-6"></path>
+                                    <path d="M1 20v-6h6"></path>
+                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                                </svg>
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="leaveCalendarLoading" class="loading-state">
+                        <div class="spinner"></div>
+                        <p>Loading leave calendar...</p>
+                    </div>
+                    
+                    <div id="leaveCalendarEmpty" class="empty-state hidden">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="16" y1="2" x2="16" y2="6"></line>
+                            <line x1="8" y1="2" x2="8" y2="6"></line>
+                            <line x1="3" y1="10" x2="21" y2="10"></line>
+                        </svg>
+                        <h3>No Approved Leaves</h3>
+                        <p>There are no approved leaves for this period.</p>
+                    </div>
+                    
+                    <div id="leaveCalendarContent" class="leave-calendar-container hidden">
+                        <div id="leaveCalendarGrid" class="leave-calendar-grid"></div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Vacation Request Modal (for viewing details / approval) -->
+    <div id="vacationDetailModal" class="modal hidden">
+        <div class="modal-content vacation-detail-modal">
+            <div class="modal-header">
+                <h3>Leave Request Details</h3>
+                <button class="modal-close" onclick="closeVacationDetailModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="vacation-detail-grid">
+                    <div class="detail-item">
+                        <label>Employee</label>
+                        <span id="detailEmployeeName"></span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Email</label>
+                        <span id="detailEmployeeEmail"></span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Leave Type</label>
+                        <span id="detailLeaveType"></span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Status</label>
+                        <span id="detailStatus"></span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Start Date</label>
+                        <span id="detailStartDate"></span>
+                    </div>
+                    <div class="detail-item">
+                        <label>End Date</label>
+                        <span id="detailEndDate"></span>
+                    </div>
+                    <div class="detail-item full-width">
+                        <label>Reason</label>
+                        <span id="detailReason"></span>
+                    </div>
+                    <div class="detail-item full-width">
+                        <label>Submitted</label>
+                        <span id="detailSubmitted"></span>
+                    </div>
+                </div>
+                
+                <div id="approvalSection" class="approval-section hidden">
+                    <h4>Manager Action</h4>
+                    <div class="form-group">
+                        <label for="managerNotes">Notes (Optional)</label>
+                        <textarea id="managerNotes" rows="2" placeholder="Add notes for the employee..."></textarea>
+                    </div>
+                    <div class="approval-actions">
+                        <button class="btn btn-danger" onclick="rejectVacationRequest()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                            Reject
+                        </button>
+                        <button class="btn btn-success" onclick="approveVacationRequest()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                            Approve
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Notification Modal -->
+    <div id="notificationModal" class="notification-modal hidden">
+        <div class="notification-modal-overlay"></div>
+        <div class="notification-modal-content">
+            <div class="notification-modal-icon" id="notificationModalIcon">
+                <!-- Icon will be inserted by JS -->
+            </div>
+            <h3 class="notification-modal-title" id="notificationModalTitle">Notification</h3>
+            <p class="notification-modal-message" id="notificationModalMessage">Message goes here</p>
+            <div class="notification-modal-actions">
+                <button class="btn btn-primary notification-modal-btn" id="notificationModalOkBtn" onclick="closeNotificationModal()">OK</button>
+                <button class="btn btn-secondary notification-modal-btn hidden" id="notificationModalCancelBtn" onclick="closeNotificationModal(false)">Cancel</button>
+            </div>
         </div>
     </div>
 

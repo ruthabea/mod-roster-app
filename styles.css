@@ -4253,3 +4253,699 @@ header h1 {
         padding: 0.625rem 0.5rem;
     }
 }
+
+/* ========================================
+   VACATION REQUESTS STYLES
+   ======================================== */
+
+/* Vacation Form Styles */
+.vacation-form {
+    max-width: 800px;
+}
+
+.vacation-form .form-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+}
+
+.vacation-form .form-group {
+    margin-bottom: 1.25rem;
+}
+
+.vacation-form .form-group label {
+    display: block;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.vacation-form .form-group input,
+.vacation-form .form-group select,
+.vacation-form .form-group textarea {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    transition: all 0.2s ease;
+}
+
+.vacation-form .form-group input:focus,
+.vacation-form .form-group select:focus,
+.vacation-form .form-group textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.vacation-form .form-group input[readonly] {
+    background-color: #f9fafb;
+    color: #6b7280;
+}
+
+.vacation-form textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.vacation-form .form-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+/* Vacation Header */
+.vacation-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.vacation-header h2 {
+    margin: 0 0 0.25rem 0;
+}
+
+.vacation-filters {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.vacation-filters select,
+.vacation-filters input {
+    padding: 0.5rem 1rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    min-width: 150px;
+}
+
+/* Vacation Stats Cards */
+.vacation-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.vacation-stat-card {
+    padding: 1.25rem;
+    border-radius: 12px;
+    text-align: center;
+}
+
+.vacation-stat-card.pending {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border: 1px solid #f59e0b;
+}
+
+.vacation-stat-card.approved {
+    background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+    border: 1px solid #10b981;
+}
+
+.vacation-stat-card.rejected {
+    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+    border: 1px solid #ef4444;
+}
+
+.vacation-stat-card .stat-number {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.vacation-stat-card .stat-label {
+    font-size: 0.85rem;
+    color: #475569;
+    margin-top: 0.25rem;
+}
+
+/* Vacation Table */
+.vacation-table-container {
+    overflow-x: auto;
+}
+
+.vacation-requests-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.vacation-requests-table th,
+.vacation-requests-table td {
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.vacation-requests-table th {
+    background: #f8fafc;
+    font-weight: 600;
+    color: #374151;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.vacation-requests-table tr:hover {
+    background: #f9fafb;
+}
+
+/* Status Badges */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.status-badge.pending {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.status-badge.approved {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.status-badge.rejected {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.status-badge.cancelled {
+    background: #e5e7eb;
+    color: #4b5563;
+}
+
+/* Leave Type Badges */
+.leave-type-badge {
+    display: inline-block;
+    padding: 0.25rem 0.625rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.leave-type-badge.vacation {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.leave-type-badge.sick {
+    background: #fce7f3;
+    color: #9d174d;
+}
+
+.leave-type-badge.personal {
+    background: #ede9fe;
+    color: #5b21b6;
+}
+
+.leave-type-badge.other {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+/* Action Buttons in Table */
+.vacation-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.vacation-actions .btn-icon {
+    padding: 0.5rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vacation-actions .btn-view {
+    background: #eff6ff;
+    color: #2563eb;
+}
+
+.vacation-actions .btn-view:hover {
+    background: #dbeafe;
+}
+
+.vacation-actions .btn-cancel {
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+.vacation-actions .btn-cancel:hover {
+    background: #fee2e2;
+}
+
+.vacation-actions .btn-approve {
+    background: #f0fdf4;
+    color: #16a34a;
+}
+
+.vacation-actions .btn-approve:hover {
+    background: #dcfce7;
+}
+
+.vacation-actions .btn-reject {
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+.vacation-actions .btn-reject:hover {
+    background: #fee2e2;
+}
+
+/* Vacation Detail Modal */
+.vacation-detail-modal {
+    max-width: 600px;
+}
+
+.vacation-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.vacation-detail-grid .detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+
+.vacation-detail-grid .detail-item.full-width {
+    grid-column: span 2;
+}
+
+.vacation-detail-grid .detail-item label {
+    font-size: 0.8rem;
+    color: #6b7280;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.vacation-detail-grid .detail-item span {
+    font-size: 1rem;
+    color: #1e293b;
+}
+
+/* Approval Section */
+.approval-section {
+    padding-top: 1.5rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+.approval-section h4 {
+    margin: 0 0 1rem 0;
+    color: #374151;
+}
+
+.approval-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.btn-success {
+    background: #10b981;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+.btn-success:hover {
+    background: #059669;
+}
+
+.btn-danger {
+    background: #ef4444;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+.btn-danger:hover {
+    background: #dc2626;
+}
+
+/* Leave Calendar */
+.leave-calendar-container {
+    margin-top: 1.5rem;
+}
+
+.leave-calendar-grid {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.leave-calendar-item {
+    display: flex;
+    align-items: center;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 8px;
+    border-left: 4px solid var(--primary-color);
+}
+
+.leave-calendar-item .calendar-dates {
+    min-width: 150px;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.leave-calendar-item .calendar-employee {
+    flex: 1;
+    font-weight: 500;
+    color: #374151;
+}
+
+.leave-calendar-item .calendar-type {
+    margin-left: auto;
+}
+
+/* Empty States */
+.empty-state {
+    text-align: center;
+    padding: 3rem 2rem;
+    color: #64748b;
+}
+
+.empty-state svg {
+    color: #cbd5e1;
+    margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+    margin: 0 0 0.5rem 0;
+    color: #475569;
+}
+
+.empty-state p {
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+/* Loading States */
+.loading-state {
+    text-align: center;
+    padding: 3rem 2rem;
+}
+
+.loading-state .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #e2e8f0;
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    margin: 0 auto 1rem;
+    animation: spin 0.8s linear infinite;
+}
+
+/* Vacation Responsive */
+@media (max-width: 768px) {
+    .vacation-form .form-row {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+    
+    .vacation-stats {
+        grid-template-columns: 1fr;
+    }
+    
+    .vacation-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .vacation-filters {
+        flex-direction: column;
+    }
+    
+    .vacation-filters select,
+    .vacation-filters input {
+        width: 100%;
+    }
+    
+    .vacation-detail-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .vacation-detail-grid .detail-item.full-width {
+        grid-column: span 1;
+    }
+    
+    .approval-actions {
+        flex-direction: column;
+    }
+}
+
+/* ========================================
+   VACATION CONFLICT INDICATOR (ROSTER)
+   ======================================== */
+
+.vacation-conflict {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%) !important;
+    position: relative;
+}
+
+.vacation-conflict::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border: 2px solid #f59e0b;
+    pointer-events: none;
+}
+
+.conflict-icon {
+    display: inline-block;
+    margin-left: 4px;
+    font-size: 0.85rem;
+    cursor: help;
+    vertical-align: middle;
+}
+
+/* Tooltip styling for conflict cells */
+.day-cell.vacation-conflict {
+    cursor: help;
+}
+
+/* Conflict warning in modal/form */
+.conflict-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border: 1px solid #f59e0b;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.conflict-warning svg {
+    flex-shrink: 0;
+    color: #b45309;
+}
+
+.conflict-warning-content {
+    flex: 1;
+}
+
+.conflict-warning-content h4 {
+    margin: 0 0 0.25rem 0;
+    color: #92400e;
+    font-size: 0.95rem;
+}
+
+.conflict-warning-content p {
+    margin: 0;
+    color: #b45309;
+    font-size: 0.875rem;
+}
+
+.conflict-warning-list {
+    margin: 0.5rem 0 0 0;
+    padding-left: 1.25rem;
+    font-size: 0.85rem;
+    color: #92400e;
+}
+
+.conflict-warning-list li {
+    margin-bottom: 0.25rem;
+}
+
+/* ========================================
+   CUSTOM NOTIFICATION MODAL
+   ======================================== */
+
+.notification-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 1;
+    transition: opacity 0.2s ease;
+}
+
+.notification-modal.hidden {
+    display: none;
+    opacity: 0;
+}
+
+.notification-modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+}
+
+.notification-modal-content {
+    position: relative;
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 2rem;
+    max-width: 420px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: notificationSlideIn 0.3s ease;
+}
+
+@keyframes notificationSlideIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9) translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.notification-modal-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 1rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.notification-modal-icon.success {
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    color: #155724;
+}
+
+.notification-modal-icon.error {
+    background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+    color: #721c24;
+}
+
+.notification-modal-icon.warning {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%);
+    color: #856404;
+}
+
+.notification-modal-icon.info {
+    background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+    color: #0c5460;
+}
+
+.notification-modal-icon svg {
+    width: 32px;
+    height: 32px;
+}
+
+.notification-modal-title {
+    margin: 0 0 0.75rem 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1a1a2e;
+}
+
+.notification-modal-message {
+    margin: 0 0 1.5rem 0;
+    font-size: 0.95rem;
+    color: #4a5568;
+    line-height: 1.6;
+}
+
+.notification-modal-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+}
+
+.notification-modal-btn {
+    min-width: 100px;
+    padding: 0.75rem 1.5rem;
+    font-size: 0.95rem;
+    font-weight: 500;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.notification-modal-btn.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #ffffff;
+    border: none;
+}
+
+.notification-modal-btn.btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.notification-modal-btn.btn-secondary {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+}
+
+.notification-modal-btn.btn-secondary:hover {
+    background: #e2e8f0;
+}

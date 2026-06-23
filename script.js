@@ -1370,6 +1370,130 @@ function showToast(message, type = 'success') {
     setTimeout(() => toast.remove(), 3000);
 }
 
+// ==================== NOTIFICATION MODAL ====================
+
+// Modal icons by type
+const notificationIcons = {
+    success: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"></polyline>
+    </svg>`,
+    error: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="15" y1="9" x2="9" y2="15"></line>
+        <line x1="9" y1="9" x2="15" y2="15"></line>
+    </svg>`,
+    warning: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+        <line x1="12" y1="9" x2="12" y2="13"></line>
+        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+    </svg>`,
+    info: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="16" x2="12" y2="12"></line>
+        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+    </svg>`
+};
+
+// Notification modal callback
+let notificationModalCallback = null;
+
+// Show notification modal (replacement for alert)
+function showNotificationModal(message, options = {}) {
+    const {
+        type = 'success',
+        title = getDefaultTitle(type),
+        showCancel = false,
+        okText = 'OK',
+        cancelText = 'Cancel',
+        onOk = null,
+        onCancel = null
+    } = options;
+    
+    const modal = document.getElementById('notificationModal');
+    const iconEl = document.getElementById('notificationModalIcon');
+    const titleEl = document.getElementById('notificationModalTitle');
+    const messageEl = document.getElementById('notificationModalMessage');
+    const okBtn = document.getElementById('notificationModalOkBtn');
+    const cancelBtn = document.getElementById('notificationModalCancelBtn');
+    
+    if (!modal) return;
+    
+    // Set icon and type
+    iconEl.innerHTML = notificationIcons[type] || notificationIcons.info;
+    iconEl.className = `notification-modal-icon ${type}`;
+    
+    // Set content
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+    okBtn.textContent = okText;
+    cancelBtn.textContent = cancelText;
+    
+    // Show/hide cancel button
+    if (showCancel) {
+        cancelBtn.classList.remove('hidden');
+    } else {
+        cancelBtn.classList.add('hidden');
+    }
+    
+    // Store callbacks
+    notificationModalCallback = { onOk, onCancel };
+    
+    // Show modal
+    modal.classList.remove('hidden');
+    
+    // Focus OK button
+    okBtn.focus();
+}
+
+// Get default title based on type
+function getDefaultTitle(type) {
+    switch (type) {
+        case 'success': return 'Success';
+        case 'error': return 'Error';
+        case 'warning': return 'Warning';
+        case 'info': return 'Information';
+        default: return 'Notification';
+    }
+}
+
+// Close notification modal
+function closeNotificationModal(confirmed = true) {
+    const modal = document.getElementById('notificationModal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+    
+    // Execute callback
+    if (notificationModalCallback) {
+        if (confirmed && notificationModalCallback.onOk) {
+            notificationModalCallback.onOk();
+        } else if (!confirmed && notificationModalCallback.onCancel) {
+            notificationModalCallback.onCancel();
+        }
+        notificationModalCallback = null;
+    }
+}
+
+// Helper function for success messages
+function showSuccessModal(message, title = 'Success') {
+    showNotificationModal(message, { type: 'success', title });
+}
+
+// Helper function for error messages
+function showErrorModal(message, title = 'Error') {
+    showNotificationModal(message, { type: 'error', title });
+}
+
+// Helper function for warning messages
+function showWarningModal(message, title = 'Warning') {
+    showNotificationModal(message, { type: 'warning', title });
+}
+
+// Helper function for info messages
+function showInfoModal(message, title = 'Information') {
+    showNotificationModal(message, { type: 'info', title });
+}
+
 // ==================== L2 ROSTER FUNCTIONS ====================
 
 // Initialize L2 upload
@@ -2439,13 +2563,106 @@ function saveRosterData() {
     localStorage.setItem(storageKey, JSON.stringify(rosterData));
 }
 
-function renderRosterTable() {
+// Vacation conflict cache for current week
+let vacationConflictCache = {};
+let vacationConflictCacheWeek = null;
+
+// Fetch approved vacations for a given week
+async function fetchVacationConflicts(weekStartStr) {
+    if (vacationConflictCacheWeek === weekStartStr && Object.keys(vacationConflictCache).length > 0) {
+        return vacationConflictCache;
+    }
+    
+    try {
+        const weekStart = new Date(weekStartStr);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        
+        const startStr = weekStart.toISOString().split('T')[0];
+        const endStr = weekEnd.toISOString().split('T')[0];
+        
+        const response = await fetch(
+            `${SUPABASE_URL}/rest/v1/vacation_requests?select=employee_name,start_date,end_date&status=eq.approved&start_date=lte.${endStr}&end_date=gte.${startStr}`,
+            {
+                headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                }
+            }
+        );
+        
+        if (!response.ok) {
+            console.error('Failed to fetch vacation conflicts');
+            return {};
+        }
+        
+        const vacations = await response.json();
+        
+        // Build conflict map: { "personname_lowercase": { dates: [date1, date2, ...] } }
+        const conflicts = {};
+        const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+        
+        vacations.forEach(v => {
+            const personKey = v.employee_name.toLowerCase().trim();
+            const vacStart = new Date(v.start_date);
+            const vacEnd = new Date(v.end_date);
+            
+            if (!conflicts[personKey]) {
+                conflicts[personKey] = { days: [], startDate: v.start_date, endDate: v.end_date };
+            }
+            
+            // Check which days of this week overlap with the vacation
+            for (let i = 0; i < 7; i++) {
+                const dayDate = new Date(weekStart);
+                dayDate.setDate(dayDate.getDate() + i);
+                
+                if (dayDate >= vacStart && dayDate <= vacEnd) {
+                    if (!conflicts[personKey].days.includes(days[i])) {
+                        conflicts[personKey].days.push(days[i]);
+                    }
+                }
+            }
+        });
+        
+        vacationConflictCache = conflicts;
+        vacationConflictCacheWeek = weekStartStr;
+        
+        return conflicts;
+    } catch (error) {
+        console.error('Error fetching vacation conflicts:', error);
+        return {};
+    }
+}
+
+// Check if a person has vacation conflict for a specific day
+function hasVacationConflict(personName, dayKey, conflicts) {
+    if (!personName || !conflicts) return false;
+    const personKey = personName.toLowerCase().trim();
+    return conflicts[personKey] && conflicts[personKey].days.includes(dayKey);
+}
+
+// Get vacation tooltip for a person
+function getVacationTooltip(personName, conflicts) {
+    if (!personName || !conflicts) return '';
+    const personKey = personName.toLowerCase().trim();
+    const conflict = conflicts[personKey];
+    if (!conflict) return '';
+    
+    const startDate = new Date(conflict.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const endDate = new Date(conflict.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `On approved leave: ${startDate} - ${endDate}`;
+}
+
+async function renderRosterTable() {
     const thead = document.getElementById('rosterTableHead');
     const tbody = document.getElementById('rosterTableBody');
     if (!thead || !tbody || !rosterData) return;
     
     const weekStart = document.getElementById('rosterWeekStart').value;
     const startDate = weekStart ? new Date(weekStart) : new Date();
+    
+    // Fetch vacation conflicts for this week
+    const vacationConflicts = await fetchVacationConflicts(weekStart);
     
     // Generate header with dates
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -2484,7 +2701,13 @@ function renderRosterTable() {
         const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
         dayKeys.forEach((key, i) => {
             const isWeekend = i >= 5;
-            bodyHtml += `<td class="day-cell ${isWeekend ? 'weekend' : ''}">${escapeHtml(row.days[key] || '')}</td>`;
+            const personName = row.days[key] || '';
+            const hasConflict = hasVacationConflict(personName, key, vacationConflicts);
+            const conflictClass = hasConflict ? 'vacation-conflict' : '';
+            const conflictTooltip = hasConflict ? getVacationTooltip(personName, vacationConflicts) : '';
+            const conflictIcon = hasConflict ? '<span class="conflict-icon" title="' + conflictTooltip + '">⚠️</span>' : '';
+            
+            bodyHtml += `<td class="day-cell ${isWeekend ? 'weekend' : ''} ${conflictClass}" ${conflictTooltip ? 'title="' + conflictTooltip + '"' : ''}>${escapeHtml(personName)}${conflictIcon}</td>`;
         });
         
         bodyHtml += `<td class="actions-col">
@@ -2870,6 +3093,16 @@ async function saveRosterEntry(event) {
         }
     };
     
+    // Check for vacation conflicts before saving
+    const conflicts = await checkRosterVacationConflicts(entry, weekStart);
+    if (conflicts.length > 0) {
+        const conflictList = conflicts.map(c => `• ${c.name} on ${c.day} (Leave: ${c.leaveDate})`).join('\n');
+        const proceed = confirm(
+            `⚠️ Vacation Conflict Warning\n\nThe following people have approved leave during this period:\n\n${conflictList}\n\nDo you want to proceed anyway?`
+        );
+        if (!proceed) return;
+    }
+    
     if (useDatabase) {
         if (editIndex >= 0 && rosterData[editIndex]) {
             const id = rosterData[editIndex]._id;
@@ -2893,6 +3126,26 @@ async function saveRosterEntry(event) {
     
     renderRosterTable();
     closeRosterModal();
+}
+
+// Check for vacation conflicts in a roster entry
+async function checkRosterVacationConflicts(entry, weekStartStr) {
+    const vacationConflicts = await fetchVacationConflicts(weekStartStr);
+    const conflicts = [];
+    const dayNames = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
+    
+    Object.entries(entry.days).forEach(([dayKey, personName]) => {
+        if (personName && hasVacationConflict(personName, dayKey, vacationConflicts)) {
+            const tooltip = getVacationTooltip(personName, vacationConflicts);
+            conflicts.push({
+                name: personName,
+                day: dayNames[dayKey],
+                leaveDate: tooltip.replace('On approved leave: ', '')
+            });
+        }
+    });
+    
+    return conflicts;
 }
 
 function editRosterEntry(index) {
@@ -3945,4 +4198,842 @@ showTab = function(screen, tab) {
     if (screen === 'oncall' && tab === 'acktracker') {
         initializeAcknowledgementTracker();
     }
+    
+    // Initialize vacation tabs
+    if (screen === 'vacation') {
+        if (tab === 'submit') {
+            initializeVacationForm();
+        } else if (tab === 'myrequests') {
+            loadMyVacationRequests();
+        } else if (tab === 'approvals') {
+            loadPendingApprovals();
+        } else if (tab === 'calendar') {
+            initializeLeaveCalendar();
+        }
+    }
 };
+
+// ========================================
+// VACATION REQUESTS FUNCTIONALITY
+// ========================================
+
+let allVacationRequests = [];
+let currentVacationRequest = null;
+
+// Initialize vacation form
+function initializeVacationForm() {
+    populateVacationEmployeeDropdown();
+    populateVacationManagerDropdown();
+    setupVacationDateListeners();
+    setupManagerEmailListeners();
+    
+    // Set minimum date to today
+    const today = new Date().toISOString().split('T')[0];
+    const startDateInput = document.getElementById('vacationStartDate');
+    const endDateInput = document.getElementById('vacationEndDate');
+    
+    if (startDateInput) startDateInput.min = today;
+    if (endDateInput) endDateInput.min = today;
+}
+
+// Populate manager dropdown from managers table
+async function populateVacationManagerDropdown() {
+    const managerSelect = document.getElementById('vacationManagerEmail');
+    if (!managerSelect) return;
+    
+    try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/managers?select=name,email&order=name`, {
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+            }
+        });
+        
+        if (!response.ok) throw new Error('Failed to fetch managers');
+        
+        const managers = await response.json();
+        
+        managerSelect.innerHTML = '<option value="">Select your manager</option>';
+        managers.forEach(manager => {
+            const option = document.createElement('option');
+            option.value = manager.email;
+            option.textContent = `${manager.name} (${manager.email})`;
+            managerSelect.appendChild(option);
+        });
+        
+    } catch (error) {
+        console.error('Error fetching managers:', error);
+    }
+}
+
+// Setup manager email field listeners (dropdown vs manual input)
+function setupManagerEmailListeners() {
+    const managerSelect = document.getElementById('vacationManagerEmail');
+    const managerCustom = document.getElementById('vacationManagerEmailCustom');
+    
+    if (managerSelect && managerCustom) {
+        // When dropdown changes, clear manual input
+        managerSelect.addEventListener('change', function() {
+            if (this.value) {
+                managerCustom.value = '';
+            }
+        });
+        
+        // When manual input changes, clear dropdown
+        managerCustom.addEventListener('input', function() {
+            if (this.value) {
+                managerSelect.value = '';
+            }
+        });
+    }
+}
+
+// Get the selected manager email (from dropdown or manual input)
+function getSelectedManagerEmail() {
+    const managerSelect = document.getElementById('vacationManagerEmail');
+    const managerCustom = document.getElementById('vacationManagerEmailCustom');
+    
+    // Priority: manual input if filled, otherwise dropdown
+    if (managerCustom && managerCustom.value.trim()) {
+        return managerCustom.value.trim();
+    }
+    if (managerSelect && managerSelect.value) {
+        return managerSelect.value;
+    }
+    return null;
+}
+
+// Populate employee dropdown from staff directory
+async function populateVacationEmployeeDropdown() {
+    const employeeSelect = document.getElementById('vacationEmployeeName');
+    const myRequestsSelect = document.getElementById('myRequestsFilterName');
+    
+    if (!employeeSelect) return;
+    
+    try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/staff_directory?select=name,email&order=name`, {
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+            }
+        });
+        
+        if (!response.ok) throw new Error('Failed to fetch staff');
+        
+        const staff = await response.json();
+        
+        // Clear and populate employee dropdown
+        employeeSelect.innerHTML = '<option value="">Select your name</option>';
+        staff.forEach(person => {
+            const option = document.createElement('option');
+            option.value = person.name;
+            option.textContent = person.name;
+            option.dataset.email = person.email;
+            employeeSelect.appendChild(option);
+        });
+        
+        // Also populate My Requests filter
+        if (myRequestsSelect) {
+            myRequestsSelect.innerHTML = '<option value="">Select Your Name</option>';
+            staff.forEach(person => {
+                const option = document.createElement('option');
+                option.value = person.name;
+                option.textContent = person.name;
+                myRequestsSelect.appendChild(option);
+            });
+        }
+        
+        // Add change listener to auto-fill email
+        employeeSelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            const emailInput = document.getElementById('vacationEmployeeEmail');
+            if (emailInput && selectedOption.dataset.email) {
+                emailInput.value = selectedOption.dataset.email;
+            } else if (emailInput) {
+                emailInput.value = '';
+            }
+        });
+    } catch (error) {
+        console.error('Error loading staff for vacation form:', error);
+    }
+}
+
+// Setup date change listeners to calculate duration
+function setupVacationDateListeners() {
+    const startDateInput = document.getElementById('vacationStartDate');
+    const endDateInput = document.getElementById('vacationEndDate');
+    const durationInput = document.getElementById('vacationDuration');
+    
+    function calculateDuration() {
+        if (startDateInput.value && endDateInput.value) {
+            const start = new Date(startDateInput.value);
+            const end = new Date(endDateInput.value);
+            
+            if (end >= start) {
+                const diffTime = Math.abs(end - start);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                durationInput.value = `${diffDays} day${diffDays > 1 ? 's' : ''}`;
+                
+                // Update end date minimum
+                endDateInput.min = startDateInput.value;
+            } else {
+                durationInput.value = 'Invalid dates';
+            }
+        } else {
+            durationInput.value = '';
+        }
+    }
+    
+    if (startDateInput) startDateInput.addEventListener('change', calculateDuration);
+    if (endDateInput) endDateInput.addEventListener('change', calculateDuration);
+}
+
+// Submit vacation request
+async function submitVacationRequest(event) {
+    event.preventDefault();
+    
+    const employeeName = document.getElementById('vacationEmployeeName').value;
+    const email = document.getElementById('vacationEmployeeEmail').value;
+    const managerEmail = getSelectedManagerEmail();
+    const startDate = document.getElementById('vacationStartDate').value;
+    const endDate = document.getElementById('vacationEndDate').value;
+    const requestType = document.getElementById('vacationType').value;
+    const reason = document.getElementById('vacationReason').value;
+    
+    if (!employeeName || !email || !startDate || !endDate) {
+        showWarningModal('Please fill in all required fields.', 'Missing Information');
+        return;
+    }
+    
+    if (!managerEmail) {
+        showWarningModal('Please select a manager or enter their email address.', 'Manager Required');
+        return;
+    }
+    
+    // Validate dates
+    if (new Date(endDate) < new Date(startDate)) {
+        showWarningModal('End date must be on or after start date.', 'Invalid Dates');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/vacation_requests`, {
+            method: 'POST',
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation'
+            },
+            body: JSON.stringify({
+                employee_name: employeeName,
+                email: email,
+                manager_email: managerEmail,
+                start_date: startDate,
+                end_date: endDate,
+                request_type: requestType,
+                reason: reason || null,
+                status: 'pending'
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.text();
+            throw new Error(error);
+        }
+        
+        const savedRequest = await response.json();
+        
+        // Send email notification to manager
+        await sendVacationNotification(savedRequest[0], 'new_request');
+        
+        showSuccessModal('Leave request submitted successfully! Your manager has been notified via email.', 'Request Submitted');
+        document.getElementById('vacationRequestForm').reset();
+        document.getElementById('vacationDuration').value = '';
+        document.getElementById('vacationManagerEmail').value = '';
+        document.getElementById('vacationManagerEmailCustom').value = '';
+        
+    } catch (error) {
+        console.error('Error submitting vacation request:', error);
+        showErrorModal('Failed to submit leave request. Please try again.');
+    }
+}
+
+// Send vacation notification email
+async function sendVacationNotification(request, notificationType) {
+    try {
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/send-vacation-notifications`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+            },
+            body: JSON.stringify({
+                requestId: request.id,
+                notificationType: notificationType,
+                requestData: request
+            })
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Failed to send notification:', errorText);
+        } else {
+            console.log('Vacation notification sent successfully');
+        }
+    } catch (error) {
+        console.error('Error sending vacation notification:', error);
+    }
+}
+
+// Load My Vacation Requests
+async function loadMyVacationRequests() {
+    const loadingEl = document.getElementById('myVacationRequestsLoading');
+    const emptyEl = document.getElementById('myVacationRequestsEmpty');
+    const tableEl = document.getElementById('myVacationRequestsTable');
+    
+    if (loadingEl) loadingEl.classList.remove('hidden');
+    if (emptyEl) emptyEl.classList.add('hidden');
+    if (tableEl) tableEl.classList.add('hidden');
+    
+    try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/vacation_requests?select=*&order=submitted_at.desc`, {
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+            }
+        });
+        
+        if (!response.ok) throw new Error('Failed to fetch vacation requests');
+        
+        allVacationRequests = await response.json();
+        filterMyVacationRequests();
+        
+    } catch (error) {
+        console.error('Error loading vacation requests:', error);
+        if (loadingEl) loadingEl.classList.add('hidden');
+    }
+}
+
+// Filter My Vacation Requests
+function filterMyVacationRequests() {
+    const statusFilter = document.getElementById('myRequestsFilterStatus')?.value || '';
+    const nameFilter = document.getElementById('myRequestsFilterName')?.value || '';
+    
+    let filtered = [...allVacationRequests];
+    
+    if (statusFilter) {
+        filtered = filtered.filter(r => r.status === statusFilter);
+    }
+    
+    if (nameFilter) {
+        filtered = filtered.filter(r => r.employee_name === nameFilter);
+    }
+    
+    renderMyVacationRequests(filtered);
+}
+
+// Render My Vacation Requests
+function renderMyVacationRequests(requests) {
+    const loadingEl = document.getElementById('myVacationRequestsLoading');
+    const emptyEl = document.getElementById('myVacationRequestsEmpty');
+    const tableEl = document.getElementById('myVacationRequestsTable');
+    const tableBody = document.getElementById('myVacationRequestsBody');
+    
+    if (loadingEl) loadingEl.classList.add('hidden');
+    
+    if (requests.length === 0) {
+        if (emptyEl) emptyEl.classList.remove('hidden');
+        if (tableEl) tableEl.classList.add('hidden');
+        return;
+    }
+    
+    if (emptyEl) emptyEl.classList.add('hidden');
+    if (tableEl) tableEl.classList.remove('hidden');
+    
+    const rows = requests.map(req => {
+        const startDate = new Date(req.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const endDate = new Date(req.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const submitted = new Date(req.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const duration = calculateDaysBetween(req.start_date, req.end_date);
+        const typeClass = req.request_type.toLowerCase().replace(' ', '');
+        
+        return `
+            <tr>
+                <td>${submitted}</td>
+                <td><span class="leave-type-badge ${typeClass}">${req.request_type}</span></td>
+                <td>${startDate}</td>
+                <td>${endDate}</td>
+                <td>${duration} day${duration > 1 ? 's' : ''}</td>
+                <td><span class="status-badge ${req.status}">${capitalizeFirst(req.status)}</span></td>
+                <td>
+                    <div class="vacation-actions">
+                        <button class="btn-icon btn-view" onclick="viewVacationRequest(${req.id})" title="View Details">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                        ${req.status === 'pending' ? `
+                        <button class="btn-icon btn-cancel" onclick="cancelVacationRequest(${req.id})" title="Cancel Request">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                        ` : ''}
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+    
+    if (tableBody) tableBody.innerHTML = rows;
+}
+
+// Load Pending Approvals (Manager View)
+async function loadPendingApprovals() {
+    const loadingEl = document.getElementById('pendingApprovalsLoading');
+    const emptyEl = document.getElementById('pendingApprovalsEmpty');
+    const tableEl = document.getElementById('pendingApprovalsTable');
+    
+    if (loadingEl) loadingEl.classList.remove('hidden');
+    if (emptyEl) emptyEl.classList.add('hidden');
+    if (tableEl) tableEl.classList.add('hidden');
+    
+    try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/vacation_requests?select=*&order=submitted_at.desc`, {
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+            }
+        });
+        
+        if (!response.ok) throw new Error('Failed to fetch vacation requests');
+        
+        allVacationRequests = await response.json();
+        updateApprovalStats(allVacationRequests);
+        filterPendingApprovals();
+        
+    } catch (error) {
+        console.error('Error loading pending approvals:', error);
+        if (loadingEl) loadingEl.classList.add('hidden');
+    }
+}
+
+// Update approval statistics
+function updateApprovalStats(requests) {
+    const now = new Date();
+    const thisMonth = now.getMonth();
+    const thisYear = now.getFullYear();
+    
+    const pending = requests.filter(r => r.status === 'pending').length;
+    const approvedThisMonth = requests.filter(r => {
+        const reviewed = new Date(r.reviewed_at);
+        return r.status === 'approved' && reviewed.getMonth() === thisMonth && reviewed.getFullYear() === thisYear;
+    }).length;
+    const rejectedThisMonth = requests.filter(r => {
+        const reviewed = new Date(r.reviewed_at);
+        return r.status === 'rejected' && reviewed.getMonth() === thisMonth && reviewed.getFullYear() === thisYear;
+    }).length;
+    
+    const pendingEl = document.getElementById('pendingApprovalsCount');
+    const approvedEl = document.getElementById('approvedRequestsCount');
+    const rejectedEl = document.getElementById('rejectedRequestsCount');
+    
+    if (pendingEl) pendingEl.textContent = pending;
+    if (approvedEl) approvedEl.textContent = approvedThisMonth;
+    if (rejectedEl) rejectedEl.textContent = rejectedThisMonth;
+}
+
+// Filter Pending Approvals
+function filterPendingApprovals() {
+    const statusFilter = document.getElementById('approvalsFilterStatus')?.value || 'pending';
+    
+    let filtered = [...allVacationRequests];
+    
+    if (statusFilter) {
+        filtered = filtered.filter(r => r.status === statusFilter);
+    }
+    
+    renderPendingApprovals(filtered);
+}
+
+// Render Pending Approvals
+function renderPendingApprovals(requests) {
+    const loadingEl = document.getElementById('pendingApprovalsLoading');
+    const emptyEl = document.getElementById('pendingApprovalsEmpty');
+    const tableEl = document.getElementById('pendingApprovalsTable');
+    const tableBody = document.getElementById('pendingApprovalsBody');
+    
+    if (loadingEl) loadingEl.classList.add('hidden');
+    
+    if (requests.length === 0) {
+        if (emptyEl) emptyEl.classList.remove('hidden');
+        if (tableEl) tableEl.classList.add('hidden');
+        return;
+    }
+    
+    if (emptyEl) emptyEl.classList.add('hidden');
+    if (tableEl) tableEl.classList.remove('hidden');
+    
+    const rows = requests.map(req => {
+        const startDate = new Date(req.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const endDate = new Date(req.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const submitted = new Date(req.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const duration = calculateDaysBetween(req.start_date, req.end_date);
+        const typeClass = req.request_type.toLowerCase().replace(' ', '');
+        
+        return `
+            <tr>
+                <td><strong>${req.employee_name}</strong><br><small style="color: #64748b;">${req.email}</small></td>
+                <td><span class="leave-type-badge ${typeClass}">${req.request_type}</span></td>
+                <td>${startDate} - ${endDate}</td>
+                <td>${duration} day${duration > 1 ? 's' : ''}</td>
+                <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${req.reason || ''}">${req.reason || '-'}</td>
+                <td>${submitted}</td>
+                <td>
+                    <div class="vacation-actions">
+                        ${req.status === 'pending' ? `
+                        <button class="btn-icon btn-approve" onclick="quickApprove(${req.id})" title="Approve">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                        </button>
+                        <button class="btn-icon btn-reject" onclick="quickReject(${req.id})" title="Reject">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                        ` : `<span class="status-badge ${req.status}">${capitalizeFirst(req.status)}</span>`}
+                        <button class="btn-icon btn-view" onclick="viewVacationRequestForApproval(${req.id})" title="View Details">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+    
+    if (tableBody) tableBody.innerHTML = rows;
+}
+
+// View vacation request details
+function viewVacationRequest(id) {
+    currentVacationRequest = allVacationRequests.find(r => r.id === id);
+    if (!currentVacationRequest) return;
+    
+    populateVacationDetailModal(currentVacationRequest, false);
+    document.getElementById('vacationDetailModal').classList.remove('hidden');
+}
+
+// View vacation request for approval (with approval section)
+async function viewVacationRequestForApproval(id) {
+    currentVacationRequest = allVacationRequests.find(r => r.id === id);
+    
+    // If not in the loaded array, fetch directly by ID (for email link access)
+    if (!currentVacationRequest) {
+        currentVacationRequest = await fetchVacationRequestById(id);
+    }
+    
+    if (!currentVacationRequest) {
+        showWarningModal('Vacation request not found. It may have already been processed.', 'Request Not Found');
+        return;
+    }
+    
+    populateVacationDetailModal(currentVacationRequest, currentVacationRequest.status === 'pending');
+    document.getElementById('vacationDetailModal').classList.remove('hidden');
+}
+
+// Populate the detail modal
+function populateVacationDetailModal(req, showApproval) {
+    document.getElementById('detailEmployeeName').textContent = req.employee_name;
+    document.getElementById('detailEmployeeEmail').textContent = req.email;
+    document.getElementById('detailLeaveType').innerHTML = `<span class="leave-type-badge ${req.request_type.toLowerCase().replace(' ', '')}">${req.request_type}</span>`;
+    document.getElementById('detailStatus').innerHTML = `<span class="status-badge ${req.status}">${capitalizeFirst(req.status)}</span>`;
+    document.getElementById('detailStartDate').textContent = new Date(req.start_date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    document.getElementById('detailEndDate').textContent = new Date(req.end_date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    document.getElementById('detailReason').textContent = req.reason || 'No reason provided';
+    document.getElementById('detailSubmitted').textContent = new Date(req.submitted_at).toLocaleString('en-US');
+    
+    const approvalSection = document.getElementById('approvalSection');
+    if (showApproval) {
+        approvalSection.classList.remove('hidden');
+        document.getElementById('managerNotes').value = '';
+    } else {
+        approvalSection.classList.add('hidden');
+    }
+}
+
+// Close vacation detail modal
+function closeVacationDetailModal() {
+    document.getElementById('vacationDetailModal').classList.add('hidden');
+    currentVacationRequest = null;
+}
+
+// Quick approve
+async function quickApprove(id) {
+    if (!confirm('Are you sure you want to approve this leave request?')) return;
+    await updateVacationStatus(id, 'approved', '');
+}
+
+// Quick reject
+async function quickReject(id) {
+    const reason = prompt('Please provide a reason for rejection (optional):');
+    if (reason === null) return; // User cancelled
+    await updateVacationStatus(id, 'rejected', reason);
+}
+
+// Approve vacation request (from modal)
+async function approveVacationRequest() {
+    if (!currentVacationRequest) return;
+    const notes = document.getElementById('managerNotes').value;
+    await updateVacationStatus(currentVacationRequest.id, 'approved', notes);
+    closeVacationDetailModal();
+}
+
+// Reject vacation request (from modal)
+async function rejectVacationRequest() {
+    if (!currentVacationRequest) return;
+    const notes = document.getElementById('managerNotes').value;
+    if (!notes) {
+        showWarningModal('Please provide a reason for rejection.', 'Reason Required');
+        return;
+    }
+    await updateVacationStatus(currentVacationRequest.id, 'rejected', notes);
+    closeVacationDetailModal();
+}
+
+// Update vacation request status
+async function updateVacationStatus(id, status, notes) {
+    try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/vacation_requests?id=eq.${id}`, {
+            method: 'PATCH',
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation'
+            },
+            body: JSON.stringify({
+                status: status,
+                reviewed_by: 'Manager', // In a real app, this would be the logged-in manager's name
+                reviewed_at: new Date().toISOString(),
+                manager_notes: notes || null
+            })
+        });
+        
+        if (!response.ok) throw new Error('Failed to update request');
+        
+        const updatedRequest = await response.json();
+        
+        // Clear vacation conflict cache when status changes (especially when approved)
+        vacationConflictCache = {};
+        vacationConflictCacheWeek = null;
+        
+        // Send notification to the requestor about the status update
+        if (updatedRequest && updatedRequest[0]) {
+            await sendVacationNotification(updatedRequest[0], status === 'approved' ? 'approved' : 'rejected');
+        }
+        
+        showSuccessModal(`Leave request ${status} successfully! The employee has been notified.`, status === 'approved' ? 'Request Approved' : 'Request Rejected');
+        loadPendingApprovals();
+        
+    } catch (error) {
+        console.error('Error updating vacation request:', error);
+        showErrorModal('Failed to update leave request. Please try again.');
+    }
+}
+
+// Cancel vacation request
+async function cancelVacationRequest(id) {
+    if (!confirm('Are you sure you want to cancel this leave request?')) return;
+    
+    try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/vacation_requests?id=eq.${id}`, {
+            method: 'PATCH',
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                status: 'cancelled'
+            })
+        });
+        
+        if (!response.ok) throw new Error('Failed to cancel request');
+        
+        showSuccessModal('Leave request has been cancelled.', 'Request Cancelled');
+        loadMyVacationRequests();
+        
+    } catch (error) {
+        console.error('Error cancelling vacation request:', error);
+        showErrorModal('Failed to cancel leave request. Please try again.');
+    }
+}
+
+// Initialize Leave Calendar
+function initializeLeaveCalendar() {
+    const calendarMonth = document.getElementById('calendarMonth');
+    if (calendarMonth && !calendarMonth.value) {
+        const now = new Date();
+        calendarMonth.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    }
+    loadLeaveCalendar();
+}
+
+// Load Leave Calendar
+async function loadLeaveCalendar() {
+    const loadingEl = document.getElementById('leaveCalendarLoading');
+    const emptyEl = document.getElementById('leaveCalendarEmpty');
+    const contentEl = document.getElementById('leaveCalendarContent');
+    const gridEl = document.getElementById('leaveCalendarGrid');
+    
+    if (loadingEl) loadingEl.classList.remove('hidden');
+    if (emptyEl) emptyEl.classList.add('hidden');
+    if (contentEl) contentEl.classList.add('hidden');
+    
+    const calendarMonth = document.getElementById('calendarMonth')?.value;
+    if (!calendarMonth) return;
+    
+    const [year, month] = calendarMonth.split('-');
+    const startOfMonth = `${year}-${month}-01`;
+    const endOfMonth = new Date(year, month, 0).toISOString().split('T')[0];
+    
+    try {
+        const response = await fetch(
+            `${SUPABASE_URL}/rest/v1/vacation_requests?select=*&status=eq.approved&or=(start_date.lte.${endOfMonth},end_date.gte.${startOfMonth})&order=start_date`, 
+            {
+                headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                }
+            }
+        );
+        
+        if (!response.ok) throw new Error('Failed to fetch calendar data');
+        
+        const leaves = await response.json();
+        
+        if (loadingEl) loadingEl.classList.add('hidden');
+        
+        if (leaves.length === 0) {
+            if (emptyEl) emptyEl.classList.remove('hidden');
+            return;
+        }
+        
+        if (contentEl) contentEl.classList.remove('hidden');
+        
+        const items = leaves.map(leave => {
+            const startDate = new Date(leave.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const endDate = new Date(leave.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const typeClass = leave.request_type.toLowerCase().replace(' ', '');
+            
+            return `
+                <div class="leave-calendar-item">
+                    <div class="calendar-dates">${startDate} - ${endDate}</div>
+                    <div class="calendar-employee">${leave.employee_name}</div>
+                    <div class="calendar-type">
+                        <span class="leave-type-badge ${typeClass}">${leave.request_type}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        if (gridEl) gridEl.innerHTML = items;
+        
+    } catch (error) {
+        console.error('Error loading leave calendar:', error);
+        if (loadingEl) loadingEl.classList.add('hidden');
+    }
+}
+
+// Helper function to calculate days between two dates
+function calculateDaysBetween(startDate, endDate) {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffTime = Math.abs(end - start);
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+}
+
+// Helper function to capitalize first letter
+function capitalizeFirst(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+// Initialize vacation section when switching to it
+document.addEventListener('DOMContentLoaded', function() {
+    // Add vacation screen to switchMainScreen function if needed
+    const originalSwitchMainScreen = window.switchMainScreen;
+    if (originalSwitchMainScreen) {
+        window.switchMainScreen = function(screen) {
+            originalSwitchMainScreen(screen);
+            
+            if (screen === 'vacation') {
+                initializeVacationForm();
+            }
+        };
+    }
+    
+    // Check for vacation review URL parameter (from email link)
+    checkVacationReviewParam();
+});
+
+// Check for vacation review URL parameter
+async function checkVacationReviewParam() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const vacationReviewId = urlParams.get('vacationReview');
+    
+    if (vacationReviewId) {
+        console.log('Vacation review requested for ID:', vacationReviewId);
+        
+        // Switch to vacation screen
+        if (typeof switchMainScreen === 'function') {
+            switchMainScreen('vacation');
+        }
+        
+        // Wait a moment for the screen to initialize
+        setTimeout(async () => {
+            // Switch to pending approvals tab
+            showTab('vacation-pendingapprovalsTab');
+            
+            // Wait for data to load
+            await loadPendingApprovals();
+            
+            // Small delay to ensure data is rendered
+            setTimeout(() => {
+                // Open the specific request for review
+                viewVacationRequestForApproval(parseInt(vacationReviewId));
+                
+                // Clear the URL parameter
+                const newUrl = window.location.pathname + window.location.hash;
+                window.history.replaceState({}, '', newUrl);
+            }, 500);
+        }, 300);
+    }
+}
+
+// Fetch a specific vacation request by ID for review
+async function fetchVacationRequestById(id) {
+    try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/vacation_requests?id=eq.${id}&select=*`, {
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+            }
+        });
+        
+        if (!response.ok) throw new Error('Failed to fetch request');
+        
+        const data = await response.json();
+        return data.length > 0 ? data[0] : null;
+    } catch (error) {
+        console.error('Error fetching vacation request:', error);
+        return null;
+    }
+}
