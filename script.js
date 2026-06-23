@@ -193,14 +193,31 @@ document.addEventListener('DOMContentLoaded', async function() {
 });
 
 // Switch main screen
-function switchMainScreen(screen) {
+function switchMainScreen(screen, clickEvent = null) {
     currentScreen = screen;
     
     document.querySelectorAll('.main-screen').forEach(s => s.classList.remove('active'));
     document.querySelectorAll('.main-screen-tab').forEach(t => t.classList.remove('active'));
     
     document.getElementById(`${screen}Screen`).classList.add('active');
-    event.target.closest('.main-screen-tab').classList.add('active');
+    
+    // Handle tab highlighting - either from click event or find by screen name
+    if (clickEvent && clickEvent.target) {
+        const tab = clickEvent.target.closest('.main-screen-tab');
+        if (tab) tab.classList.add('active');
+    } else {
+        // Find and highlight the correct tab based on screen name
+        const screenToTab = {
+            'mod': 0,
+            'oncall': 1,
+            'vacation': 2
+        };
+        const tabs = document.querySelectorAll('.main-screen-tab');
+        const tabIndex = screenToTab[screen];
+        if (tabs[tabIndex]) {
+            tabs[tabIndex].classList.add('active');
+        }
+    }
 }
 
 // Toggle team section (hide/show)
@@ -1394,11 +1411,11 @@ const notificationIcons = {
     </svg>`
 };
 
-// Notification modal callback
-let notificationModalCallback = null;
+// Alert modal callback
+let alertModalCallback = null;
 
-// Show notification modal (replacement for alert)
-function showNotificationModal(message, options = {}) {
+// Show alert modal (replacement for alert)
+function showAlertModal(message, options = {}) {
     const {
         type = 'success',
         title = getDefaultTitle(type),
@@ -1416,7 +1433,11 @@ function showNotificationModal(message, options = {}) {
     const okBtn = document.getElementById('notificationModalOkBtn');
     const cancelBtn = document.getElementById('notificationModalCancelBtn');
     
-    if (!modal) return;
+    if (!modal) {
+        // Fallback to native alert if modal doesn't exist
+        alert(message);
+        return;
+    }
     
     // Set icon and type
     iconEl.innerHTML = notificationIcons[type] || notificationIcons.info;
@@ -1436,7 +1457,7 @@ function showNotificationModal(message, options = {}) {
     }
     
     // Store callbacks
-    notificationModalCallback = { onOk, onCancel };
+    alertModalCallback = { onOk, onCancel };
     
     // Show modal
     modal.classList.remove('hidden');
@@ -1456,42 +1477,42 @@ function getDefaultTitle(type) {
     }
 }
 
-// Close notification modal
-function closeNotificationModal(confirmed = true) {
+// Close alert modal
+function closeAlertModal(confirmed = true) {
     const modal = document.getElementById('notificationModal');
     if (modal) {
         modal.classList.add('hidden');
     }
     
     // Execute callback
-    if (notificationModalCallback) {
-        if (confirmed && notificationModalCallback.onOk) {
-            notificationModalCallback.onOk();
-        } else if (!confirmed && notificationModalCallback.onCancel) {
-            notificationModalCallback.onCancel();
+    if (alertModalCallback) {
+        if (confirmed && alertModalCallback.onOk) {
+            alertModalCallback.onOk();
+        } else if (!confirmed && alertModalCallback.onCancel) {
+            alertModalCallback.onCancel();
         }
-        notificationModalCallback = null;
+        alertModalCallback = null;
     }
 }
 
 // Helper function for success messages
 function showSuccessModal(message, title = 'Success') {
-    showNotificationModal(message, { type: 'success', title });
+    showAlertModal(message, { type: 'success', title });
 }
 
 // Helper function for error messages
 function showErrorModal(message, title = 'Error') {
-    showNotificationModal(message, { type: 'error', title });
+    showAlertModal(message, { type: 'error', title });
 }
 
 // Helper function for warning messages
 function showWarningModal(message, title = 'Warning') {
-    showNotificationModal(message, { type: 'warning', title });
+    showAlertModal(message, { type: 'warning', title });
 }
 
 // Helper function for info messages
 function showInfoModal(message, title = 'Information') {
-    showNotificationModal(message, { type: 'info', title });
+    showAlertModal(message, { type: 'info', title });
 }
 
 // ==================== L2 ROSTER FUNCTIONS ====================
