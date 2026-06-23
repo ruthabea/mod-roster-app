@@ -237,14 +237,31 @@ function toggleTeamSection(headerEl) {
 }
 
 // Show tab within a screen
-function showTab(screen, tabName) {
+function showTab(screen, tabName, clickEvent = null) {
     const screenEl = document.getElementById(`${screen}Screen`);
+    if (!screenEl) return;
     
     screenEl.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
     screenEl.querySelectorAll('.nav-tab').forEach(btn => btn.classList.remove('active'));
     
-    document.getElementById(`${screen}-${tabName}Tab`).classList.add('active');
-    event.target.classList.add('active');
+    const tabElement = document.getElementById(`${screen}-${tabName}Tab`);
+    if (tabElement) {
+        tabElement.classList.add('active');
+    }
+    
+    // Handle nav tab highlighting
+    if (clickEvent && clickEvent.target) {
+        clickEvent.target.classList.add('active');
+    } else {
+        // Find the correct nav tab by matching the tabName
+        const navTabs = screenEl.querySelectorAll('.nav-tab');
+        navTabs.forEach(tab => {
+            const onclickAttr = tab.getAttribute('onclick') || '';
+            if (onclickAttr.includes(`'${tabName}'`)) {
+                tab.classList.add('active');
+            }
+        });
+    }
     
     if (tabName === 'details' || tabName === 'contacts') {
         displayDetails(screen);
@@ -5020,8 +5037,8 @@ async function checkVacationReviewParam() {
         
         // Wait a moment for the screen to initialize
         setTimeout(async () => {
-            // Switch to pending approvals tab
-            showTab('vacation-approvalsTab');
+            // Switch to pending approvals tab (screen='vacation', tabName='approvals')
+            showTab('vacation', 'approvals');
             
             // Wait for data to load
             await loadPendingApprovals();

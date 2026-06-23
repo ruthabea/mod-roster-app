@@ -56,10 +56,10 @@
 
             <!-- MOD Navigation Tabs -->
             <nav class="main-nav">
-                <button class="nav-tab active" onclick="showTab('mod', 'schedule')">MOD Schedule</button>
-                <button class="nav-tab" onclick="showTab('mod', 'details')">MOD Details</button>
-                <button class="nav-tab" onclick="showTab('mod', 'escalation')">MOD Escalation</button>
-                <button class="nav-tab" onclick="showTab('mod', 'l2support')">L2 Support & Contact</button>
+                <button class="nav-tab active" onclick="showTab('mod', 'schedule', event)">MOD Schedule</button>
+                <button class="nav-tab" onclick="showTab('mod', 'details', event)">MOD Details</button>
+                <button class="nav-tab" onclick="showTab('mod', 'escalation', event)">MOD Escalation</button>
+                <button class="nav-tab" onclick="showTab('mod', 'l2support', event)">L2 Support & Contact</button>
             </nav>
 
             <!-- MOD Tab 1: Schedule -->
@@ -528,12 +528,12 @@
 
             <!-- On-Call Navigation Tabs -->
             <nav class="main-nav">
-                <button class="nav-tab active" onclick="showTab('oncall', 'summary')">Summary / Roster</button>
-                <button class="nav-tab" onclick="showTab('oncall', 'l2roster')">L2 Roster</button>
-                <button class="nav-tab" onclick="showTab('oncall', 'contacts')">Contact Details</button>
-                <button class="nav-tab" onclick="showTab('oncall', 'escalation')">Escalation Matrix</button>
-                <button class="nav-tab" onclick="showTab('oncall', 'staffdir')">Staff Directory</button>
-                <button class="nav-tab" onclick="showTab('oncall', 'acktracker')">Acknowledgement Tracker</button>
+                <button class="nav-tab active" onclick="showTab('oncall', 'summary', event)">Summary / Roster</button>
+                <button class="nav-tab" onclick="showTab('oncall', 'l2roster', event)">L2 Roster</button>
+                <button class="nav-tab" onclick="showTab('oncall', 'contacts', event)">Contact Details</button>
+                <button class="nav-tab" onclick="showTab('oncall', 'escalation', event)">Escalation Matrix</button>
+                <button class="nav-tab" onclick="showTab('oncall', 'staffdir', event)">Staff Directory</button>
+                <button class="nav-tab" onclick="showTab('oncall', 'acktracker', event)">Acknowledgement Tracker</button>
             </nav>
 
             <!-- On-Call Tab 1: Summary / Roster -->
@@ -2000,10 +2000,10 @@
 
             <!-- Vacation Navigation Tabs -->
             <nav class="main-nav">
-                <button class="nav-tab active" onclick="showTab('vacation', 'submit')">Submit Request</button>
-                <button class="nav-tab" onclick="showTab('vacation', 'myrequests')">My Requests</button>
-                <button class="nav-tab" onclick="showTab('vacation', 'approvals')">Pending Approvals</button>
-                <button class="nav-tab" onclick="showTab('vacation', 'calendar')">Leave Calendar</button>
+                <button class="nav-tab active" onclick="showTab('vacation', 'submit', event)">Submit Request</button>
+                <button class="nav-tab" onclick="showTab('vacation', 'myrequests', event)">My Requests</button>
+                <button class="nav-tab" onclick="showTab('vacation', 'approvals', event)">Pending Approvals</button>
+                <button class="nav-tab" onclick="showTab('vacation', 'calendar', event)">Leave Calendar</button>
             </nav>
 
             <!-- Vacation Tab 1: Submit Request -->
