@@ -4992,8 +4992,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Add vacation screen to switchMainScreen function if needed
     const originalSwitchMainScreen = window.switchMainScreen;
     if (originalSwitchMainScreen) {
-        window.switchMainScreen = function(screen) {
-            originalSwitchMainScreen(screen);
+        window.switchMainScreen = function(screen, clickEvent = null) {
+            originalSwitchMainScreen(screen, clickEvent);
             
             if (screen === 'vacation') {
                 initializeVacationForm();
@@ -5021,7 +5021,7 @@ async function checkVacationReviewParam() {
         // Wait a moment for the screen to initialize
         setTimeout(async () => {
             // Switch to pending approvals tab
-            showTab('vacation-pendingapprovalsTab');
+            showTab('vacation-approvalsTab');
             
             // Wait for data to load
             await loadPendingApprovals();
