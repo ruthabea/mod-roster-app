@@ -4436,10 +4436,10 @@ async function submitVacationRequest(event) {
     const startDate = document.getElementById('vacationStartDate').value;
     const endDate = document.getElementById('vacationEndDate').value;
     const requestType = document.getElementById('vacationType').value;
-    const reason = document.getElementById('vacationReason').value;
+    const reason = document.getElementById('vacationReason').value.trim();
     
-    if (!employeeName || !email || !startDate || !endDate) {
-        showWarningModal('Please fill in all required fields.', 'Missing Information');
+    if (!employeeName || !email || !startDate || !endDate || !reason) {
+        showWarningModal('Please fill in all required fields including the reason.', 'Missing Information');
         return;
     }
     
@@ -4535,7 +4535,7 @@ async function loadMyVacationRequests() {
     if (tableEl) tableEl.classList.add('hidden');
     
     try {
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/vacation_requests?select=*&order=submitted_at.desc`, {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/vacation_requests?select=*&order=created_at.desc`, {
             headers: {
                 'apikey': SUPABASE_ANON_KEY,
                 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
@@ -4550,6 +4550,7 @@ async function loadMyVacationRequests() {
     } catch (error) {
         console.error('Error loading vacation requests:', error);
         if (loadingEl) loadingEl.classList.add('hidden');
+        if (emptyEl) emptyEl.classList.remove('hidden');
     }
 }
 
@@ -4592,7 +4593,7 @@ function renderMyVacationRequests(requests) {
     const rows = requests.map(req => {
         const startDate = new Date(req.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         const endDate = new Date(req.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        const submitted = new Date(req.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const submitted = new Date(req.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         const duration = calculateDaysBetween(req.start_date, req.end_date);
         const typeClass = req.request_type.toLowerCase().replace(' ', '');
         
@@ -4640,7 +4641,7 @@ async function loadPendingApprovals() {
     if (tableEl) tableEl.classList.add('hidden');
     
     try {
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/vacation_requests?select=*&order=submitted_at.desc`, {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/vacation_requests?select=*&order=created_at.desc`, {
             headers: {
                 'apikey': SUPABASE_ANON_KEY,
                 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
@@ -4718,7 +4719,7 @@ function renderPendingApprovals(requests) {
     const rows = requests.map(req => {
         const startDate = new Date(req.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         const endDate = new Date(req.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        const submitted = new Date(req.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const submitted = new Date(req.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         const duration = calculateDaysBetween(req.start_date, req.end_date);
         const typeClass = req.request_type.toLowerCase().replace(' ', '');
         
@@ -4796,7 +4797,7 @@ function populateVacationDetailModal(req, showApproval) {
     document.getElementById('detailStartDate').textContent = new Date(req.start_date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
     document.getElementById('detailEndDate').textContent = new Date(req.end_date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
     document.getElementById('detailReason').textContent = req.reason || 'No reason provided';
-    document.getElementById('detailSubmitted').textContent = new Date(req.submitted_at).toLocaleString('en-US');
+    document.getElementById('detailSubmitted').textContent = new Date(req.created_at).toLocaleString('en-US');
     
     const approvalSection = document.getElementById('approvalSection');
     if (showApproval) {

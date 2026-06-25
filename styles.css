@@ -4258,27 +4258,47 @@ header h1 {
    VACATION REQUESTS STYLES
    ======================================== */
 
+/* Vacation Submit Section */
+#vacation-submitTab .card {
+    max-width: 700px;
+    margin: 0 auto;
+    text-align: center;
+}
+
+#vacation-submitTab .card h2 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+#vacation-submitTab .card .help-text {
+    color: #6b7280;
+    margin-bottom: 2rem;
+}
+
 /* Vacation Form Styles */
 .vacation-form {
-    max-width: 800px;
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 0;
+    text-align: left;
 }
 
 .vacation-form .form-row {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 1.5rem;
+    gap: 1.25rem;
 }
 
 .vacation-form .form-group {
-    margin-bottom: 1.25rem;
+    margin-bottom: 1.5rem;
 }
 
 .vacation-form .form-group label {
     display: block;
-    font-weight: 500;
+    font-weight: 600;
     color: #374151;
     margin-bottom: 0.5rem;
-    font-size: 0.9rem;
+    font-size: 0.875rem;
 }
 
 .vacation-form .form-group input,
@@ -4286,10 +4306,11 @@ header h1 {
 .vacation-form .form-group textarea {
     width: 100%;
     padding: 0.75rem 1rem;
-    border: 1px solid #d1d5db;
+    border: 1px solid #e5e7eb;
     border-radius: 8px;
     font-size: 0.95rem;
     transition: all 0.2s ease;
+    background: #f9fafb;
 }
 
 .vacation-form .form-group input:focus,
@@ -4298,24 +4319,33 @@ header h1 {
     outline: none;
     border-color: var(--primary-color);
     box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+    background: #ffffff;
 }
 
 .vacation-form .form-group input[readonly] {
-    background-color: #f9fafb;
+    background-color: #f3f4f6;
     color: #6b7280;
+    cursor: not-allowed;
 }
 
 .vacation-form textarea {
     resize: vertical;
-    min-height: 80px;
+    min-height: 100px;
 }
 
 .vacation-form .form-actions {
     display: flex;
     gap: 1rem;
-    margin-top: 1.5rem;
+    margin-top: 2rem;
     padding-top: 1.5rem;
     border-top: 1px solid #e5e7eb;
+    justify-content: center;
+}
+
+.vacation-form .form-actions .btn {
+    min-width: 140px;
+    padding: 0.75rem 1.5rem;
+    font-weight: 500;
 }
 
 /* Vacation Header */
