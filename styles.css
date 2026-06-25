@@ -29,6 +29,11 @@ body {
     padding-top: 60px;
 }
 
+/* Global Hidden Class */
+.hidden {
+    display: none !important;
+}
+
 /* Main Screen Navigation */
 .main-screen-nav {
     position: fixed;
