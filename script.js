@@ -4261,9 +4261,7 @@ let currentVacationRequest = null;
 // Initialize vacation form
 function initializeVacationForm() {
     populateVacationEmployeeDropdown();
-    populateVacationManagerDropdown();
     setupVacationDateListeners();
-    setupManagerEmailListeners();
     
     // Set minimum date to today
     const today = new Date().toISOString().split('T')[0];
@@ -4273,72 +4271,68 @@ function initializeVacationForm() {
     if (startDateInput) startDateInput.min = today;
     if (endDateInput) endDateInput.min = today;
 }
+// Helper to capitalize first letter
+function capitalizeFirst(str) {
+    if (!str) return '';
+    return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+}
 
-// Populate manager dropdown from managers table
-async function populateVacationManagerDropdown() {
-    const managerSelect = document.getElementById('vacationManagerEmail');
-    if (!managerSelect) return;
-    
+// Fetch employee team from contacts table
+async function fetchEmployeeTeam(employeeName) {
     try {
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/managers?select=name,email&order=name`, {
-            headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        const response = await fetch(
+            `${SUPABASE_URL}/rest/v1/contacts?select=team&name=ilike.${encodeURIComponent(employeeName)}&limit=1`,
+            {
+                headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                }
             }
-        });
+        );
         
-        if (!response.ok) throw new Error('Failed to fetch managers');
+        if (!response.ok) return null;
         
-        const managers = await response.json();
-        
-        managerSelect.innerHTML = '<option value="">Select your manager</option>';
-        managers.forEach(manager => {
-            const option = document.createElement('option');
-            option.value = manager.email;
-            option.textContent = `${manager.name} (${manager.email})`;
-            managerSelect.appendChild(option);
-        });
-        
+        const data = await response.json();
+        return data.length > 0 ? data[0] : null;
     } catch (error) {
-        console.error('Error fetching managers:', error);
+        console.error('Error fetching employee team:', error);
+        return null;
     }
 }
 
-// Setup manager email field listeners (dropdown vs manual input)
-function setupManagerEmailListeners() {
-    const managerSelect = document.getElementById('vacationManagerEmail');
-    const managerCustom = document.getElementById('vacationManagerEmailCustom');
+// Manager routing configuration for vacation approvals
+const VACATION_APPROVERS = {
+    // Team-based approvers
+    'frontend': { name: 'Manisha Bardiya', email: 'MBardiya@amdocs.com' },
+    'digital': { name: 'Manisha Bardiya', email: 'MBardiya@amdocs.com' },
+    'backend': { name: 'Bindiya Phadte', email: 'BPhadte@amdocs.com' },
+    'infra': { name: 'Rahul Gupta', email: 'RGupta@amdocs.com' },
+    'ods': { name: 'Prachi Menon', email: 'PMenon@amdocs.com' },
     
-    if (managerSelect && managerCustom) {
-        // When dropdown changes, clear manual input
-        managerSelect.addEventListener('change', function() {
-            if (this.value) {
-                managerCustom.value = '';
-            }
-        });
-        
-        // When manual input changes, clear dropdown
-        managerCustom.addEventListener('input', function() {
-            if (this.value) {
-                managerSelect.value = '';
-            }
-        });
-    }
-}
+    // Site-based approver (Philippines - regardless of team)
+    'philippines': { name: 'Josie Solar', email: 'JSolar@amdocs.com' },
+    
+    // Default approver if no match (for B2B, ANM, SDM, L2, etc.)
+    'default': { name: 'Not Configured', email: '' }
+};
 
-// Get the selected manager email (from dropdown or manual input)
-function getSelectedManagerEmail() {
-    const managerSelect = document.getElementById('vacationManagerEmail');
-    const managerCustom = document.getElementById('vacationManagerEmailCustom');
+// Determine vacation approver based on Site and Team
+function determineVacationApprover(site, team) {
+    const siteLower = (site || '').toLowerCase().trim();
+    const teamLower = (team || '').toLowerCase().trim();
     
-    // Priority: manual input if filled, otherwise dropdown
-    if (managerCustom && managerCustom.value.trim()) {
-        return managerCustom.value.trim();
+    // Rule 1: Site-based routing takes priority (Philippines -> Josie Solar)
+    if (siteLower.includes('philippines') || siteLower === 'ph') {
+        return VACATION_APPROVERS['philippines'];
     }
-    if (managerSelect && managerSelect.value) {
-        return managerSelect.value;
+    
+    // Rule 2-5: Team-based routing
+    if (teamLower && VACATION_APPROVERS[teamLower]) {
+        return VACATION_APPROVERS[teamLower];
     }
-    return null;
+    
+    // Default: No specific approver found (B2B, ANM, SDM, L2, etc.)
+    return VACATION_APPROVERS['default'];
 }
 
 // Populate employee dropdown from staff directory
@@ -4349,7 +4343,8 @@ async function populateVacationEmployeeDropdown() {
     if (!employeeSelect) return;
     
     try {
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/staff_directory?select=name,email&order=name`, {
+        // Fetch staff with site and application fields
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/staff_directory?select=name,email,site,application&order=name`, {
             headers: {
                 'apikey': SUPABASE_ANON_KEY,
                 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
@@ -4366,7 +4361,8 @@ async function populateVacationEmployeeDropdown() {
             const option = document.createElement('option');
             option.value = person.name;
             option.textContent = person.name;
-            option.dataset.email = person.email;
+            option.dataset.email = person.email || '';
+            option.dataset.site = person.site || '';
             employeeSelect.appendChild(option);
         });
         
@@ -4381,14 +4377,43 @@ async function populateVacationEmployeeDropdown() {
             });
         }
         
-        // Add change listener to auto-fill email
-        employeeSelect.addEventListener('change', function() {
+        // Add change listener to auto-fill email, site, team, and manager
+        employeeSelect.addEventListener('change', async function() {
             const selectedOption = this.options[this.selectedIndex];
             const emailInput = document.getElementById('vacationEmployeeEmail');
-            if (emailInput && selectedOption.dataset.email) {
-                emailInput.value = selectedOption.dataset.email;
-            } else if (emailInput) {
-                emailInput.value = '';
+            const siteInput = document.getElementById('vacationSite');
+            const teamInput = document.getElementById('vacationTeam');
+            const approverNameInput = document.getElementById('vacationApproverName');
+            const managerEmailInput = document.getElementById('vacationManagerEmail');
+            
+            if (selectedOption.value) {
+                // Auto-fill email and site from staff_directory
+                if (emailInput) emailInput.value = selectedOption.dataset.email || '';
+                if (siteInput) siteInput.value = selectedOption.dataset.site || '';
+                
+                // Fetch team from contacts table
+                const employeeName = selectedOption.value;
+                const teamData = await fetchEmployeeTeam(employeeName);
+                const team = teamData?.team || '';
+                const teamDisplay = team ? capitalizeFirst(team) + ' Team' : '';
+                
+                if (teamInput) teamInput.value = teamDisplay;
+                
+                // Auto-determine manager based on Site and Team
+                const manager = determineVacationApprover(
+                    selectedOption.dataset.site || '',
+                    team
+                );
+                
+                if (approverNameInput) approverNameInput.value = manager.name;
+                if (managerEmailInput) managerEmailInput.value = manager.email;
+            } else {
+                // Clear all fields
+                if (emailInput) emailInput.value = '';
+                if (siteInput) siteInput.value = '';
+                if (teamInput) teamInput.value = '';
+                if (approverNameInput) approverNameInput.value = '';
+                if (managerEmailInput) managerEmailInput.value = '';
             }
         });
     } catch (error) {
@@ -4432,7 +4457,10 @@ async function submitVacationRequest(event) {
     
     const employeeName = document.getElementById('vacationEmployeeName').value;
     const email = document.getElementById('vacationEmployeeEmail').value;
-    const managerEmail = getSelectedManagerEmail();
+    const site = document.getElementById('vacationSite').value;
+    const team = document.getElementById('vacationTeam').value;
+    const approverName = document.getElementById('vacationApproverName').value;
+    const managerEmail = document.getElementById('vacationManagerEmail').value;
     const startDate = document.getElementById('vacationStartDate').value;
     const endDate = document.getElementById('vacationEndDate').value;
     const requestType = document.getElementById('vacationType').value;
@@ -4444,7 +4472,7 @@ async function submitVacationRequest(event) {
     }
     
     if (!managerEmail) {
-        showWarningModal('Please select a manager or enter their email address.', 'Manager Required');
+        showWarningModal('No approving manager configured for your team. Please contact admin.', 'Manager Not Found');
         return;
     }
     
@@ -4466,6 +4494,9 @@ async function submitVacationRequest(event) {
             body: JSON.stringify({
                 employee_name: employeeName,
                 email: email,
+                site: site || null,
+                team: team || null,
+                approver_name: approverName || null,
                 manager_email: managerEmail,
                 start_date: startDate,
                 end_date: endDate,
@@ -4485,11 +4516,13 @@ async function submitVacationRequest(event) {
         // Send email notification to manager
         await sendVacationNotification(savedRequest[0], 'new_request');
         
-        showSuccessModal('Leave request submitted successfully! Your manager has been notified via email.', 'Request Submitted');
+        showSuccessModal(`Leave request submitted successfully! ${approverName} has been notified via email.`, 'Request Submitted');
         document.getElementById('vacationRequestForm').reset();
         document.getElementById('vacationDuration').value = '';
+        document.getElementById('vacationSite').value = '';
+        document.getElementById('vacationTeam').value = '';
+        document.getElementById('vacationApproverName').value = '';
         document.getElementById('vacationManagerEmail').value = '';
-        document.getElementById('vacationManagerEmailCustom').value = '';
         
     } catch (error) {
         console.error('Error submitting vacation request:', error);

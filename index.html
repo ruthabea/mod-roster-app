@@ -2028,14 +2028,23 @@
                         
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="vacationManagerEmail">Manager Email *</label>
-                                <select id="vacationManagerEmail" required>
-                                    <option value="">Select your manager</option>
-                                </select>
+                                <label for="vacationSite">Site</label>
+                                <input type="text" id="vacationSite" readonly placeholder="Auto-filled based on selection">
                             </div>
                             <div class="form-group">
-                                <label for="vacationManagerEmailCustom">Or enter manually</label>
-                                <input type="email" id="vacationManagerEmailCustom" placeholder="manager@amdocs.com">
+                                <label for="vacationTeam">Team</label>
+                                <input type="text" id="vacationTeam" readonly placeholder="Auto-filled based on selection">
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="vacationApproverName">Approving Manager</label>
+                                <input type="text" id="vacationApproverName" readonly placeholder="Auto-determined based on Site/Application">
+                            </div>
+                            <div class="form-group">
+                                <label for="vacationManagerEmail">Manager Email</label>
+                                <input type="email" id="vacationManagerEmail" readonly placeholder="Auto-determined">
                             </div>
                         </div>
                         
