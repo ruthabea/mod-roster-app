@@ -2318,6 +2318,33 @@
         </div>
     </div>
 
+    <!-- Approver Selection Modal -->
+    <div id="approverSelectModal" class="notification-modal hidden">
+        <div class="notification-modal-overlay"></div>
+        <div class="notification-modal-content">
+            <div class="notification-modal-icon info">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                </svg>
+            </div>
+            <h3 class="notification-modal-title" id="approverSelectTitle">Select Approver</h3>
+            <p class="notification-modal-message" id="approverSelectMessage">Please select your name:</p>
+            <div class="prompt-input-container">
+                <select id="approverSelectDropdown" class="prompt-modal-input">
+                    <option value="">-- Select Your Name --</option>
+                </select>
+            </div>
+            <div id="approverReasonContainer" class="prompt-input-container hidden">
+                <input type="text" id="approverReasonInput" class="prompt-modal-input" placeholder="Enter rejection reason (optional)">
+            </div>
+            <div class="notification-modal-actions">
+                <button class="btn btn-secondary notification-modal-btn" onclick="closeApproverSelectModal(false)">Cancel</button>
+                <button class="btn btn-success notification-modal-btn" id="approverSelectOkBtn" onclick="closeApproverSelectModal(true)">Approve</button>
+            </div>
+        </div>
+    </div>
+
     <!-- SheetJS for Excel export -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <!-- Database Configuration (REST API - no SDK needed) -->

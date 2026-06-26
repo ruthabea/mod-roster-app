@@ -1654,6 +1654,124 @@ function showApproveModal(message, title = 'Confirm Approval', onConfirm, onCanc
     });
 }
 
+// Approver select modal callback
+let approverSelectCallback = null;
+
+// Show approver selection modal (for multiple approvers)
+function showApproverSelectModal(message, title, approverNames, onConfirm) {
+    const modal = document.getElementById('approverSelectModal');
+    
+    if (!modal) {
+        // Fallback - just use first approver
+        if (onConfirm) onConfirm(approverNames[0] || 'Manager');
+        return;
+    }
+    
+    const titleEl = document.getElementById('approverSelectTitle');
+    const messageEl = document.getElementById('approverSelectMessage');
+    const selectEl = document.getElementById('approverSelectDropdown');
+    const reasonContainer = document.getElementById('approverReasonContainer');
+    const okBtn = document.getElementById('approverSelectOkBtn');
+    
+    // Set content
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+    
+    // Populate dropdown
+    selectEl.innerHTML = '<option value="">-- Select Your Name --</option>';
+    approverNames.forEach(name => {
+        const option = document.createElement('option');
+        option.value = name;
+        option.textContent = name;
+        selectEl.appendChild(option);
+    });
+    
+    // Hide reason input for approval
+    reasonContainer.classList.add('hidden');
+    
+    // Update button text
+    okBtn.textContent = 'Approve';
+    okBtn.className = 'btn btn-success notification-modal-btn';
+    
+    // Store callback
+    approverSelectCallback = { onConfirm, includeReason: false };
+    
+    // Show modal
+    modal.classList.remove('hidden');
+}
+
+// Show approver selection modal with reason input (for rejection)
+function showApproverSelectWithReasonModal(message, title, approverNames, onConfirm) {
+    const modal = document.getElementById('approverSelectModal');
+    
+    if (!modal) {
+        // Fallback
+        if (onConfirm) onConfirm(approverNames[0] || 'Manager', '');
+        return;
+    }
+    
+    const titleEl = document.getElementById('approverSelectTitle');
+    const messageEl = document.getElementById('approverSelectMessage');
+    const selectEl = document.getElementById('approverSelectDropdown');
+    const reasonContainer = document.getElementById('approverReasonContainer');
+    const reasonInput = document.getElementById('approverReasonInput');
+    const okBtn = document.getElementById('approverSelectOkBtn');
+    
+    // Set content
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+    
+    // Populate dropdown
+    selectEl.innerHTML = '<option value="">-- Select Your Name --</option>';
+    approverNames.forEach(name => {
+        const option = document.createElement('option');
+        option.value = name;
+        option.textContent = name;
+        selectEl.appendChild(option);
+    });
+    
+    // Show reason input for rejection
+    reasonContainer.classList.remove('hidden');
+    reasonInput.value = '';
+    
+    // Update button text
+    okBtn.textContent = 'Reject';
+    okBtn.className = 'btn btn-danger notification-modal-btn';
+    
+    // Store callback
+    approverSelectCallback = { onConfirm, includeReason: true };
+    
+    // Show modal
+    modal.classList.remove('hidden');
+}
+
+// Close approver select modal
+function closeApproverSelectModal(confirmed = false) {
+    const modal = document.getElementById('approverSelectModal');
+    const selectEl = document.getElementById('approverSelectDropdown');
+    const reasonInput = document.getElementById('approverReasonInput');
+    
+    if (confirmed && approverSelectCallback) {
+        const selectedApprover = selectEl.value;
+        
+        if (!selectedApprover) {
+            showWarningModal('Please select your name before proceeding.', 'Selection Required');
+            return;
+        }
+        
+        if (approverSelectCallback.includeReason) {
+            approverSelectCallback.onConfirm(selectedApprover, reasonInput.value || '');
+        } else {
+            approverSelectCallback.onConfirm(selectedApprover);
+        }
+    }
+    
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+    approverSelectCallback = null;
+}
+
 // Prompt modal callback
 let promptModalCallback = null;
 
@@ -5142,41 +5260,124 @@ function closeVacationDetailModal() {
     currentVacationRequest = null;
 }
 
-// Quick approve
+// Quick approve - with manager selection
 async function quickApprove(id) {
-    showApproveModal(
-        'Are you sure you want to approve this leave request?',
-        'Approve Leave Request',
-        async () => {
-            // Fetch request data to get approver_name
-            const request = allVacationRequests.find(r => r.id === id) || await fetchVacationRequestById(id);
-            if (request) {
+    // Fetch request data to get approver_name list
+    const request = allVacationRequests.find(r => r.id === id) || await fetchVacationRequestById(id);
+    if (!request) {
+        showErrorModal('Request not found');
+        return;
+    }
+    
+    // Get list of approvers from the request
+    const approverNames = request.approver_name ? request.approver_name.split(',').map(n => n.trim()) : [];
+    
+    if (approverNames.length > 1) {
+        // Multiple approvers - show selection modal
+        showApproverSelectModal(
+            'Select your name to approve this request:',
+            'Approve Leave Request',
+            approverNames,
+            async (selectedApprover) => {
                 currentVacationRequest = request;
+                await updateVacationStatusWithReviewer(id, 'approved', '', selectedApprover);
+                currentVacationRequest = null;
             }
-            
-            await updateVacationStatus(id, 'approved', '');
-            currentVacationRequest = null;
-        }
-    );
+        );
+    } else {
+        // Single approver - use simple confirmation
+        showApproveModal(
+            'Are you sure you want to approve this leave request?',
+            'Approve Leave Request',
+            async () => {
+                currentVacationRequest = request;
+                const reviewerName = approverNames[0] || 'Manager';
+                await updateVacationStatusWithReviewer(id, 'approved', '', reviewerName);
+                currentVacationRequest = null;
+            }
+        );
+    }
 }
 
-// Quick reject
+// Quick reject - with manager selection
 async function quickReject(id) {
-    showPromptModal(
-        'Please provide a reason for rejection (optional):',
-        'Reject Leave Request',
-        'Enter rejection reason...',
-        async (reason) => {
-            // Fetch request data to get approver_name
-            const request = allVacationRequests.find(r => r.id === id) || await fetchVacationRequestById(id);
-            if (request) {
+    // Fetch request data to get approver_name list
+    const request = allVacationRequests.find(r => r.id === id) || await fetchVacationRequestById(id);
+    if (!request) {
+        showErrorModal('Request not found');
+        return;
+    }
+    
+    // Get list of approvers from the request
+    const approverNames = request.approver_name ? request.approver_name.split(',').map(n => n.trim()) : [];
+    
+    if (approverNames.length > 1) {
+        // Multiple approvers - show selection modal with reason input
+        showApproverSelectWithReasonModal(
+            'Select your name and provide a reason for rejection:',
+            'Reject Leave Request',
+            approverNames,
+            async (selectedApprover, reason) => {
                 currentVacationRequest = request;
+                await updateVacationStatusWithReviewer(id, 'rejected', reason || '', selectedApprover);
+                currentVacationRequest = null;
             }
-            
-            await updateVacationStatus(id, 'rejected', reason || '');
-            currentVacationRequest = null;
+        );
+    } else {
+        // Single approver - use simple prompt
+        showPromptModal(
+            'Please provide a reason for rejection (optional):',
+            'Reject Leave Request',
+            'Enter rejection reason...',
+            async (reason) => {
+                currentVacationRequest = request;
+                const reviewerName = approverNames[0] || 'Manager';
+                await updateVacationStatusWithReviewer(id, 'rejected', reason || '', reviewerName);
+                currentVacationRequest = null;
+            }
+        );
+    }
+}
+
+// Update vacation status with specific reviewer name
+async function updateVacationStatusWithReviewer(id, status, notes, reviewerName) {
+    try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/vacation_requests?id=eq.${id}`, {
+            method: 'PATCH',
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation'
+            },
+            body: JSON.stringify({
+                status: status,
+                reviewed_by: reviewerName,
+                reviewed_at: new Date().toISOString(),
+                manager_notes: notes || null
+            })
+        });
+        
+        if (!response.ok) throw new Error('Failed to update request');
+        
+        const updatedRequest = await response.json();
+        
+        // Clear vacation conflict cache
+        vacationConflictCache = {};
+        vacationConflictCacheWeek = null;
+        
+        // Send notification to the requestor
+        if (updatedRequest && updatedRequest[0]) {
+            await sendVacationNotification(updatedRequest[0], status === 'approved' ? 'approved' : 'rejected');
         }
-    );
+        
+        showSuccessModal(`Leave request ${status} successfully! The employee has been notified.`, status === 'approved' ? 'Request Approved' : 'Request Rejected');
+        loadPendingApprovals();
+        
+    } catch (error) {
+        console.error('Error updating vacation request:', error);
+        showErrorModal('Failed to update leave request. Please try again.');
+    }
 }
 
 // Approve vacation request (from modal)
