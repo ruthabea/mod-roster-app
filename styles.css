@@ -1122,7 +1122,8 @@ body {
     margin: 0;
 }
 
-#escalationForm {
+#escalationForm,
+#staffForm {
     padding: 1.25rem;
 }
 
@@ -1132,12 +1133,14 @@ body {
     gap: 1rem;
 }
 
-#escalationForm .form-group {
+#escalationForm .form-group,
+#staffForm .form-group {
     display: flex;
     flex-direction: column;
 }
 
-#escalationForm .form-group label {
+#escalationForm .form-group label,
+#staffForm .form-group label {
     font-weight: 600;
     color: var(--text-primary);
     margin-bottom: 0.35rem;
@@ -1147,7 +1150,9 @@ body {
 }
 
 #escalationForm input,
-#escalationForm select {
+#escalationForm select,
+#staffForm input,
+#staffForm select {
     padding: 0.6rem 0.75rem;
     border: 1px solid var(--border-color);
     border-radius: 6px;
@@ -1159,13 +1164,16 @@ body {
 }
 
 #escalationForm input:focus,
-#escalationForm select:focus {
+#escalationForm select:focus,
+#staffForm input:focus,
+#staffForm select:focus {
     outline: none;
     border-color: var(--primary-color);
     box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
-#escalationForm .modal-footer {
+#escalationForm .modal-footer,
+#staffForm .modal-footer {
     padding: 1rem 0 0 0;
     margin-top: 1rem;
     border-top: 1px solid var(--border-color);
@@ -5036,6 +5044,34 @@ header h1 {
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s ease;
+}
+
+/* Prompt Modal Input */
+.prompt-input-container {
+    margin-bottom: 1.5rem;
+}
+
+.prompt-modal-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    font-size: 0.95rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background-color: #f8fafc;
+    color: #1a1a2e;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+}
+
+.prompt-modal-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+    background-color: #fff;
+}
+
+.prompt-modal-input::placeholder {
+    color: #94a3b8;
 }
 
 .notification-modal-btn.btn-primary {

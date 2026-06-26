@@ -1554,99 +1554,39 @@
                     
                     <!-- Staff Modal -->
                     <div id="staffModal" class="modal hidden">
-                        <div class="modal-content">
+                        <div class="modal-content escalation-modal-content">
                             <div class="modal-header">
                                 <h3 id="staffModalTitle">Add Staff Entry</h3>
                                 <button class="modal-close" onclick="closeStaffModal()">&times;</button>
                             </div>
-                            <form id="staffForm" onsubmit="saveStaffEntry(event)" class="staff-form">
+                            <form id="staffForm" onsubmit="saveStaffEntry(event)">
                                 <input type="hidden" id="staffEditIndex" value="">
                                 
-                                <div class="staff-form-section">
-                                    <div class="section-icon">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                                            <circle cx="12" cy="7" r="4"/>
-                                        </svg>
+                                <div class="esc-form-grid">
+                                    <div class="form-group">
+                                        <label for="staffName">Name *</label>
+                                        <input type="text" id="staffName" required placeholder="Enter name as it appears in roster">
                                     </div>
-                                    <div class="section-content">
-                                        <label for="staffName">Name</label>
-                                        <input type="text" id="staffName" required placeholder="Enter name exactly as it appears in roster">
-                                        <span class="field-hint">Must match the roster entry (case-insensitive)</span>
-                                    </div>
-                                </div>
-                                
-                                <div class="staff-form-section">
-                                    <div class="section-icon">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                                            <polyline points="22,6 12,13 2,6"/>
-                                        </svg>
-                                    </div>
-                                    <div class="section-content">
-                                        <label for="staffEmail">Email Address</label>
+                                    <div class="form-group">
+                                        <label for="staffEmail">Email Address *</label>
                                         <input type="email" id="staffEmail" required placeholder="email@amdocs.com">
-                                        <span class="field-hint">Notifications will be sent to this email</span>
                                     </div>
-                                </div>
-                                
-                                <div class="staff-form-section">
-                                    <div class="section-icon">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
-                                            <line x1="12" y1="18" x2="12.01" y2="18"/>
-                                        </svg>
-                                    </div>
-                                    <div class="section-content">
+                                    <div class="form-group">
                                         <label for="staffMobile">Mobile Number</label>
                                         <input type="tel" id="staffMobile" placeholder="+61 412 345 678">
-                                        <span class="field-hint">Optional - displayed in manager summary emails</span>
                                     </div>
-                                </div>
-                                
-                                <div class="staff-form-section">
-                                    <div class="section-icon">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <circle cx="12" cy="12" r="10"/>
-                                            <polyline points="12 6 12 12 16 14"/>
-                                        </svg>
-                                    </div>
-                                    <div class="section-content">
-                                        <label>Notification Timezone</label>
-                                        <div class="timezone-options">
-                                            <label class="timezone-option">
-                                                <input type="radio" name="staffTimezone" id="staffTimezoneAEST" value="AEST" checked>
-                                                <div class="timezone-card aest">
-                                                    <span class="tz-flag">AU</span>
-                                                    <div class="tz-details">
-                                                        <span class="tz-name">AEST</span>
-                                                        <span class="tz-desc">8:00 AM</span>
-                                                    </div>
-                                                </div>
-                                            </label>
-                                            <label class="timezone-option">
-                                                <input type="radio" name="staffTimezone" id="staffTimezoneIST" value="IST">
-                                                <div class="timezone-card ist">
-                                                    <span class="tz-flag">IN</span>
-                                                    <div class="tz-details">
-                                                        <span class="tz-name">IST</span>
-                                                        <span class="tz-desc">9:00 AM</span>
-                                                    </div>
-                                                </div>
-                                            </label>
-                                        </div>
-                                        <span class="field-hint">When should this person receive notifications?</span>
+                                    <div class="form-group">
+                                        <label for="staffTimezone">Notification Timezone *</label>
+                                        <select id="staffTimezone" required>
+                                            <option value="AEST">AEST (Australia)</option>
+                                            <option value="IST">IST (India)</option>
+                                        </select>
                                     </div>
                                 </div>
                                 
                                 <div class="modal-footer">
                                     <button type="button" class="btn btn-secondary" onclick="closeStaffModal()">Cancel</button>
-                                    <button type="submit" class="btn btn-primary">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <polyline points="20 6 9 17 4 12"/>
-                                        </svg>
-                                        Save Entry
-                                    </button>
+                                    <button type="submit" class="btn btn-primary">Save Entry</button>
                                 </div>
                             </form>
                         </div>
@@ -2355,6 +2295,25 @@
             <div class="notification-modal-actions">
                 <button class="btn btn-primary notification-modal-btn" id="notificationModalOkBtn" onclick="closeAlertModal()">OK</button>
                 <button class="btn btn-secondary notification-modal-btn hidden" id="notificationModalCancelBtn" onclick="closeAlertModal(false)">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Prompt Modal -->
+    <div id="promptModal" class="notification-modal hidden">
+        <div class="notification-modal-overlay"></div>
+        <div class="notification-modal-content">
+            <div class="notification-modal-icon" id="promptModalIcon">
+                <!-- Icon will be inserted by JS -->
+            </div>
+            <h3 class="notification-modal-title" id="promptModalTitle">Input Required</h3>
+            <p class="notification-modal-message" id="promptModalMessage">Please enter a value:</p>
+            <div class="prompt-input-container">
+                <input type="text" id="promptModalInput" class="prompt-modal-input" placeholder="">
+            </div>
+            <div class="notification-modal-actions">
+                <button class="btn btn-secondary notification-modal-btn" id="promptModalCancelBtn" onclick="closePromptModal(false)">Cancel</button>
+                <button class="btn btn-primary notification-modal-btn" id="promptModalOkBtn" onclick="closePromptModal(true)">OK</button>
             </div>
         </div>
     </div>

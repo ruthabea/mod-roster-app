@@ -480,19 +480,29 @@ function editModPersonnel(type, index) {
 }
 
 async function deleteModPersonnel(type, index) {
-    if (!confirm('Are you sure you want to delete this MOD personnel?')) return;
+    // Get the person's name for the confirmation message
+    const person = modPersonnelData[type]?.[index];
+    const personName = person?.name || 'this MOD personnel';
+    const typeLabel = type === 'onsite' ? 'Onsite' : 'Offshore';
     
-    if (useDatabase) {
-        const id = modPersonnelData[type][index]._id;
-        await db.deleteModPersonnel(id);
-        modPersonnelData = await db.getModPersonnel();
-    } else {
-        modPersonnelData[type].splice(index, 1);
-        saveModPersonnelData();
-    }
-    
-    renderModPersonnelTables();
-    showToast('MOD personnel deleted');
+    showConfirmModal(
+        `Are you sure you want to delete "${personName}" from the ${typeLabel} MOD list?`,
+        'Delete MOD Personnel',
+        async () => {
+            // On confirm - delete the personnel
+            if (useDatabase) {
+                const id = modPersonnelData[type][index]._id;
+                await db.deleteModPersonnel(id);
+                modPersonnelData = await db.getModPersonnel();
+            } else {
+                modPersonnelData[type].splice(index, 1);
+                saveModPersonnelData();
+            }
+            
+            renderModPersonnelTables();
+            showToast('MOD personnel deleted');
+        }
+    );
 }
 
 // ==================== MOD SCHEDULE CRUD ====================
@@ -593,6 +603,39 @@ function saveModScheduleEntry(event) {
         };
     }
     
+    // Check for duplicate date
+    const existingEntries = appData.mod.savedSchedule.entries || [];
+    
+    // Normalize date to YYYY-MM-DD format for comparison
+    const normalizeDate = (d) => {
+        if (!d) return '';
+        // Handle both "2026-06-04" and "2026-06-04T00:00:00.000Z" formats
+        return d.split('T')[0];
+    };
+    
+    const normalizedInputDate = normalizeDate(date);
+    
+    const duplicateIndex = existingEntries.findIndex((entry, idx) => {
+        // When editing, exclude the current entry from duplicate check
+        if (editIndex >= 0 && idx === editIndex) return false;
+        return normalizeDate(entry.date) === normalizedInputDate;
+    });
+    
+    if (duplicateIndex >= 0) {
+        const duplicateDate = new Date(date);
+        const formattedDate = duplicateDate.toLocaleDateString('en-US', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
+        showWarningModal(
+            `A schedule entry for "${formattedDate}" already exists. Please select a different date.`,
+            'Duplicate Date'
+        );
+        return;
+    }
+    
     const entry = {
         date: date,
         primaryName: onsiteName,
@@ -624,14 +667,32 @@ function editModScheduleEntry(index) {
 }
 
 function deleteModScheduleEntry(index) {
-    if (!confirm('Are you sure you want to delete this schedule entry?')) return;
-    
-    if (appData.mod.savedSchedule && appData.mod.savedSchedule.entries) {
-        appData.mod.savedSchedule.entries.splice(index, 1);
-        saveScheduleToStorage('mod', appData.mod.savedSchedule);
-        displaySavedSchedule('mod');
-        showToast('Schedule entry deleted');
+    // Get the entry details for the confirmation message
+    const entry = appData.mod.savedSchedule?.entries?.[index];
+    let dateDisplay = 'this entry';
+    if (entry && entry.date) {
+        const date = new Date(entry.date);
+        dateDisplay = date.toLocaleDateString('en-US', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
     }
+    
+    showConfirmModal(
+        `Are you sure you want to delete the schedule entry for ${dateDisplay}?`,
+        'Delete Schedule Entry',
+        () => {
+            // On confirm - delete the entry
+            if (appData.mod.savedSchedule && appData.mod.savedSchedule.entries) {
+                appData.mod.savedSchedule.entries.splice(index, 1);
+                saveScheduleToStorage('mod', appData.mod.savedSchedule);
+                displaySavedSchedule('mod');
+                showToast('Schedule entry deleted');
+            }
+        }
+    );
 }
 
 // Load all saved data
@@ -660,8 +721,46 @@ function saveScheduleToStorage(screen, scheduleData) {
     try {
         localStorage.setItem(STORAGE_KEYS[screen].schedule, JSON.stringify(scheduleData));
         appData[screen].savedSchedule = scheduleData;
+        
+        // Sync MOD schedule to Supabase for weekly notifications
+        if (screen === 'mod' && scheduleData && scheduleData.entries) {
+            syncModScheduleToSupabase(scheduleData.entries);
+        }
     } catch (e) {
         console.error(`Error saving ${screen} schedule:`, e);
+    }
+}
+
+// Sync MOD schedule to Supabase
+async function syncModScheduleToSupabase(entries) {
+    try {
+        // Prepare data for upsert
+        const scheduleData = entries.map(entry => ({
+            date: entry.date,
+            onsite_name: entry.primaryName || entry.primaryDisplay?.split('<')[0]?.trim() || null,
+            onsite_email: entry.primaryDisplay?.match(/<(.+?)>/)?.[1] || null,
+            offshore_name: entry.secondaryName || entry.secondaryDisplay?.split('<')[0]?.trim() || null,
+            offshore_email: entry.secondaryDisplay?.match(/<(.+?)>/)?.[1] || null,
+            updated_at: new Date().toISOString()
+        }));
+        
+        // Upsert each entry (update if exists, insert if not)
+        for (const entry of scheduleData) {
+            await fetch(`${SUPABASE_URL}/rest/v1/mod_schedule?on_conflict=date`, {
+                method: 'POST',
+                headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'resolution=merge-duplicates'
+                },
+                body: JSON.stringify(entry)
+            });
+        }
+        
+        console.log('MOD schedule synced to Supabase');
+    } catch (error) {
+        console.error('Error syncing MOD schedule to Supabase:', error);
     }
 }
 
@@ -1296,19 +1395,19 @@ function exportScheduleJSON(screen) {
         const primaryDisplay = entry.primaryDisplay || '';
         const secondaryDisplay = entry.secondaryDisplay || '';
         
-        // Extract name and email
+        // Extract name only (no email in main columns to match table display)
         const primaryName = primaryDisplay.split('<')[0].trim();
-        const primaryEmail = primaryDisplay.includes('<') ? primaryDisplay.match(/<(.+?)>/)?.[1] || '' : '';
         const secondaryName = secondaryDisplay.split('<')[0].trim();
-        const secondaryEmail = secondaryDisplay.includes('<') ? secondaryDisplay.match(/<(.+?)>/)?.[1] || '' : '';
+        
+        // Format date as "DD-Mon" to match table display
+        const day = date.getDate();
+        const month = date.toLocaleDateString('en-US', { month: 'short' });
+        const dateFormatted = `${day}-${month}`;
         
         return {
-            'Date': formatDateShort(date),
-            'Day': date.toLocaleDateString('en-US', { weekday: 'long' }),
-            [screen === 'mod' ? 'Onsite MOD' : 'Primary On-Call']: primaryName,
-            [screen === 'mod' ? 'Onsite Email' : 'Primary Email']: primaryEmail,
-            [screen === 'mod' ? 'Offshore MOD' : 'Secondary On-Call']: secondaryName,
-            [screen === 'mod' ? 'Offshore Email' : 'Secondary Email']: secondaryEmail
+            'Days': dateFormatted,
+            [screen === 'mod' ? 'Onsite MOD (7AM to 7PM AEST)' : 'Primary On-Call']: primaryName,
+            [screen === 'mod' ? 'Offshore MOD (7PM to 7AM AEST)' : 'Secondary On-Call']: secondaryName
         };
     });
     
@@ -1319,12 +1418,9 @@ function exportScheduleJSON(screen) {
     
     // Auto-size columns
     const colWidths = [
-        { wch: 12 },  // Date
-        { wch: 12 },  // Day
-        { wch: 25 },  // Onsite/Primary Name
-        { wch: 30 },  // Onsite/Primary Email
-        { wch: 25 },  // Offshore/Secondary Name
-        { wch: 30 }   // Offshore/Secondary Email
+        { wch: 10 },  // Days
+        { wch: 35 },  // Onsite MOD (7AM to 7PM AEST)
+        { wch: 35 }   // Offshore MOD (7PM to 7AM AEST)
     ];
     ws['!cols'] = colWidths;
     
@@ -1530,6 +1626,99 @@ function showWarningModal(message, title = 'Warning') {
 // Helper function for info messages
 function showInfoModal(message, title = 'Information') {
     showAlertModal(message, { type: 'info', title });
+}
+
+// Helper function for confirm dialogs
+function showConfirmModal(message, title = 'Confirm', onConfirm, onCancel = null) {
+    showAlertModal(message, { 
+        type: 'warning', 
+        title,
+        showCancel: true,
+        okText: 'Yes, Delete',
+        cancelText: 'Cancel',
+        onOk: onConfirm,
+        onCancel: onCancel
+    });
+}
+
+// Helper function for approval confirm dialogs
+function showApproveModal(message, title = 'Confirm Approval', onConfirm, onCancel = null) {
+    showAlertModal(message, { 
+        type: 'info', 
+        title,
+        showCancel: true,
+        okText: 'Yes, Approve',
+        cancelText: 'Cancel',
+        onOk: onConfirm,
+        onCancel: onCancel
+    });
+}
+
+// Prompt modal callback
+let promptModalCallback = null;
+
+// Show prompt modal (replacement for prompt)
+function showPromptModal(message, title = 'Input Required', placeholder = '', onSubmit = null, onCancel = null) {
+    const modal = document.getElementById('promptModal');
+    const iconEl = document.getElementById('promptModalIcon');
+    const titleEl = document.getElementById('promptModalTitle');
+    const messageEl = document.getElementById('promptModalMessage');
+    const inputEl = document.getElementById('promptModalInput');
+    const okBtn = document.getElementById('promptModalOkBtn');
+    
+    if (!modal) {
+        const result = prompt(message);
+        if (result !== null && onSubmit) onSubmit(result);
+        else if (result === null && onCancel) onCancel();
+        return;
+    }
+    
+    // Set icon
+    iconEl.innerHTML = notificationIcons.info;
+    iconEl.className = 'notification-modal-icon info';
+    
+    // Set content
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+    inputEl.value = '';
+    inputEl.placeholder = placeholder;
+    
+    // Store callback
+    promptModalCallback = { onSubmit, onCancel };
+    
+    // Show modal
+    modal.classList.remove('hidden');
+    
+    // Focus input
+    setTimeout(() => inputEl.focus(), 100);
+    
+    // Handle Enter key
+    inputEl.onkeydown = function(e) {
+        if (e.key === 'Enter') {
+            closePromptModal(true);
+        } else if (e.key === 'Escape') {
+            closePromptModal(false);
+        }
+    };
+}
+
+// Close prompt modal
+function closePromptModal(confirmed = true) {
+    const modal = document.getElementById('promptModal');
+    const inputEl = document.getElementById('promptModalInput');
+    
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+    
+    if (promptModalCallback) {
+        if (confirmed && promptModalCallback.onSubmit) {
+            promptModalCallback.onSubmit(inputEl.value);
+        } else if (!confirmed && promptModalCallback.onCancel) {
+            promptModalCallback.onCancel();
+        }
+        promptModalCallback = null;
+    }
 }
 
 // ==================== L2 ROSTER FUNCTIONS ====================
@@ -2196,25 +2385,35 @@ function editContact(teamKey, index) {
 }
 
 async function deleteContact(teamKey, index) {
-    if (!confirm('Are you sure you want to delete this contact?')) return;
+    // Get contact details for the confirmation message
+    const contact = contactsData[teamKey]?.[index];
+    const contactName = contact?.name || 'this contact';
+    const contactArea = contact?.area || '';
     
-    if (contactsData[teamKey]) {
-        if (useDatabase) {
-            const id = contactsData[teamKey][index]._id;
-            await db.deleteContact(id);
-            contactsData = await db.getContacts();
-        } else {
-            contactsData[teamKey].splice(index, 1);
-            saveContactsData();
+    showConfirmModal(
+        `Are you sure you want to delete "${contactName}"${contactArea ? ` from ${contactArea}` : ''}?`,
+        'Delete Contact',
+        async () => {
+            // On confirm - delete the contact
+            if (contactsData[teamKey]) {
+                if (useDatabase) {
+                    const id = contactsData[teamKey][index]._id;
+                    await db.deleteContact(id);
+                    contactsData = await db.getContacts();
+                } else {
+                    contactsData[teamKey].splice(index, 1);
+                    saveContactsData();
+                }
+                
+                renderAllContactTables();
+                showToast('Contact deleted');
+                
+                if (contactEditMode) {
+                    document.querySelector('#oncall-contactsTab .card').classList.add('edit-mode');
+                }
+            }
         }
-        
-        renderAllContactTables();
-        showToast('Contact deleted');
-        
-        if (contactEditMode) {
-            document.querySelector('#oncall-contactsTab .card').classList.add('edit-mode');
-        }
-    }
+    );
 }
 
 // ========================================
@@ -2461,19 +2660,29 @@ function editEscalationEntry(index) {
 }
 
 async function deleteEscalationEntry(index) {
-    if (!confirm('Are you sure you want to delete this escalation entry?')) return;
-    
-    if (useDatabase) {
-        const id = escalationMatrixData[index]._id;
-        await db.deleteEscalationEntry(id);
-        escalationMatrixData = await db.getEscalationMatrix();
-    } else {
-        escalationMatrixData.splice(index, 1);
-        saveEscalationMatrixData();
-    }
-    
-    renderEscalationMatrixTable();
-    showToast('Escalation entry deleted');
+    // Get escalation entry details for the confirmation message
+    const entry = escalationMatrixData[index];
+    const areaName = entry?.area || 'this entry';
+    const onCall = entry?.onCall || '';
+
+    showConfirmModal(
+        `Are you sure you want to delete the escalation entry for "${areaName}"${onCall ? ` (On-Call: ${onCall})` : ''}?`,
+        'Delete Escalation Entry',
+        async () => {
+            // On confirm - delete the entry
+            if (useDatabase) {
+                const id = escalationMatrixData[index]._id;
+                await db.deleteEscalationEntry(id);
+                escalationMatrixData = await db.getEscalationMatrix();
+            } else {
+                escalationMatrixData.splice(index, 1);
+                saveEscalationMatrixData();
+            }
+            
+            renderEscalationMatrixTable();
+            showToast('Escalation entry deleted');
+        }
+    );
 }
 
 // ========================================
@@ -3191,21 +3400,32 @@ function editRosterEntry(index) {
 }
 
 async function deleteRosterEntry(index) {
-    if (!confirm('Are you sure you want to delete this roster entry?')) return;
+    // Get entry details for the confirmation message
+    const entry = rosterData[index];
+    const app = entry?.app || 'Unknown';
+    const team = entry?.team || 'Unknown';
+    const timeShift = entry?.time_shift || '';
     
-    const weekStart = getCurrentWeekStart();
-    
-    if (useDatabase) {
-        const id = rosterData[index]._id;
-        await db.deleteRosterEntry(id);
-        rosterData = await db.getRoster(weekStart);
-    } else {
-        rosterData.splice(index, 1);
-        saveRosterData();
-    }
-    
-    renderRosterTable();
-    showToast('Roster entry deleted');
+    showConfirmModal(
+        `Are you sure you want to delete this roster entry?\n\nApplication: ${app}\nTeam: ${team}\nShift: ${timeShift}`,
+        'Delete Roster Entry',
+        async () => {
+            // On confirm - delete the entry
+            const weekStart = getCurrentWeekStart();
+            
+            if (useDatabase) {
+                const id = rosterData[index]._id;
+                await db.deleteRosterEntry(id);
+                rosterData = await db.getRoster(weekStart);
+            } else {
+                rosterData.splice(index, 1);
+                saveRosterData();
+            }
+            
+            renderRosterTable();
+            showToast('Roster entry deleted');
+        }
+    );
 }
 
 function exportRosterExcel() {
@@ -3519,14 +3739,12 @@ function openStaffModal(index = -1) {
         document.getElementById('staffName').value = staff.name || '';
         document.getElementById('staffEmail').value = staff.email || '';
         document.getElementById('staffMobile').value = staff.mobile || '';
-        // Set timezone radio button
-        const tz = staff.timezone || 'AEST';
-        const tzRadio = document.querySelector(`input[name="staffTimezone"][value="${tz}"]`);
-        if (tzRadio) tzRadio.checked = true;
+        // Set timezone dropdown
+        document.getElementById('staffTimezone').value = staff.timezone || 'AEST';
     } else {
         title.textContent = 'Add Staff Entry';
         // Default to AEST
-        document.getElementById('staffTimezoneAEST').checked = true;
+        document.getElementById('staffTimezone').value = 'AEST';
     }
     
     modal.classList.remove('hidden');
@@ -3540,12 +3758,11 @@ async function saveStaffEntry(event) {
     event.preventDefault();
     
     const editIndex = parseInt(document.getElementById('staffEditIndex').value);
-    const selectedTimezone = document.querySelector('input[name="staffTimezone"]:checked');
     const entry = {
         name: document.getElementById('staffName').value.trim(),
         email: document.getElementById('staffEmail').value.trim(),
         mobile: document.getElementById('staffMobile').value.trim(),
-        timezone: selectedTimezone ? selectedTimezone.value : 'AEST'
+        timezone: document.getElementById('staffTimezone').value || 'AEST'
     };
     
     if (useDatabase) {
@@ -3578,19 +3795,29 @@ function editStaffEntry(index) {
 }
 
 async function deleteStaffEntry(index) {
-    if (!confirm('Are you sure you want to delete this staff entry?')) return;
-    
-    if (useDatabase) {
-        const id = staffData[index]._id;
-        await db.deleteStaffEntry(id);
-        staffData = await db.getStaffDirectory();
-    } else {
-        staffData.splice(index, 1);
-        localStorage.setItem('staff_directory', JSON.stringify(staffData));
-    }
-    
-    renderStaffTable();
-    showToast('Staff entry deleted');
+    // Get staff entry details for the confirmation message
+    const staff = staffData[index];
+    const staffName = staff?.name || 'this staff member';
+    const staffEmail = staff?.email || '';
+
+    showConfirmModal(
+        `Are you sure you want to delete "${staffName}"${staffEmail ? ` (${staffEmail})` : ''}?`,
+        'Delete Staff Entry',
+        async () => {
+            // On confirm - delete the entry
+            if (useDatabase) {
+                const id = staffData[index]._id;
+                await db.deleteStaffEntry(id);
+                staffData = await db.getStaffDirectory();
+            } else {
+                staffData.splice(index, 1);
+                localStorage.setItem('staff_directory', JSON.stringify(staffData));
+            }
+            
+            renderStaffTable();
+            showToast('Staff entry deleted');
+        }
+    );
 }
 
 function exportStaffExcel() {
@@ -3609,6 +3836,7 @@ function exportStaffExcel() {
     const exportData = staffData.map(s => ({
         'Name': s.name,
         'Email': s.email,
+        'Mobile': s.mobile || '',
         'Timezone': s.timezone || 'AEST'
     }));
     
@@ -3620,6 +3848,7 @@ function exportStaffExcel() {
     ws['!cols'] = [
         { wch: 25 },  // Name
         { wch: 35 },  // Email
+        { wch: 20 },  // Mobile
         { wch: 10 }   // Timezone
     ];
     
@@ -4300,39 +4529,77 @@ async function fetchEmployeeTeam(employeeName) {
     }
 }
 
-// Manager routing configuration for vacation approvals
-const VACATION_APPROVERS = {
-    // Team-based approvers
-    'frontend': { name: 'Manisha Bardiya', email: 'MBardiya@amdocs.com' },
-    'digital': { name: 'Manisha Bardiya', email: 'MBardiya@amdocs.com' },
-    'backend': { name: 'Bindiya Phadte', email: 'BPhadte@amdocs.com' },
-    'infra': { name: 'Rahul Gupta', email: 'RGupta@amdocs.com' },
-    'ods': { name: 'Prachi Menon', email: 'PMenon@amdocs.com' },
-    
-    // Site-based approver (Philippines - regardless of team)
-    'philippines': { name: 'Josie Solar', email: 'JSolar@amdocs.com' },
-    
-    // Default approver if no match (for B2B, ANM, SDM, L2, etc.)
-    'default': { name: 'Not Configured', email: '' }
+// Manager directory for vacation approvals
+const MANAGERS = {
+    josieSolar: { name: 'Josie Solar', email: 'JSolar@amdocs.com' },
+    manishaBardiya: { name: 'Manisha Bardiya', email: 'MBardiya@amdocs.com' },
+    ashwaniAggarwal: { name: 'Ashwani Aggarwal', email: 'AAggarwal@amdocs.com' },
+    atmaramMore: { name: 'Atmaram More', email: 'AMore@amdocs.com' },
+    bindiyaPhadte: { name: 'Bindiya Phadte', email: 'BPhadte@amdocs.com' },
+    rahulGupta: { name: 'Rahul Gupta', email: 'RGupta@amdocs.com' },
+    prachiMenon: { name: 'Prachi Menon', email: 'PMenon@amdocs.com' }
 };
 
-// Determine vacation approver based on Site and Team
-function determineVacationApprover(site, team) {
+// Manager routing configuration for vacation approvals (supports multiple approvers)
+const VACATION_APPROVERS = {
+    // Philippines Site - Team-based routing
+    'philippines_frontend': [MANAGERS.josieSolar, MANAGERS.manishaBardiya, MANAGERS.ashwaniAggarwal],
+    'philippines_digital': [MANAGERS.josieSolar, MANAGERS.manishaBardiya, MANAGERS.ashwaniAggarwal],
+    'philippines_backend': [MANAGERS.josieSolar, MANAGERS.atmaramMore, MANAGERS.bindiyaPhadte],
+    'philippines_infra': [MANAGERS.josieSolar, MANAGERS.rahulGupta],
+    'philippines_ods': [MANAGERS.josieSolar, MANAGERS.prachiMenon],
+    
+    // India/Australia Site - Team-based routing
+    'india_frontend': [MANAGERS.manishaBardiya, MANAGERS.ashwaniAggarwal],
+    'india_digital': [MANAGERS.manishaBardiya, MANAGERS.ashwaniAggarwal],
+    'india_backend': [MANAGERS.atmaramMore, MANAGERS.bindiyaPhadte],
+    'india_infra': [MANAGERS.rahulGupta],
+    'india_ods': [MANAGERS.prachiMenon],
+    
+    'australia_frontend': [MANAGERS.manishaBardiya, MANAGERS.ashwaniAggarwal],
+    'australia_digital': [MANAGERS.manishaBardiya, MANAGERS.ashwaniAggarwal],
+    'australia_backend': [MANAGERS.atmaramMore, MANAGERS.bindiyaPhadte],
+    'australia_infra': [MANAGERS.rahulGupta],
+    'australia_ods': [MANAGERS.prachiMenon],
+    
+    // Default (for B2B, ANM, SDM, L2, etc.)
+    'default': []
+};
+
+// Determine vacation approvers based on Site and Team (returns array of approvers)
+function determineVacationApprovers(site, team) {
     const siteLower = (site || '').toLowerCase().trim();
     const teamLower = (team || '').toLowerCase().trim();
     
-    // Rule 1: Site-based routing takes priority (Philippines -> Josie Solar)
+    // Normalize site names
+    let siteKey = 'default';
     if (siteLower.includes('philippines') || siteLower === 'ph') {
-        return VACATION_APPROVERS['philippines'];
+        siteKey = 'philippines';
+    } else if (siteLower.includes('india') || siteLower === 'in') {
+        siteKey = 'india';
+    } else if (siteLower.includes('australia') || siteLower === 'au' || siteLower.includes('aest')) {
+        siteKey = 'australia';
     }
     
-    // Rule 2-5: Team-based routing
-    if (teamLower && VACATION_APPROVERS[teamLower]) {
-        return VACATION_APPROVERS[teamLower];
+    // Build lookup key
+    const lookupKey = `${siteKey}_${teamLower}`;
+    
+    // Check for exact match
+    if (VACATION_APPROVERS[lookupKey]) {
+        return VACATION_APPROVERS[lookupKey];
     }
     
-    // Default: No specific approver found (B2B, ANM, SDM, L2, etc.)
+    // Default: No specific approvers found
     return VACATION_APPROVERS['default'];
+}
+
+// Legacy function for backward compatibility (returns first approver)
+function determineVacationApprover(site, team) {
+    const approvers = determineVacationApprovers(site, team);
+    if (approvers.length > 0) {
+        return approvers[0];
+    }
+    return { name: 'Not Configured', email: '' };
 }
 
 // Populate employee dropdown from staff directory
@@ -4399,14 +4666,24 @@ async function populateVacationEmployeeDropdown() {
                 
                 if (teamInput) teamInput.value = teamDisplay;
                 
-                // Auto-determine manager based on Site and Team
-                const manager = determineVacationApprover(
+                // Auto-determine managers based on Site and Team (now supports multiple)
+                const approvers = determineVacationApprovers(
                     selectedOption.dataset.site || '',
                     team
                 );
                 
-                if (approverNameInput) approverNameInput.value = manager.name;
-                if (managerEmailInput) managerEmailInput.value = manager.email;
+                if (approvers.length > 0) {
+                    // Display all approver names (comma-separated)
+                    const approverNames = approvers.map(a => a.name).join(', ');
+                    // Store all approver emails (semicolon-separated for multiple recipients)
+                    const approverEmails = approvers.map(a => a.email).join(';');
+                    
+                    if (approverNameInput) approverNameInput.value = approverNames;
+                    if (managerEmailInput) managerEmailInput.value = approverEmails;
+                } else {
+                    if (approverNameInput) approverNameInput.value = 'Not Configured';
+                    if (managerEmailInput) managerEmailInput.value = '';
+                }
             } else {
                 // Clear all fields
                 if (emailInput) emailInput.value = '';
@@ -4516,7 +4793,12 @@ async function submitVacationRequest(event) {
         // Send email notification to manager
         await sendVacationNotification(savedRequest[0], 'new_request');
         
-        showSuccessModal(`Leave request submitted successfully! ${approverName} has been notified via email.`, 'Request Submitted');
+        // Format success message for single or multiple approvers
+        const approverCount = approverName.split(',').length;
+        const approverMsg = approverCount > 1 
+            ? `${approverCount} managers have been notified via email.`
+            : `${approverName} has been notified via email.`;
+        showSuccessModal(`Leave request submitted successfully! ${approverMsg}`, 'Request Submitted');
         document.getElementById('vacationRequestForm').reset();
         document.getElementById('vacationDuration').value = '';
         document.getElementById('vacationSite').value = '';
@@ -4530,27 +4812,40 @@ async function submitVacationRequest(event) {
     }
 }
 
+// TEST MODE: Set this to your email to receive all vacation notifications for testing
+// Set to null or empty string to disable test mode and send to actual recipients
+const VACATION_TEST_EMAIL = 'ruthabegail.adraneda@amdocs.com'; // Change to null for production
+
 // Send vacation notification email
 async function sendVacationNotification(request, notificationType) {
     try {
+        const payload = {
+            requestId: request.id,
+            notificationType: notificationType,
+            requestData: request
+        };
+        
+        // Add test email if in test mode
+        if (VACATION_TEST_EMAIL) {
+            payload.testEmail = VACATION_TEST_EMAIL;
+            console.log(`TEST MODE: Vacation notification will be sent to ${VACATION_TEST_EMAIL}`);
+        }
+        
         const response = await fetch(`${SUPABASE_URL}/functions/v1/send-vacation-notifications`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
             },
-            body: JSON.stringify({
-                requestId: request.id,
-                notificationType: notificationType,
-                requestData: request
-            })
+            body: JSON.stringify(payload)
         });
         
         if (!response.ok) {
             const errorText = await response.text();
             console.error('Failed to send notification:', errorText);
         } else {
-            console.log('Vacation notification sent successfully');
+            const result = await response.json();
+            console.log('Vacation notification sent successfully:', result);
         }
     } catch (error) {
         console.error('Error sending vacation notification:', error);
@@ -4849,15 +5144,39 @@ function closeVacationDetailModal() {
 
 // Quick approve
 async function quickApprove(id) {
-    if (!confirm('Are you sure you want to approve this leave request?')) return;
-    await updateVacationStatus(id, 'approved', '');
+    showApproveModal(
+        'Are you sure you want to approve this leave request?',
+        'Approve Leave Request',
+        async () => {
+            // Fetch request data to get approver_name
+            const request = allVacationRequests.find(r => r.id === id) || await fetchVacationRequestById(id);
+            if (request) {
+                currentVacationRequest = request;
+            }
+            
+            await updateVacationStatus(id, 'approved', '');
+            currentVacationRequest = null;
+        }
+    );
 }
 
 // Quick reject
 async function quickReject(id) {
-    const reason = prompt('Please provide a reason for rejection (optional):');
-    if (reason === null) return; // User cancelled
-    await updateVacationStatus(id, 'rejected', reason);
+    showPromptModal(
+        'Please provide a reason for rejection (optional):',
+        'Reject Leave Request',
+        'Enter rejection reason...',
+        async (reason) => {
+            // Fetch request data to get approver_name
+            const request = allVacationRequests.find(r => r.id === id) || await fetchVacationRequestById(id);
+            if (request) {
+                currentVacationRequest = request;
+            }
+            
+            await updateVacationStatus(id, 'rejected', reason || '');
+            currentVacationRequest = null;
+        }
+    );
 }
 
 // Approve vacation request (from modal)
@@ -4883,6 +5202,21 @@ async function rejectVacationRequest() {
 // Update vacation request status
 async function updateVacationStatus(id, status, notes) {
     try {
+        // Get the reviewer name from the current request's approver_name, or derive from manager_email
+        let reviewerName = 'Manager';
+        if (currentVacationRequest) {
+            if (currentVacationRequest.approver_name) {
+                reviewerName = currentVacationRequest.approver_name;
+            } else if (currentVacationRequest.manager_email) {
+                // Derive name from manager email (e.g., "john.smith@company.com" -> "John Smith")
+                const emailPart = currentVacationRequest.manager_email.split('@')[0];
+                reviewerName = emailPart
+                    .split('.')
+                    .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+                    .join(' ');
+            }
+        }
+        
         const response = await fetch(`${SUPABASE_URL}/rest/v1/vacation_requests?id=eq.${id}`, {
             method: 'PATCH',
             headers: {
@@ -4893,7 +5227,7 @@ async function updateVacationStatus(id, status, notes) {
             },
             body: JSON.stringify({
                 status: status,
-                reviewed_by: 'Manager', // In a real app, this would be the logged-in manager's name
+                reviewed_by: reviewerName,
                 reviewed_at: new Date().toISOString(),
                 manager_notes: notes || null
             })
@@ -4923,30 +5257,34 @@ async function updateVacationStatus(id, status, notes) {
 
 // Cancel vacation request
 async function cancelVacationRequest(id) {
-    if (!confirm('Are you sure you want to cancel this leave request?')) return;
-    
-    try {
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/vacation_requests?id=eq.${id}`, {
-            method: 'PATCH',
-            headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                status: 'cancelled'
-            })
-        });
-        
-        if (!response.ok) throw new Error('Failed to cancel request');
-        
-        showSuccessModal('Leave request has been cancelled.', 'Request Cancelled');
-        loadMyVacationRequests();
-        
-    } catch (error) {
-        console.error('Error cancelling vacation request:', error);
-        showErrorModal('Failed to cancel leave request. Please try again.');
-    }
+    showConfirmModal(
+        'Are you sure you want to cancel this leave request?',
+        'Cancel Leave Request',
+        async () => {
+            try {
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/vacation_requests?id=eq.${id}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        status: 'cancelled'
+                    })
+                });
+                
+                if (!response.ok) throw new Error('Failed to cancel request');
+                
+                showSuccessModal('Leave request has been cancelled.', 'Request Cancelled');
+                loadMyVacationRequests();
+                
+            } catch (error) {
+                console.error('Error cancelling vacation request:', error);
+                showErrorModal('Failed to cancel leave request. Please try again.');
+            }
+        }
+    );
 }
 
 // Initialize Leave Calendar
