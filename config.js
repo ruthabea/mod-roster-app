@@ -3,7 +3,7 @@ const SUPABASE_URL = 'https://yvbemhhnrgmccasifzey.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl2YmVtaGhucmdtY2Nhc2lmemV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwODg3ODQsImV4cCI6MjA5NjY2NDc4NH0.I2nk7xpCoBewq3_anek_PjOjDW5VC__eIeYJDFSwN0M';
 
 // ==================== Microsoft Azure AD Configuration ====================
-const MS_AUTH_CLIENT_ID = '4d6e4452-f0b0-4c9e-8e42-8a51ef3729a1';
+const MS_AUTH_CLIENT_ID = '85877ca0-8209-45d2-9454-2d9578dbedf8';
 const MS_AUTH_TENANT_ID = 'c8eca3ca-1276-46d5-9d9d-a0f2a028920f';
 const MS_AUTH_REDIRECT_URI = window.location.origin + window.location.pathname;
 
