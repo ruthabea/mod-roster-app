@@ -1,67 +1,62 @@
-// ==================== Microsoft Azure AD Authentication ====================
-// Using MSAL.js (Microsoft Authentication Library)
+// ==================== Magic Link Authentication ====================
+// Email-based authentication with magic links
 
-let msalInstance = null;
+// Authentication Mode
+const AUTH_ENABLED = true; // Set to false to disable authentication
+
+// Session duration (24 hours in milliseconds)
+const SESSION_DURATION = 24 * 60 * 60 * 1000;
+
+// Current user session
 let currentUser = null;
 
-// Initialize MSAL on page load
-function initializeMsal() {
-    try {
-        if (typeof msal === 'undefined') {
-            console.error('MSAL library not loaded');
-            showLoginError('Authentication library failed to load. Please refresh the page.');
-            return false;
-        }
-        
-        // Check if tenant ID is configured
-        if (MS_AUTH_TENANT_ID === 'YOUR_TENANT_ID_HERE') {
-            console.warn('Azure AD Tenant ID not configured. Authentication disabled.');
-            // For development: auto-show app without auth
-            showAppWithoutAuth();
-            return false;
-        }
-        
-        msalInstance = new msal.PublicClientApplication(msalConfig);
-        
-        // Handle redirect response
-        msalInstance.handleRedirectPromise()
-            .then(handleResponse)
-            .catch(error => {
-                console.error('Redirect error:', error);
-                showLoginError('Authentication error. Please try again.');
-            });
-        
-        return true;
-    } catch (error) {
-        console.error('MSAL initialization error:', error);
-        showLoginError('Failed to initialize authentication.');
-        return false;
+// Initialize authentication on page load
+function initializeAuth() {
+    // If authentication is disabled, show app directly
+    if (!AUTH_ENABLED) {
+        console.log('Authentication disabled. Showing app directly.');
+        showAppWithoutAuth();
+        return;
     }
+    
+    // Check for magic link token in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const authToken = urlParams.get('authToken');
+    
+    if (authToken) {
+        // Validate the magic link token
+        validateMagicToken(authToken);
+        return;
+    }
+    
+    // Check for existing session
+    const session = getStoredSession();
+    if (session && session.expiresAt > Date.now()) {
+        currentUser = session.user;
+        showAuthenticatedApp();
+        return;
+    }
+    
+    // Clear expired session
+    clearSession();
+    
+    // Show login screen
+    showLoginScreen();
 }
 
-// Handle authentication response
-async function handleResponse(response) {
-    if (response) {
-        // User just logged in via redirect
-        currentUser = response.account;
-        await showAuthenticatedApp();
-    } else {
-        // Check if user is already logged in
-        const accounts = msalInstance.getAllAccounts();
-        if (accounts.length > 0) {
-            currentUser = accounts[0];
-            await showAuthenticatedApp();
-        } else {
-            // Show login screen
-            showLoginScreen();
-        }
+// Request magic link
+async function requestMagicLink() {
+    const emailInput = document.getElementById('loginEmail');
+    const email = emailInput?.value?.trim();
+    
+    if (!email) {
+        showLoginError('Please enter your email address.');
+        return;
     }
-}
-
-// Sign in with Microsoft
-async function signIn() {
-    if (!msalInstance) {
-        showLoginError('Authentication not initialized. Please refresh the page.');
+    
+    // Basic email validation
+    if (!email.includes('@')) {
+        showLoginError('Please enter a valid email address.');
         return;
     }
     
@@ -69,95 +64,41 @@ async function signIn() {
     hideLoginError();
     
     try {
-        // Try popup first, fall back to redirect
-        const response = await msalInstance.loginPopup(loginRequest);
-        currentUser = response.account;
-        await showAuthenticatedApp();
-    } catch (error) {
-        console.error('Login error:', error);
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/send-magic-link`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+            },
+            body: JSON.stringify({ email })
+        });
         
-        if (error.errorCode === 'popup_window_error' || error.errorCode === 'empty_window_error') {
-            // Popup blocked, try redirect
-            try {
-                await msalInstance.loginRedirect(loginRequest);
-            } catch (redirectError) {
-                console.error('Redirect error:', redirectError);
-                showLoginError('Login failed. Please check your popup blocker and try again.');
-            }
-        } else if (error.errorCode === 'user_cancelled') {
-            showLoginError('Login cancelled.');
+        const data = await response.json();
+        
+        if (data.success) {
+            showMagicLinkSent(email);
         } else {
-            showLoginError('Login failed: ' + (error.message || 'Unknown error'));
+            showLoginError(data.error || 'Failed to send sign-in link. Please try again.');
         }
+    } catch (error) {
+        console.error('Magic link request error:', error);
+        showLoginError('Failed to send sign-in link. Please try again.');
+    } finally {
         showLoginLoading(false);
     }
 }
 
-// Sign out
-function signOut() {
-    if (!msalInstance) return;
-    
-    const logoutRequest = {
-        account: currentUser,
-        postLogoutRedirectUri: MS_AUTH_REDIRECT_URI
-    };
-    
-    msalInstance.logoutPopup(logoutRequest)
-        .then(() => {
-            currentUser = null;
-            showLoginScreen();
-        })
-        .catch(error => {
-            console.error('Logout error:', error);
-            // Force logout anyway
-            currentUser = null;
-            showLoginScreen();
-        });
-}
-
-// Show authenticated app
-async function showAuthenticatedApp() {
-    showLoginLoading(false);
-    
-    // Update user display
-    const userName = currentUser?.name || currentUser?.username || 'User';
-    const userNameEl = document.getElementById('userName');
-    const userAvatarEl = document.getElementById('userAvatar');
-    
-    if (userNameEl) {
-        userNameEl.textContent = userName;
-    }
-    
-    if (userAvatarEl && currentUser?.name) {
-        // Show initials
-        const initials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-        userAvatarEl.innerHTML = initials;
-        userAvatarEl.classList.add('has-initials');
-    }
-    
-    // Verify user is authorized (check against managers table)
-    const isAuthorized = await checkUserAuthorization(currentUser?.username);
-    
-    if (!isAuthorized) {
-        showLoginError('Access denied. You are not authorized to access this application.');
-        signOut();
-        return;
-    }
-    
-    // Hide login, show app
-    document.getElementById('loginScreen').classList.add('hidden');
-    document.getElementById('appContainer').classList.remove('hidden');
-    
-    console.log('User authenticated:', userName);
-}
-
-// Check if user is authorized (exists in managers table)
-async function checkUserAuthorization(email) {
-    if (!email) return false;
+// Validate magic link token
+async function validateMagicToken(token) {
+    showLoginScreen();
+    showLoginLoading(true);
+    document.getElementById('loginFormContainer').classList.add('hidden');
+    document.getElementById('loginLoadingText').textContent = 'Verifying your sign-in link...';
     
     try {
+        // Validate token against database
         const response = await fetch(
-            `${SUPABASE_URL}/rest/v1/managers?select=id&email=ilike.${encodeURIComponent(email)}&limit=1`,
+            `${SUPABASE_URL}/rest/v1/auth_tokens?token=eq.${token}&used=eq.false&select=*`,
             {
                 headers: {
                     'apikey': SUPABASE_ANON_KEY,
@@ -167,16 +108,152 @@ async function checkUserAuthorization(email) {
         );
         
         if (!response.ok) {
-            console.error('Authorization check failed');
-            return true; // Allow access if check fails (fail open for now)
+            throw new Error('Failed to validate token');
         }
         
-        const data = await response.json();
-        return data.length > 0;
+        const tokens = await response.json();
+        
+        if (tokens.length === 0) {
+            showLoginError('This sign-in link is invalid or has already been used.');
+            showLoginLoading(false);
+            document.getElementById('loginFormContainer').classList.remove('hidden');
+            clearUrlParams();
+            return;
+        }
+        
+        const tokenData = tokens[0];
+        
+        // Check if token is expired
+        if (new Date(tokenData.expires_at) < new Date()) {
+            showLoginError('This sign-in link has expired. Please request a new one.');
+            showLoginLoading(false);
+            document.getElementById('loginFormContainer').classList.remove('hidden');
+            clearUrlParams();
+            return;
+        }
+        
+        // Mark token as used
+        await fetch(
+            `${SUPABASE_URL}/rest/v1/auth_tokens?id=eq.${tokenData.id}`,
+            {
+                method: 'PATCH',
+                headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ used: true })
+            }
+        );
+        
+        // Get manager info
+        const managerResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/managers?email=ilike.${encodeURIComponent(tokenData.email)}&select=*`,
+            {
+                headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                }
+            }
+        );
+        
+        const managers = await managerResponse.json();
+        const manager = managers[0];
+        
+        // Create session
+        currentUser = {
+            email: tokenData.email,
+            name: manager?.name || tokenData.email.split('@')[0]
+        };
+        
+        // Store session
+        storeSession(currentUser);
+        
+        // Clear URL params
+        clearUrlParams();
+        
+        // Show app
+        showAuthenticatedApp();
+        
     } catch (error) {
-        console.error('Authorization check error:', error);
-        return true; // Allow access if check fails
+        console.error('Token validation error:', error);
+        showLoginError('Failed to verify sign-in link. Please try again.');
+        showLoginLoading(false);
+        document.getElementById('loginFormContainer').classList.remove('hidden');
+        clearUrlParams();
     }
+}
+
+// Clear URL parameters
+function clearUrlParams() {
+    const url = window.location.pathname + window.location.hash;
+    window.history.replaceState({}, '', url);
+}
+
+// Store session in localStorage
+function storeSession(user) {
+    const session = {
+        user: user,
+        expiresAt: Date.now() + SESSION_DURATION
+    };
+    localStorage.setItem('mod_auth_session', JSON.stringify(session));
+}
+
+// Get stored session
+function getStoredSession() {
+    try {
+        const sessionData = localStorage.getItem('mod_auth_session');
+        return sessionData ? JSON.parse(sessionData) : null;
+    } catch {
+        return null;
+    }
+}
+
+// Clear session
+function clearSession() {
+    localStorage.removeItem('mod_auth_session');
+    currentUser = null;
+}
+
+// Sign out
+function signOut() {
+    clearSession();
+    showLoginScreen();
+    
+    // Reset login form
+    const emailInput = document.getElementById('loginEmail');
+    if (emailInput) emailInput.value = '';
+    
+    document.getElementById('loginFormContainer')?.classList.remove('hidden');
+    document.getElementById('magicLinkSent')?.classList.add('hidden');
+    hideLoginError();
+}
+
+// Show authenticated app
+function showAuthenticatedApp() {
+    showLoginLoading(false);
+    
+    // Update user display
+    const userName = currentUser?.name || currentUser?.email || 'User';
+    const userNameEl = document.getElementById('userName');
+    const userAvatarEl = document.getElementById('userAvatar');
+    
+    if (userNameEl) {
+        userNameEl.textContent = userName;
+    }
+    
+    if (userAvatarEl) {
+        // Show initials
+        const initials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+        userAvatarEl.innerHTML = initials || '?';
+        userAvatarEl.classList.add('has-initials');
+    }
+    
+    // Hide login, show app
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('appContainer').classList.remove('hidden');
+    
+    console.log('User authenticated:', userName);
 }
 
 // Show login screen
@@ -186,18 +263,30 @@ function showLoginScreen() {
     showLoginLoading(false);
 }
 
-// Show app without auth (for development when tenant ID not configured)
+// Show app without auth (for development)
 function showAppWithoutAuth() {
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('appContainer').classList.remove('hidden');
     
-    // Set default user
     const userNameEl = document.getElementById('userName');
     if (userNameEl) {
         userNameEl.textContent = 'Development Mode';
     }
     
     console.log('Running in development mode (no authentication)');
+}
+
+// Show magic link sent message
+function showMagicLinkSent(email) {
+    document.getElementById('loginFormContainer').classList.add('hidden');
+    document.getElementById('magicLinkSent').classList.remove('hidden');
+    document.getElementById('sentToEmail').textContent = email;
+}
+
+// Back to email input
+function backToEmailInput() {
+    document.getElementById('magicLinkSent').classList.add('hidden');
+    document.getElementById('loginFormContainer').classList.remove('hidden');
 }
 
 // UI Helpers
@@ -229,9 +318,16 @@ function hideLoginError() {
     }
 }
 
+// Handle Enter key on email input
+function handleEmailKeypress(event) {
+    if (event.key === 'Enter') {
+        requestMagicLink();
+    }
+}
+
 // Initialize on DOM ready
 document.addEventListener('DOMContentLoaded', function() {
-    initializeMsal();
+    initializeAuth();
 });
 
 // Get current user info

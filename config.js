@@ -2,30 +2,6 @@
 const SUPABASE_URL = 'https://yvbemhhnrgmccasifzey.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl2YmVtaGhucmdtY2Nhc2lmemV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwODg3ODQsImV4cCI6MjA5NjY2NDc4NH0.I2nk7xpCoBewq3_anek_PjOjDW5VC__eIeYJDFSwN0M';
 
-// ==================== Microsoft Azure AD Configuration ====================
-const MS_AUTH_CLIENT_ID = '85877ca0-8209-45d2-9454-2d9578dbedf8';
-const MS_AUTH_TENANT_ID = 'c8eca3ca-1276-46d5-9d9d-a0f2a028920f';
-const MS_AUTH_REDIRECT_URI = window.location.origin + window.location.pathname;
-
-// MSAL Configuration
-const msalConfig = {
-    auth: {
-        clientId: MS_AUTH_CLIENT_ID,
-        authority: `https://login.microsoftonline.com/${MS_AUTH_TENANT_ID}`,
-        redirectUri: MS_AUTH_REDIRECT_URI,
-        postLogoutRedirectUri: MS_AUTH_REDIRECT_URI
-    },
-    cache: {
-        cacheLocation: 'localStorage',
-        storeAuthStateInCookie: false
-    }
-};
-
-// Login request scopes
-const loginRequest = {
-    scopes: ['User.Read']
-};
-
 // ==================== Edge Function Configuration ====================
 // Edge Function URL for sending notifications
 const EDGE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/send-oncall-notifications`;
