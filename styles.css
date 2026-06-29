@@ -5584,6 +5584,7 @@ select.prompt-modal-input:focus {
     position: sticky;
     top: 0;
     z-index: 20;
+    border: 1px solid #4b5563;
 }
 
 .hs-header-row th small {
@@ -5593,18 +5594,19 @@ select.prompt-modal-input:focus {
     font-size: 0.65rem;
 }
 
-.hs-fixed-col {
+/* Fixed header columns - need higher z-index for corner cells */
+.hs-header-row th.hs-fixed-col {
     text-align: center !important;
     position: sticky;
-    background: #374151;
-    z-index: 25;
+    background: #1f2937 !important;
+    z-index: 30;
 }
 
-.hs-fixed-col:nth-child(1) { left: 0; min-width: 70px; max-width: 70px; }
-.hs-fixed-col:nth-child(2) { left: 70px; min-width: 90px; max-width: 90px; }
-.hs-fixed-col:nth-child(3) { left: 160px; min-width: 120px; max-width: 120px; }
-.hs-fixed-col:nth-child(4) { left: 280px; min-width: 60px; max-width: 60px; }
-.hs-fixed-col:nth-child(5) { left: 340px; min-width: 100px; max-width: 100px; }
+.hs-header-row th.hs-fixed-col:nth-child(1) { left: 0; min-width: 70px; max-width: 70px; }
+.hs-header-row th.hs-fixed-col:nth-child(2) { left: 70px; min-width: 90px; max-width: 90px; }
+.hs-header-row th.hs-fixed-col:nth-child(3) { left: 160px; min-width: 120px; max-width: 120px; }
+.hs-header-row th.hs-fixed-col:nth-child(4) { left: 280px; min-width: 60px; max-width: 60px; }
+.hs-header-row th.hs-fixed-col:nth-child(5) { left: 340px; min-width: 100px; max-width: 100px; }
 
 .hs-date-col {
     min-width: 45px;
