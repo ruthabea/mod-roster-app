@@ -6189,19 +6189,39 @@ async function fetchVacationRequestById(id) {
 
 // ==================== HOLIDAY STAFFING FUNCTIONS ====================
 
-// Holiday Staffing Data (sample structure - will be stored in Supabase)
-let holidayStaffingData = {
-    periods: {
-        christmas: {
-            name: 'Christmas Period',
-            startDate: '2026-12-08',
-            endDate: '2027-01-02',
-            dates: []
-        }
-    },
-    summary: [],
-    deskSupport: [],
-    callSupport: []
+// Holiday Staffing Status Options
+const HOLIDAY_STATUS_OPTIONS = [
+    { value: '', label: '-' },
+    { value: 'PL', label: 'PL' },
+    { value: 'WO', label: 'WO' },
+    { value: 'PH', label: 'PH' },
+    { value: 'AL', label: 'AL' },
+    { value: 'SL', label: 'SL' },
+    { value: 'WFH', label: 'WFH' },
+    { value: 'HD', label: 'HD' },
+    { value: 'S1', label: 'S1' },
+    { value: 'S2', label: 'S2' },
+    { value: 'S3', label: 'S3' },
+    { value: 'GS', label: 'GS' },
+    { value: 'CO', label: 'CO' },
+    { value: 'AH', label: 'AH' },
+    { value: 'DVCIH', label: 'DVCIH' }
+];
+
+// Store holiday staffing data from database
+let holidayStaffingEntries = {};
+
+// Application color mapping
+const APP_COLORS = {
+    'Frontend': '#90EE90',
+    'Backend': '#FFB6C1',
+    'Digital': '#DDA0DD',
+    'Infra': '#87CEEB',
+    'ODS': '#F0E68C',
+    'SDM': '#20B2AA',
+    'B2B': '#FFA07A',
+    'L2': '#D8BFD8',
+    'Manager': '#FFD700'
 };
 
 // Generate date headers for holiday period
@@ -6213,7 +6233,7 @@ function generateHolidayDates(startDate, endDate) {
     while (current <= end) {
         dates.push({
             date: current.toISOString().split('T')[0],
-            display: current.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }),
+            display: `${current.getDate()}-${current.toLocaleDateString('en-US', { month: 'short' })}`,
             dayOfWeek: current.toLocaleDateString('en-US', { weekday: 'short' }),
             isWeekend: current.getDay() === 0 || current.getDay() === 6
         });
@@ -6223,8 +6243,27 @@ function generateHolidayDates(startDate, endDate) {
     return dates;
 }
 
-// Load Holiday Summary
-function loadHolidaySummary() {
+// Initialize holiday date pickers with default range
+function initializeHolidayDatePickers() {
+    const startInput = document.getElementById('holidayStartDate');
+    const endInput = document.getElementById('holidayEndDate');
+    
+    if (startInput && endInput) {
+        // Default to current week
+        const today = new Date();
+        const startOfWeek = new Date(today);
+        startOfWeek.setDate(today.getDate() - today.getDay() + 1);
+        
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 13); // 2 weeks
+        
+        startInput.value = formatDateForInput(startOfWeek);
+        endInput.value = formatDateForInput(endOfWeek);
+    }
+}
+
+// Load Holiday Summary - Main function
+async function loadHolidaySummary() {
     const loadingEl = document.getElementById('holidaySummaryLoading');
     const emptyEl = document.getElementById('holidaySummaryEmpty');
     const tableEl = document.getElementById('holidaySummaryTable');
@@ -6233,98 +6272,232 @@ function loadHolidaySummary() {
     if (emptyEl) emptyEl.classList.add('hidden');
     if (tableEl) tableEl.classList.add('hidden');
     
-    // Get selected period
-    const periodSelect = document.getElementById('holidaySummaryPeriod');
-    const selectedPeriod = periodSelect?.value || 'christmas';
+    // Initialize date pickers if not set
+    const startInput = document.getElementById('holidayStartDate');
+    const endInput = document.getElementById('holidayEndDate');
     
-    // Generate sample data for demonstration
-    setTimeout(() => {
+    if (!startInput?.value || !endInput?.value) {
+        initializeHolidayDatePickers();
+    }
+    
+    const startDate = startInput?.value;
+    const endDate = endInput?.value;
+    
+    if (!startDate || !endDate) {
         if (loadingEl) loadingEl.classList.add('hidden');
+        if (emptyEl) emptyEl.classList.remove('hidden');
+        return;
+    }
+    
+    try {
+        // Load contacts data from Contact Details
+        const contactsResult = await supabaseRequest('contacts', 'GET', null, '?order=team,area,name');
         
-        // Generate dates for Christmas period
-        const dates = generateHolidayDates('2026-12-08', '2027-01-02');
-        
-        // Sample data structure
-        const summaryData = getSampleHolidaySummaryData();
-        
-        if (summaryData.length === 0) {
+        if (contactsResult.error || !contactsResult.data || contactsResult.data.length === 0) {
+            if (loadingEl) loadingEl.classList.add('hidden');
             if (emptyEl) emptyEl.classList.remove('hidden');
             return;
         }
         
+        // Load existing holiday staffing entries for the date range
+        const staffingResult = await supabaseRequest('holiday_staffing', 'GET', null, 
+            `?staff_date=gte.${startDate}&staff_date=lte.${endDate}`);
+        
+        // Build lookup map for existing entries
+        holidayStaffingEntries = {};
+        if (staffingResult.data) {
+            staffingResult.data.forEach(entry => {
+                const key = `${entry.contact_id}_${entry.staff_date}`;
+                holidayStaffingEntries[key] = entry;
+            });
+        }
+        
+        // Transform contacts data
+        const summaryData = contactsResult.data.map(c => ({
+            id: c.id,
+            app: capitalizeFirst(c.team || ''),
+            area: c.area || '',
+            name: c.name || '',
+            site: c.site || '',
+            contact: c.phone || '',
+            statuses: {}
+        }));
+        
+        // Fill in statuses from loaded data
+        summaryData.forEach(row => {
+            Object.keys(holidayStaffingEntries).forEach(key => {
+                if (key.startsWith(`${row.id}_`)) {
+                    const entry = holidayStaffingEntries[key];
+                    row.statuses[entry.staff_date] = entry.status;
+                }
+            });
+        });
+        
+        if (loadingEl) loadingEl.classList.add('hidden');
         if (tableEl) tableEl.classList.remove('hidden');
+        
+        const dates = generateHolidayDates(startDate, endDate);
         renderHolidaySummaryTable(dates, summaryData);
-    }, 500);
+        
+    } catch (err) {
+        console.error('Error loading holiday summary:', err);
+        if (loadingEl) loadingEl.classList.add('hidden');
+        if (emptyEl) emptyEl.classList.remove('hidden');
+    }
 }
 
-// Get sample holiday summary data
-function getSampleHolidaySummaryData() {
-    return [
-        { app: 'Frontend', area: 'CRM/SDP/MCC', name: 'Chirag Chourasia', site: 'India', contact: '+91 96918 86425', statuses: {} },
-        { app: 'Frontend', area: 'CRM/SDP/MCC', name: 'Pankaj Rahate', site: 'India', contact: '+91 80802 05417', statuses: {} },
-        { app: 'Frontend', area: 'CRM/SDP/MCC', name: 'Prajwal Jilate', site: 'India', contact: '+91 7499464451', statuses: {} },
-        { app: 'Frontend', area: 'OMS', name: 'Anurag Bharati', site: 'Australia', contact: '+61 484920422', statuses: {} },
-        { app: 'Backend', area: 'TC/RLC', name: 'Azim Hirani', site: 'India', contact: '+91 7350739381', statuses: {} },
-        { app: 'Backend', area: 'AR/CM', name: 'Debjyoti Ghosh', site: 'Australia', contact: '+61 485599053', statuses: {} },
-        { app: 'Backend', area: 'INV/AMDD', name: 'Prachi Dangore', site: 'India', contact: '+91 99603 76686', statuses: {} },
-        { app: 'Infra', area: 'Infra', name: 'Krishna Reddy', site: 'India', contact: '+91 8074254103', statuses: {} },
-        { app: 'ODS', area: 'ODS', name: 'Poojashri Anuse', site: 'Australia', contact: '+61 481152816', statuses: {} },
-        { app: 'Digital', area: 'Digital', name: 'Rica Aricayos', site: 'Philippines', contact: '+63 9178613885', statuses: {} },
-        { app: 'Manager', area: 'Manager', name: 'Ashwani Aggarwal', site: 'Australia', contact: '+61 478 015 240', statuses: {} },
-        { app: 'Manager', area: 'Manager', name: 'Manisha Bardiya', site: 'India', contact: '+91 90110 13931', statuses: {} },
-        { app: 'Manager', area: 'Manager', name: 'Makarand Korde', site: 'Australia', contact: '+61 420456799', statuses: {} },
-    ];
+function capitalizeFirst(str) {
+    if (!str) return '';
+    return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 }
 
-// Render Holiday Summary Table
+// Render Holiday Summary Table with dropdowns
 function renderHolidaySummaryTable(dates, data) {
     const headEl = document.getElementById('holidaySummaryHead');
     const bodyEl = document.getElementById('holidaySummaryBody');
     
     if (!headEl || !bodyEl) return;
     
-    // Build header
-    let headerHtml = `
-        <tr>
-            <th rowspan="2">App</th>
-            <th rowspan="2">Application Area</th>
-            <th rowspan="2">Name</th>
-            <th rowspan="2">Site</th>
-            <th rowspan="2">Contact Number</th>
-    `;
+    // Build header - First row with day of week
+    let headerHtml = '<tr class="hs-header-row">';
+    headerHtml += '<th class="hs-fixed-col">App</th>';
+    headerHtml += '<th class="hs-fixed-col">Application Area</th>';
+    headerHtml += '<th class="hs-fixed-col">Name</th>';
+    headerHtml += '<th class="hs-fixed-col">Site</th>';
+    headerHtml += '<th class="hs-fixed-col">Contact Number</th>';
     
-    // Date headers with type indicators
     dates.forEach(d => {
-        const headerClass = d.isWeekend ? 'lean-header' : 'date-header';
-        headerHtml += `<th class="${headerClass} date-header">${d.display}</th>`;
+        const weekendClass = d.isWeekend ? 'hs-weekend' : '';
+        headerHtml += `<th class="hs-date-col ${weekendClass}">${d.display}<br><small>${d.dayOfWeek}</small></th>`;
     });
     headerHtml += '</tr>';
     
     headEl.innerHTML = headerHtml;
     
-    // Build body
+    // Build body with dropdowns
     let bodyHtml = '';
-    data.forEach(row => {
-        const appClass = `app-${row.app.toLowerCase().replace(/\s+/g, '')}`;
-        bodyHtml += `
-            <tr class="${appClass}">
-                <td class="app-cell">${escapeHtml(row.app)}</td>
-                <td class="name-cell">${escapeHtml(row.area)}</td>
-                <td class="name-cell">${escapeHtml(row.name)}</td>
-                <td class="site-cell">${escapeHtml(row.site)}</td>
-                <td>${escapeHtml(row.contact)}</td>
-        `;
+    let currentApp = '';
+    
+    data.forEach((row, rowIndex) => {
+        // Get color for this application
+        const appColor = APP_COLORS[row.app] || '#f0f0f0';
+        const rowStyle = `background-color: ${appColor};`;
+        
+        bodyHtml += `<tr style="${rowStyle}" data-contact-id="${row.id}">`;
+        bodyHtml += `<td class="hs-app-cell"><strong>${escapeHtml(row.app)}</strong></td>`;
+        bodyHtml += `<td class="hs-area-cell">${escapeHtml(row.area)}</td>`;
+        bodyHtml += `<td class="hs-name-cell"><strong>${escapeHtml(row.name)}</strong></td>`;
+        bodyHtml += `<td class="hs-site-cell">${escapeHtml(row.site)}</td>`;
+        bodyHtml += `<td class="hs-contact-cell">${escapeHtml(row.contact)}</td>`;
         
         dates.forEach(d => {
             const status = row.statuses[d.date] || '';
-            const statusClass = status ? `status-${status.toLowerCase()}` : '';
-            bodyHtml += `<td class="${statusClass}">${escapeHtml(status)}</td>`;
+            const weekendClass = d.isWeekend ? 'hs-weekend' : '';
+            const statusClass = status ? `hs-status-${status.toLowerCase()}` : '';
+            
+            // Build dropdown options
+            let optionsHtml = HOLIDAY_STATUS_OPTIONS.map(opt => 
+                `<option value="${opt.value}" ${opt.value === status ? 'selected' : ''}>${opt.label}</option>`
+            ).join('');
+            
+            bodyHtml += `<td class="hs-status-cell ${weekendClass} ${statusClass}">
+                <select class="hs-status-dropdown" 
+                        data-contact-id="${row.id}" 
+                        data-date="${d.date}"
+                        onchange="onHolidayStatusChange(this)">
+                    ${optionsHtml}
+                </select>
+            </td>`;
         });
         
         bodyHtml += '</tr>';
     });
     
     bodyEl.innerHTML = bodyHtml;
+}
+
+// Handle status change
+async function onHolidayStatusChange(selectEl) {
+    const contactId = selectEl.dataset.contactId;
+    const date = selectEl.dataset.date;
+    const status = selectEl.value;
+    
+    // Update cell styling
+    const cell = selectEl.parentElement;
+    cell.className = 'hs-status-cell';
+    if (cell.classList.contains('hs-weekend')) cell.classList.add('hs-weekend');
+    if (status) cell.classList.add(`hs-status-${status.toLowerCase()}`);
+    
+    // Save to database
+    const key = `${contactId}_${date}`;
+    
+    try {
+        if (status) {
+            // Check if entry exists
+            if (holidayStaffingEntries[key]) {
+                // Update existing
+                await supabaseRequest('holiday_staffing', 'PATCH', 
+                    { status, updated_at: new Date().toISOString() },
+                    `?contact_id=eq.${contactId}&staff_date=eq.${date}`
+                );
+            } else {
+                // Insert new
+                await supabaseRequest('holiday_staffing', 'POST', {
+                    contact_id: parseInt(contactId),
+                    staff_date: date,
+                    status: status
+                });
+            }
+            holidayStaffingEntries[key] = { contact_id: contactId, staff_date: date, status };
+        } else {
+            // Delete if status is empty
+            if (holidayStaffingEntries[key]) {
+                await supabaseRequest('holiday_staffing', 'DELETE', null,
+                    `?contact_id=eq.${contactId}&staff_date=eq.${date}`
+                );
+                delete holidayStaffingEntries[key];
+            }
+        }
+    } catch (err) {
+        console.error('Error saving holiday status:', err);
+        showToast('Failed to save status', 'error');
+    }
+}
+
+// Save all holiday staffing entries
+async function saveAllHolidayStaffing() {
+    showToast('All changes are auto-saved!', 'success');
+}
+
+// Export Holiday Summary to Excel
+function exportHolidaySummary() {
+    const table = document.getElementById('holidayStaffingTable');
+    if (!table) {
+        showToast('No data to export', 'error');
+        return;
+    }
+    
+    if (typeof XLSX === 'undefined') {
+        showToast('Excel library not loaded', 'error');
+        return;
+    }
+    
+    // Clone table and replace dropdowns with their values
+    const clonedTable = table.cloneNode(true);
+    const selects = clonedTable.querySelectorAll('select');
+    selects.forEach(select => {
+        const value = select.value || '';
+        const text = document.createTextNode(value);
+        select.parentNode.replaceChild(text, select);
+    });
+    
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.table_to_sheet(clonedTable);
+    XLSX.utils.book_append_sheet(wb, ws, 'Holiday Staffing');
+    
+    const startDate = document.getElementById('holidayStartDate')?.value || 'export';
+    XLSX.writeFile(wb, `holiday_staffing_${startDate}.xlsx`);
+    showToast('Exported successfully!', 'success');
 }
 
 // Load Holiday Support

@@ -5489,22 +5489,37 @@ select.prompt-modal-input:focus {
     flex-wrap: wrap;
 }
 
-.holiday-filters select {
-    padding: 0.5rem 1rem;
+.holiday-filters label {
+    font-weight: 500;
+    color: #4b5563;
+    font-size: 0.9rem;
+}
+
+.holiday-filters select,
+.holiday-filters input[type="date"] {
+    padding: 0.5rem 0.75rem;
     border: 1px solid #d1d5db;
     border-radius: 6px;
     font-size: 0.9rem;
-    min-width: 200px;
     background: white;
+}
+
+.holiday-filters select {
+    min-width: 200px;
+}
+
+.holiday-filters input[type="date"] {
+    min-width: 140px;
 }
 
 /* Holiday Legend */
 .holiday-legend {
     display: flex;
-    gap: 1.5rem;
+    gap: 1rem;
     flex-wrap: wrap;
-    padding: 1rem;
+    padding: 0.75rem 1rem;
     background: #f8fafc;
+    font-size: 0.8rem;
     border-radius: 8px;
     margin-bottom: 1rem;
 }
@@ -5528,6 +5543,95 @@ select.prompt-modal-input:focus {
 .legend-color.al { background-color: #dbeafe; }
 .legend-color.pl { background-color: #dcfce7; }
 .legend-color.wc { background-color: #e0e7ff; }
+
+/* New Holiday Staffing Legend Colors */
+.legend-color.hs-pl { background-color: #a78bfa; }
+.legend-color.hs-wo { background-color: #60a5fa; }
+.legend-color.hs-ph { background-color: #f87171; }
+.legend-color.hs-al { background-color: #34d399; }
+.legend-color.hs-sl { background-color: #fbbf24; }
+.legend-color.hs-wfh { background-color: #a3e635; }
+.legend-color.hs-hd { background-color: #f472b6; }
+
+/* Holiday Staffing Table - New Styles */
+.hs-header-row th {
+    background: #374151 !important;
+    color: white;
+    padding: 8px 6px !important;
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+.hs-header-row th small {
+    display: block;
+    font-weight: normal;
+    opacity: 0.8;
+}
+
+.hs-fixed-col {
+    min-width: 100px;
+    text-align: left !important;
+    position: sticky;
+    background: #374151;
+    z-index: 10;
+}
+
+.hs-fixed-col:nth-child(1) { left: 0; min-width: 80px; }
+.hs-fixed-col:nth-child(2) { left: 80px; min-width: 120px; }
+.hs-fixed-col:nth-child(3) { left: 200px; min-width: 140px; }
+.hs-fixed-col:nth-child(4) { left: 340px; min-width: 80px; }
+.hs-fixed-col:nth-child(5) { left: 420px; min-width: 120px; }
+
+.hs-date-col {
+    min-width: 60px;
+}
+
+.hs-weekend {
+    background-color: #fef3c7 !important;
+}
+
+.hs-app-cell, .hs-area-cell, .hs-name-cell, .hs-site-cell, .hs-contact-cell {
+    text-align: left;
+    padding: 6px 8px;
+    font-size: 0.8rem;
+    border: 1px solid #d1d5db;
+}
+
+.hs-status-cell {
+    padding: 2px !important;
+    border: 1px solid #d1d5db;
+}
+
+.hs-status-dropdown {
+    width: 100%;
+    padding: 4px 2px;
+    border: none;
+    background: transparent;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: center;
+    cursor: pointer;
+}
+
+.hs-status-dropdown:focus {
+    outline: 2px solid #3b82f6;
+}
+
+/* Status cell colors */
+.hs-status-pl { background-color: #a78bfa !important; }
+.hs-status-wo { background-color: #60a5fa !important; }
+.hs-status-ph { background-color: #f87171 !important; }
+.hs-status-al { background-color: #34d399 !important; }
+.hs-status-sl { background-color: #fbbf24 !important; }
+.hs-status-wfh { background-color: #a3e635 !important; }
+.hs-status-hd { background-color: #f472b6 !important; }
+.hs-status-s1 { background-color: #c084fc !important; }
+.hs-status-s2 { background-color: #818cf8 !important; }
+.hs-status-s3 { background-color: #6366f1 !important; }
+.hs-status-gs { background-color: #14b8a6 !important; }
+.hs-status-co { background-color: #f97316 !important; }
+.hs-status-ah { background-color: #ec4899 !important; }
+.hs-status-dvcih { background-color: #8b5cf6 !important; }
 
 /* Holiday Table Wrapper */
 .holiday-table-wrapper {
