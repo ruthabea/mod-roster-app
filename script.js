@@ -6948,6 +6948,365 @@ function clearAssignmentForm() {
     document.getElementById('assignmentStaff').value = '';
 }
 
+// ==================== EXCEL IMPORT FUNCTIONS ====================
+
+let holidayExcelData = null;
+
+// Handle Excel file selection
+function handleHolidayExcelUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    document.getElementById('selectedFileName').textContent = file.name;
+    document.getElementById('importExcelBtn').disabled = false;
+    
+    // Read the file
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            holidayExcelData = workbook;
+            showToast('File loaded successfully!', 'success');
+        } catch (err) {
+            console.error('Error reading Excel file:', err);
+            showToast('Error reading file. Please check the format.', 'error');
+            holidayExcelData = null;
+            document.getElementById('importExcelBtn').disabled = true;
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+// Import Holiday Excel data
+async function importHolidayExcel() {
+    if (!holidayExcelData) {
+        showToast('Please select a file first', 'error');
+        return;
+    }
+    
+    try {
+        // Get sheet names
+        const sheetNames = holidayExcelData.SheetNames;
+        console.log('Available sheets:', sheetNames);
+        
+        // Look for Holiday Dates sheet or first sheet
+        let datesSheet = null;
+        let supportSheet = null;
+        
+        for (const name of sheetNames) {
+            const lowerName = name.toLowerCase();
+            if (lowerName.includes('date') || lowerName.includes('holiday')) {
+                datesSheet = holidayExcelData.Sheets[name];
+            }
+            if (lowerName.includes('support') || lowerName.includes('assignment') || lowerName.includes('desk') || lowerName.includes('call')) {
+                supportSheet = holidayExcelData.Sheets[name];
+            }
+        }
+        
+        // If no specific sheets found, try to parse first sheet
+        if (!datesSheet && !supportSheet && sheetNames.length > 0) {
+            supportSheet = holidayExcelData.Sheets[sheetNames[0]];
+        }
+        
+        let importedDates = 0;
+        let importedAssignments = 0;
+        
+        // Parse and import support data (which includes dates)
+        if (supportSheet) {
+            const result = await parseAndImportSupportSheet(supportSheet);
+            importedDates = result.dates;
+            importedAssignments = result.assignments;
+        }
+        
+        showToast(`Imported ${importedDates} holiday dates and ${importedAssignments} assignments!`, 'success');
+        
+        // Refresh the tables
+        loadHolidayDates();
+        loadStaffAssignments();
+        populateHolidayDateDropdown();
+        
+        // Clear the file input
+        document.getElementById('holidayExcelFile').value = '';
+        document.getElementById('selectedFileName').textContent = '';
+        document.getElementById('importExcelBtn').disabled = true;
+        holidayExcelData = null;
+        
+    } catch (err) {
+        console.error('Error importing Excel:', err);
+        showToast('Error importing data: ' + err.message, 'error');
+    }
+}
+
+// Parse and import support sheet
+async function parseAndImportSupportSheet(sheet) {
+    const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+    
+    if (jsonData.length < 2) {
+        throw new Error('Sheet is empty or has no data rows');
+    }
+    
+    // First row should be headers: Application, Team, Date1, Date2, ...
+    const headers = jsonData[0];
+    console.log('Headers:', headers);
+    
+    // Find Application and Team columns
+    let appCol = -1;
+    let teamCol = -1;
+    const dateColumns = [];
+    
+    headers.forEach((header, idx) => {
+        if (!header) return;
+        const h = String(header).toLowerCase().trim();
+        
+        if (h === 'application' || h === 'app') {
+            appCol = idx;
+        } else if (h === 'team') {
+            teamCol = idx;
+        } else if (h.includes('support')) {
+            // Skip support type column
+        } else {
+            // Try to parse as date or date with country tag
+            const dateInfo = parseDateHeader(header);
+            if (dateInfo) {
+                dateColumns.push({ col: idx, ...dateInfo });
+            }
+        }
+    });
+    
+    console.log('App column:', appCol, 'Team column:', teamCol);
+    console.log('Date columns:', dateColumns);
+    
+    if (appCol === -1 || teamCol === -1) {
+        throw new Error('Could not find Application and Team columns');
+    }
+    
+    // Create holiday dates first
+    const dateIdMap = {};
+    let importedDates = 0;
+    
+    for (const dateCol of dateColumns) {
+        try {
+            // Check if date already exists
+            const existingResult = await supabaseRequest('holiday_dates', 'GET', null, 
+                `?holiday_date=eq.${dateCol.date}&country=eq.${dateCol.country}`);
+            
+            if (existingResult.data && existingResult.data.length > 0) {
+                dateIdMap[dateCol.col] = existingResult.data[0].id;
+            } else {
+                // Create new date
+                const result = await supabaseRequest('holiday_dates', 'POST', {
+                    holiday_date: dateCol.date,
+                    country: dateCol.country,
+                    holiday_name: dateCol.name || null,
+                    year: new Date(dateCol.date).getFullYear()
+                });
+                
+                if (result.data && result.data.length > 0) {
+                    dateIdMap[dateCol.col] = result.data[0].id;
+                    importedDates++;
+                }
+            }
+        } catch (err) {
+            console.error('Error creating date:', dateCol, err);
+        }
+    }
+    
+    // Determine support type from sheet name or data
+    let supportType = 'desk'; // default
+    const sheetName = sheet['!ref'] ? 'unknown' : '';
+    
+    // Import assignments
+    let importedAssignments = 0;
+    
+    for (let rowIdx = 1; rowIdx < jsonData.length; rowIdx++) {
+        const row = jsonData[rowIdx];
+        if (!row || !row[appCol]) continue;
+        
+        const application = String(row[appCol]).trim();
+        const team = String(row[teamCol] || '').trim();
+        
+        if (!application || !team) continue;
+        
+        // Check if row indicates support type
+        if (application.toLowerCase().includes('desk')) {
+            supportType = 'desk';
+            continue;
+        } else if (application.toLowerCase().includes('call')) {
+            supportType = 'call';
+            continue;
+        }
+        
+        // Get staff for each date
+        for (const dateCol of dateColumns) {
+            const staffNames = row[dateCol.col];
+            if (!staffNames) continue;
+            
+            const holidayDateId = dateIdMap[dateCol.col];
+            if (!holidayDateId) continue;
+            
+            try {
+                // Check if assignment exists
+                const existingResult = await supabaseRequest('holiday_support', 'GET', null,
+                    `?holiday_date_id=eq.${holidayDateId}&support_type=eq.${supportType}&application=eq.${encodeURIComponent(application)}&team=eq.${encodeURIComponent(team)}`);
+                
+                if (existingResult.data && existingResult.data.length > 0) {
+                    // Update existing
+                    await supabaseRequest('holiday_support', 'PATCH', {
+                        staff_names: String(staffNames).trim(),
+                        updated_at: new Date().toISOString()
+                    }, `?id=eq.${existingResult.data[0].id}`);
+                } else {
+                    // Create new
+                    await supabaseRequest('holiday_support', 'POST', {
+                        holiday_date_id: holidayDateId,
+                        support_type: supportType,
+                        application: application,
+                        team: team,
+                        staff_names: String(staffNames).trim()
+                    });
+                    importedAssignments++;
+                }
+            } catch (err) {
+                console.error('Error creating assignment:', err);
+            }
+        }
+    }
+    
+    return { dates: importedDates, assignments: importedAssignments };
+}
+
+// Parse date header (e.g., "PH\n8-Dec" or "8-Dec (PH)" or "25-Dec AUS")
+function parseDateHeader(header) {
+    if (!header) return null;
+    
+    const headerStr = String(header).trim();
+    
+    // Try to extract country tag
+    let country = 'PH'; // default
+    let dateStr = headerStr;
+    
+    // Check for country indicators
+    const countryPatterns = [
+        { pattern: /\bPH\b/i, country: 'PH' },
+        { pattern: /\bAUS\b/i, country: 'AUS' },
+        { pattern: /\bIndia\b/i, country: 'India' },
+        { pattern: /\bLean\b/i, country: 'Lean Staffing' },
+        { pattern: /\bLean\s*Staffing\b/i, country: 'Lean Staffing' }
+    ];
+    
+    for (const cp of countryPatterns) {
+        if (cp.pattern.test(headerStr)) {
+            country = cp.country;
+            dateStr = headerStr.replace(cp.pattern, '').trim();
+            break;
+        }
+    }
+    
+    // Clean up date string
+    dateStr = dateStr.replace(/[\n\r\(\)]/g, ' ').trim();
+    
+    // Try to parse date
+    const dateFormats = [
+        /(\d{1,2})[-\/]([A-Za-z]{3})/,  // 8-Dec, 25/Dec
+        /([A-Za-z]{3})[-\/](\d{1,2})/,  // Dec-8, Dec/25
+        /(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})/, // 8/12/2026
+    ];
+    
+    const months = {
+        'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'may': 4, 'jun': 5,
+        'jul': 6, 'aug': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dec': 11
+    };
+    
+    for (const format of dateFormats) {
+        const match = dateStr.match(format);
+        if (match) {
+            let day, month, year = new Date().getFullYear();
+            
+            if (match.length === 3 && isNaN(match[2])) {
+                // Format: 8-Dec
+                day = parseInt(match[1]);
+                month = months[match[2].toLowerCase()];
+            } else if (match.length === 3 && isNaN(match[1])) {
+                // Format: Dec-8
+                day = parseInt(match[2]);
+                month = months[match[1].toLowerCase()];
+            } else if (match.length === 4) {
+                // Format: 8/12/2026
+                day = parseInt(match[1]);
+                month = parseInt(match[2]) - 1;
+                year = parseInt(match[3]);
+                if (year < 100) year += 2000;
+            }
+            
+            if (day && month !== undefined) {
+                // If month is December and we're past December, assume next year
+                if (month === 11 && new Date().getMonth() > 0) {
+                    // Keep current year for December if we're in early year
+                }
+                
+                const date = new Date(year, month, day);
+                const dateFormatted = date.toISOString().split('T')[0];
+                
+                return {
+                    date: dateFormatted,
+                    country: country,
+                    name: null
+                };
+            }
+        }
+    }
+    
+    return null;
+}
+
+// Download holiday template
+function downloadHolidayTemplate(event) {
+    event.preventDefault();
+    
+    if (typeof XLSX === 'undefined') {
+        showToast('Excel library not loaded', 'error');
+        return;
+    }
+    
+    // Create sample data
+    const sampleData = [
+        ['Application', 'Team', 'PH\n8-Dec', 'PH\n24-Dec', 'AUS\n25-Dec', 'AUS\n26-Dec', 'Lean Staffing\n29-Dec'],
+        ['ON DESK SUPPORT', '', '', '', '', '', ''],
+        ['Frontend', 'ASOM/Fallout', 'Ganesh, Yash', 'Ganesh, Yash', '', '', 'Ganesh'],
+        ['Frontend', 'OMS', 'India Team', 'India Team', '', '', ''],
+        ['Frontend', 'CRM/SDP/MCO', 'Chirag, Pankaj', '', '', '', ''],
+        ['Backend', 'INV/AMDD', 'India Team', 'Jerome', '', '', ''],
+        ['Backend', 'TC/AEM/OFCA', 'Ganesh, Hendry', 'Ganesh', '', '', ''],
+        ['', '', '', '', '', '', ''],
+        ['ON CALL SUPPORT', '', '', '', '', '', ''],
+        ['Frontend', 'ASOM', 'Anurag, Yash', 'Anurag, Yash', '', '', ''],
+        ['Frontend', 'OMS', 'Anurag, Bhomesh', 'Aditya', '', '', ''],
+        ['Infra', 'Infra', 'Rohan', 'Sakshi', '', '', ''],
+        ['MOD', 'Onshore', 'Mak', 'Vikram', '', '', ''],
+        ['MOD', 'Offshore', 'Saurabh', 'Neil', '', '', ''],
+    ];
+    
+    const ws = XLSX.utils.aoa_to_sheet(sampleData);
+    
+    // Set column widths
+    ws['!cols'] = [
+        { width: 12 }, // Application
+        { width: 15 }, // Team
+        { width: 15 }, // Date 1
+        { width: 15 }, // Date 2
+        { width: 15 }, // Date 3
+        { width: 15 }, // Date 4
+        { width: 18 }, // Date 5
+    ];
+    
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Holiday Support');
+    
+    XLSX.writeFile(wb, 'holiday_support_template.xlsx');
+    showToast('Template downloaded!', 'success');
+}
+
 // Initialize Holiday Staffing when switching to it
 document.addEventListener('DOMContentLoaded', function() {
     const originalSwitchMainScreen = window.switchMainScreen;

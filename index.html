@@ -2626,6 +2626,28 @@
                 <button class="modal-close" onclick="closeHolidayScheduleModal()">&times;</button>
             </div>
             
+            <!-- Import Section -->
+            <div class="import-section">
+                <div class="import-header">
+                    <span class="import-icon">📥</span>
+                    <span>Import from Excel</span>
+                </div>
+                <div class="import-content">
+                    <input type="file" id="holidayExcelFile" accept=".xlsx,.xls" style="display: none;" onchange="handleHolidayExcelUpload(event)">
+                    <button class="btn btn-outline" onclick="document.getElementById('holidayExcelFile').click()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                        Choose Excel File
+                    </button>
+                    <span id="selectedFileName" class="selected-file-name"></span>
+                    <button class="btn btn-primary" id="importExcelBtn" onclick="importHolidayExcel()" disabled>Import Data</button>
+                    <a href="#" class="download-template-link" onclick="downloadHolidayTemplate(event)">Download Template</a>
+                </div>
+            </div>
+            
             <!-- Modal Tabs -->
             <div class="modal-tabs">
                 <button class="modal-tab active" onclick="switchHolidayModalTab('dates', event)">Manage Holiday Dates</button>

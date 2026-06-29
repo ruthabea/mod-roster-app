@@ -5806,6 +5806,62 @@ select.prompt-modal-input:focus {
     background: linear-gradient(135deg, #059669 0%, #047857 100%);
 }
 
+/* Import Section */
+.import-section {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    border: 1px solid #bfdbfe;
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.import-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    color: #1e40af;
+    margin-bottom: 0.75rem;
+    font-size: 0.9rem;
+}
+
+.import-icon {
+    font-size: 1.1rem;
+}
+
+.import-content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.import-content .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.selected-file-name {
+    font-size: 0.85rem;
+    color: #374151;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.download-template-link {
+    font-size: 0.8rem;
+    color: #2563eb;
+    text-decoration: none;
+    margin-left: auto;
+}
+
+.download-template-link:hover {
+    text-decoration: underline;
+}
+
 /* Modal Tabs */
 .modal-tabs {
     display: flex;
