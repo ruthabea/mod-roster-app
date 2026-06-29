@@ -3254,7 +3254,7 @@ function editRosterEntryByWeek(weekStart, idx) {
     const entry = weekData[idx];
     document.getElementById('rosterEditIndex').value = idx;
     document.getElementById('rosterTime').value = entry.time || '';
-    document.getElementById('rosterApp').value = entry.app || '';
+    document.getElementById('rosterApplication').value = entry.app || '';
     document.getElementById('rosterTeam').value = entry.team || '';
     document.getElementById('rosterMon').value = entry.days.mon || '';
     document.getElementById('rosterTue').value = entry.days.tue || '';
