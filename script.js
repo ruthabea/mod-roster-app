@@ -5090,6 +5090,7 @@ function renderMyVacationRequests(requests) {
         
         return `
             <tr>
+                <td><strong>${req.employee_name}</strong></td>
                 <td>${submitted}</td>
                 <td><span class="leave-type-badge ${typeClass}">${req.request_type}</span></td>
                 <td>${startDate}</td>
