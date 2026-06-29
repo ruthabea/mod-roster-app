@@ -2806,6 +2806,35 @@ header h1 {
     font-weight: 500;
 }
 
+/* MOD Schedule Filters */
+.mod-schedule-filters {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+}
+
+.mod-schedule-filters input[type="month"] {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    background: white;
+    cursor: pointer;
+}
+
+.mod-schedule-filters input[type="month"]:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.mod-schedule-filters .btn-sm {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.85rem;
+}
+
 .schedule-meta {
     font-size: 0.875rem;
     color: #64748b;

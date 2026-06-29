@@ -701,6 +701,9 @@ function loadAllData() {
         loadSavedSchedule(screen);
         loadEscalationContacts(screen);
     });
+    
+    // Initialize MOD schedule filter with current month
+    initializeModScheduleFilter();
 }
 
 // Load saved schedule
@@ -835,6 +838,123 @@ function displaySavedSchedule(screen) {
     
     document.getElementById(`${prefix}NoScheduleMessage`).style.display = 'none';
     document.getElementById(`${prefix}ScheduleTableContainer`).classList.remove('hidden');
+}
+
+// Current MOD filter state
+let modScheduleFilteredEntries = null;
+
+// Filter MOD Schedule by month
+function filterModScheduleByMonth() {
+    const monthFilter = document.getElementById('modScheduleMonthFilter')?.value;
+    const data = appData.mod.savedSchedule;
+    
+    if (!data || !data.entries || data.entries.length === 0) {
+        return;
+    }
+    
+    if (!monthFilter) {
+        // No filter selected, show all
+        modScheduleFilteredEntries = null;
+        displaySavedSchedule('mod');
+        return;
+    }
+    
+    const [filterYear, filterMonth] = monthFilter.split('-');
+    const filteredEntries = data.entries.filter(entry => {
+        const entryDate = new Date(entry.date);
+        const entryYear = entryDate.getFullYear().toString();
+        const entryMonth = String(entryDate.getMonth() + 1).padStart(2, '0');
+        return entryYear === filterYear && entryMonth === filterMonth;
+    });
+    
+    modScheduleFilteredEntries = filteredEntries;
+    displayFilteredModSchedule(filteredEntries);
+}
+
+// Show current week MOD
+function showCurrentWeekMod() {
+    const data = appData.mod.savedSchedule;
+    
+    if (!data || !data.entries || data.entries.length === 0) {
+        return;
+    }
+    
+    // Get current week's Monday and Sunday
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + diffToMonday);
+    monday.setHours(0, 0, 0, 0);
+    
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+    
+    const filteredEntries = data.entries.filter(entry => {
+        const entryDate = new Date(entry.date);
+        return entryDate >= monday && entryDate <= sunday;
+    });
+    
+    // Clear month filter
+    const monthFilter = document.getElementById('modScheduleMonthFilter');
+    if (monthFilter) monthFilter.value = '';
+    
+    modScheduleFilteredEntries = filteredEntries;
+    displayFilteredModSchedule(filteredEntries);
+}
+
+// Show all MOD entries
+function showAllMod() {
+    // Clear filters
+    const monthFilter = document.getElementById('modScheduleMonthFilter');
+    if (monthFilter) monthFilter.value = '';
+    
+    modScheduleFilteredEntries = null;
+    displaySavedSchedule('mod');
+}
+
+// Display filtered MOD schedule
+function displayFilteredModSchedule(entries) {
+    const data = appData.mod.savedSchedule;
+    
+    if (!entries || entries.length === 0) {
+        document.getElementById('modNoScheduleMessage').style.display = 'block';
+        document.getElementById('modScheduleTableContainer').classList.add('hidden');
+        document.getElementById('modScheduleInfo').textContent = 'No MOD schedule found for the selected period.';
+        return;
+    }
+    
+    colorMaps.mod.clear();
+    colorIndices.mod = 1;
+    
+    const startDate = new Date(entries[0].date);
+    const endDate = new Date(entries[entries.length - 1].date);
+    const dateRange = `${formatDateShort(startDate)} to ${formatDateShort(endDate)}`;
+    
+    document.getElementById('modScheduleInfo').innerHTML = `<strong>${dateRange}</strong> | Showing ${entries.length} entries`;
+    
+    // Create temporary data object for rendering
+    const tempData = {
+        ...data,
+        entries: entries
+    };
+    
+    const scheduleHTML = generateScheduleHTMLFromSaved('mod', tempData);
+    document.getElementById('modScheduleContent').innerHTML = scheduleHTML;
+    
+    document.getElementById('modNoScheduleMessage').style.display = 'none';
+    document.getElementById('modScheduleTableContainer').classList.remove('hidden');
+}
+
+// Initialize MOD schedule filter with current month
+function initializeModScheduleFilter() {
+    const monthFilter = document.getElementById('modScheduleMonthFilter');
+    if (monthFilter) {
+        const now = new Date();
+        monthFilter.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    }
 }
 
 // Generate schedule HTML from saved data
@@ -5563,8 +5683,10 @@ async function loadLeaveCalendar() {
     const endOfMonth = new Date(year, month, 0).toISOString().split('T')[0];
     
     try {
+        // Filter leaves that OVERLAP with the selected month:
+        // A leave overlaps if: start_date <= endOfMonth AND end_date >= startOfMonth
         const response = await fetch(
-            `${SUPABASE_URL}/rest/v1/vacation_requests?select=*&status=eq.approved&or=(start_date.lte.${endOfMonth},end_date.gte.${startOfMonth})&order=start_date`, 
+            `${SUPABASE_URL}/rest/v1/vacation_requests?select=*&status=eq.approved&start_date=lte.${endOfMonth}&end_date=gte.${startOfMonth}&order=start_date`, 
             {
                 headers: {
                     'apikey': SUPABASE_ANON_KEY,

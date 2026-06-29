@@ -156,6 +156,11 @@
                             <h2>Current MOD Schedule</h2>
                             <p id="modScheduleInfo" class="schedule-meta"></p>
                         </div>
+                        <div class="mod-schedule-filters">
+                            <input type="month" id="modScheduleMonthFilter" onchange="filterModScheduleByMonth()">
+                            <button class="btn btn-outline btn-sm" onclick="showCurrentWeekMod()">This Week</button>
+                            <button class="btn btn-outline btn-sm" onclick="showAllMod()">Show All</button>
+                        </div>
                         <div class="schedule-display-actions">
                             <button class="btn btn-secondary" onclick="toggleModScheduleEditMode()">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
