@@ -5594,7 +5594,7 @@ select.prompt-modal-input:focus {
 }
 
 .hs-fixed-col {
-    text-align: left !important;
+    text-align: center !important;
     position: sticky;
     background: #374151;
     z-index: 25;
@@ -5625,11 +5625,11 @@ select.prompt-modal-input:focus {
     text-overflow: ellipsis;
 }
 
-.hs-app-cell { position: sticky; left: 0; z-index: 15; }
+.hs-app-cell { position: sticky; left: 0; z-index: 15; text-align: center; }
 .hs-area-cell { position: sticky; left: 70px; z-index: 15; }
-.hs-name-cell { position: sticky; left: 160px; z-index: 15; }
-.hs-site-cell { position: sticky; left: 280px; z-index: 15; }
-.hs-contact-cell { position: sticky; left: 340px; z-index: 15; }
+.hs-name-cell { position: sticky; left: 160px; z-index: 15; background-color: #ffffff; }
+.hs-site-cell { position: sticky; left: 280px; z-index: 15; background-color: #f9fafb; }
+.hs-contact-cell { position: sticky; left: 340px; z-index: 15; background-color: #ffffff; }
 
 .hs-status-cell {
     padding: 1px !important;

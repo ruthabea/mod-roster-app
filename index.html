@@ -2415,6 +2415,8 @@
                             <p class="help-text">Overview of staff leave and availability during holiday periods</p>
                         </div>
                         <div class="holiday-filters">
+                            <label>Month:</label>
+                            <input type="month" id="holidayMonthFilter" onchange="onHolidayMonthChange()">
                             <label>From:</label>
                             <input type="date" id="holidayStartDate" onchange="loadHolidaySummary()">
                             <label>To:</label>

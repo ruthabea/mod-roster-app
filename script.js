@@ -6245,21 +6245,43 @@ function generateHolidayDates(startDate, endDate) {
 
 // Initialize holiday date pickers with default range
 function initializeHolidayDatePickers() {
+    const monthInput = document.getElementById('holidayMonthFilter');
     const startInput = document.getElementById('holidayStartDate');
     const endInput = document.getElementById('holidayEndDate');
     
-    if (startInput && endInput) {
-        // Default to current week
-        const today = new Date();
-        const startOfWeek = new Date(today);
-        startOfWeek.setDate(today.getDate() - today.getDay() + 1);
-        
-        const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setDate(startOfWeek.getDate() + 13); // 2 weeks
-        
-        startInput.value = formatDateForInput(startOfWeek);
-        endInput.value = formatDateForInput(endOfWeek);
+    const today = new Date();
+    
+    // Set month filter to current month
+    if (monthInput) {
+        monthInput.value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
     }
+    
+    if (startInput && endInput) {
+        // Default to current month
+        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        
+        startInput.value = formatDateForInput(startOfMonth);
+        endInput.value = formatDateForInput(endOfMonth);
+    }
+}
+
+// Handle month filter change
+function onHolidayMonthChange() {
+    const monthInput = document.getElementById('holidayMonthFilter');
+    const startInput = document.getElementById('holidayStartDate');
+    const endInput = document.getElementById('holidayEndDate');
+    
+    if (!monthInput || !monthInput.value) return;
+    
+    const [year, month] = monthInput.value.split('-').map(Number);
+    const startOfMonth = new Date(year, month - 1, 1);
+    const endOfMonth = new Date(year, month, 0);
+    
+    if (startInput) startInput.value = formatDateForInput(startOfMonth);
+    if (endInput) endInput.value = formatDateForInput(endOfMonth);
+    
+    loadHolidaySummary();
 }
 
 // Load Holiday Summary - Main function
@@ -6376,16 +6398,14 @@ function renderHolidaySummaryTable(dates, data) {
     
     // Build body with dropdowns
     let bodyHtml = '';
-    let currentApp = '';
     
     data.forEach((row, rowIndex) => {
-        // Get color for this application
+        // Get color for this application (only for App and Area columns)
         const appColor = APP_COLORS[row.app] || '#f0f0f0';
-        const rowStyle = `background-color: ${appColor};`;
         
-        bodyHtml += `<tr style="${rowStyle}" data-contact-id="${row.id}">`;
-        bodyHtml += `<td class="hs-app-cell"><strong>${escapeHtml(row.app)}</strong></td>`;
-        bodyHtml += `<td class="hs-area-cell">${escapeHtml(row.area)}</td>`;
+        bodyHtml += `<tr data-contact-id="${row.id}">`;
+        bodyHtml += `<td class="hs-app-cell" style="background-color: ${appColor};"><strong>${escapeHtml(row.app)}</strong></td>`;
+        bodyHtml += `<td class="hs-area-cell" style="background-color: ${appColor};">${escapeHtml(row.area)}</td>`;
         bodyHtml += `<td class="hs-name-cell"><strong>${escapeHtml(row.name)}</strong></td>`;
         bodyHtml += `<td class="hs-site-cell">${escapeHtml(row.site)}</td>`;
         bodyHtml += `<td class="hs-contact-cell">${escapeHtml(row.contact)}</td>`;
