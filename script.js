@@ -759,8 +759,52 @@ async function syncModScheduleToSupabase(entries) {
         }
         
         console.log('MOD schedule synced to Supabase');
+        return true;
     } catch (error) {
         console.error('Error syncing MOD schedule to Supabase:', error);
+        return false;
+    }
+}
+
+// Force sync MOD schedule to Supabase (manual trigger)
+async function forceModScheduleSync() {
+    const data = appData.mod.savedSchedule;
+    
+    if (!data || !data.entries || data.entries.length === 0) {
+        showAlertModal(
+            'No MOD schedule data found to sync. Please add schedule entries first.',
+            'No Data to Sync',
+            notificationIcons.warning
+        );
+        return;
+    }
+    
+    // Show loading toast
+    showToast('Syncing MOD schedule to cloud...', 'info');
+    
+    try {
+        const success = await syncModScheduleToSupabase(data.entries);
+        
+        if (success) {
+            showAlertModal(
+                `Successfully synced ${data.entries.length} MOD schedule entries to the cloud. The Weekly On-Call Summary email will now use the correct MOD data.`,
+                'Sync Complete',
+                notificationIcons.success
+            );
+        } else {
+            showAlertModal(
+                'Failed to sync MOD schedule. Please check your internet connection and try again.',
+                'Sync Failed',
+                notificationIcons.error
+            );
+        }
+    } catch (error) {
+        console.error('Force sync error:', error);
+        showAlertModal(
+            'An error occurred while syncing. Please try again.',
+            'Sync Error',
+            notificationIcons.error
+        );
     }
 }
 
