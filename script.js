@@ -4692,14 +4692,15 @@ async function fetchEmployeeTeam(employeeName) {
 }
 
 // Manager directory for vacation approvals
+// NOTE: These emails must match the managers table in Supabase
 const MANAGERS = {
-    josieSolar: { name: 'Josie Solar', email: 'JSolar@amdocs.com' },
-    manishaBardiya: { name: 'Manisha Bardiya', email: 'MBardiya@amdocs.com' },
-    ashwaniAggarwal: { name: 'Ashwani Aggarwal', email: 'AAggarwal@amdocs.com' },
-    atmaramMore: { name: 'Atmaram More', email: 'AMore@amdocs.com' },
-    bindiyaPhadte: { name: 'Bindiya Phadte', email: 'BPhadte@amdocs.com' },
-    rahulGupta: { name: 'Rahul Gupta', email: 'RGupta@amdocs.com' },
-    prachiMenon: { name: 'Prachi Menon', email: 'PMenon@amdocs.com' }
+    josieSolar: { name: 'Josie Solar', email: 'josephis@amdocs.com' },
+    manishaBardiya: { name: 'Manisha Bardiya', email: 'MBARDIYA@amdocs.com' },
+    ashwaniAggarwal: { name: 'Ashwani Aggarwal', email: 'ASHWANIA@amdocs.com' },
+    atmaramMore: { name: 'Atmaram More', email: 'Atmaram.More@amdocs.com' },
+    bindiyaPhadte: { name: 'Bindiya Phadte', email: 'BPHADTE@amdocs.com' },
+    rahulGupta: { name: 'Rahul Gupta', email: 'rahulg5@amdocs.com' },
+    prachiMenon: { name: 'Prachi Menon', email: 'Prachi.Menon@amdocs.com' }
 };
 
 // Manager routing configuration for vacation approvals (supports multiple approvers)
