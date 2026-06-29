@@ -5554,36 +5554,61 @@ select.prompt-modal-input:focus {
 .legend-color.hs-hd { background-color: #f472b6; }
 
 /* Holiday Staffing Table - New Styles */
+#holidayScreen .container {
+    max-width: 100%;
+    padding: 1rem 0.5rem;
+}
+
+#holiday-summaryTab .card {
+    max-width: 100%;
+    padding: 0.75rem;
+}
+
+#holiday-summaryTab .holiday-table-wrapper {
+    max-height: calc(100vh - 280px);
+    overflow: auto;
+}
+
+#holidayStaffingTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+}
+
 .hs-header-row th {
     background: #374151 !important;
     color: white;
-    padding: 8px 6px !important;
-    font-size: 0.75rem;
+    padding: 4px 3px !important;
+    font-size: 0.7rem;
     white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 20;
 }
 
 .hs-header-row th small {
     display: block;
     font-weight: normal;
     opacity: 0.8;
+    font-size: 0.65rem;
 }
 
 .hs-fixed-col {
-    min-width: 100px;
     text-align: left !important;
     position: sticky;
     background: #374151;
-    z-index: 10;
+    z-index: 25;
 }
 
-.hs-fixed-col:nth-child(1) { left: 0; min-width: 80px; }
-.hs-fixed-col:nth-child(2) { left: 80px; min-width: 120px; }
-.hs-fixed-col:nth-child(3) { left: 200px; min-width: 140px; }
-.hs-fixed-col:nth-child(4) { left: 340px; min-width: 80px; }
-.hs-fixed-col:nth-child(5) { left: 420px; min-width: 120px; }
+.hs-fixed-col:nth-child(1) { left: 0; min-width: 70px; max-width: 70px; }
+.hs-fixed-col:nth-child(2) { left: 70px; min-width: 90px; max-width: 90px; }
+.hs-fixed-col:nth-child(3) { left: 160px; min-width: 120px; max-width: 120px; }
+.hs-fixed-col:nth-child(4) { left: 280px; min-width: 60px; max-width: 60px; }
+.hs-fixed-col:nth-child(5) { left: 340px; min-width: 100px; max-width: 100px; }
 
 .hs-date-col {
-    min-width: 60px;
+    min-width: 45px;
+    max-width: 50px;
 }
 
 .hs-weekend {
@@ -5592,22 +5617,32 @@ select.prompt-modal-input:focus {
 
 .hs-app-cell, .hs-area-cell, .hs-name-cell, .hs-site-cell, .hs-contact-cell {
     text-align: left;
-    padding: 6px 8px;
-    font-size: 0.8rem;
+    padding: 3px 4px;
+    font-size: 0.7rem;
     border: 1px solid #d1d5db;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
+.hs-app-cell { position: sticky; left: 0; z-index: 15; }
+.hs-area-cell { position: sticky; left: 70px; z-index: 15; }
+.hs-name-cell { position: sticky; left: 160px; z-index: 15; }
+.hs-site-cell { position: sticky; left: 280px; z-index: 15; }
+.hs-contact-cell { position: sticky; left: 340px; z-index: 15; }
+
 .hs-status-cell {
-    padding: 2px !important;
+    padding: 1px !important;
     border: 1px solid #d1d5db;
+    min-width: 45px;
 }
 
 .hs-status-dropdown {
     width: 100%;
-    padding: 4px 2px;
+    padding: 2px 0;
     border: none;
     background: transparent;
-    font-size: 0.75rem;
+    font-size: 0.65rem;
     font-weight: 600;
     text-align: center;
     cursor: pointer;
