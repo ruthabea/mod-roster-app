@@ -6990,34 +6990,52 @@ async function importHolidayExcel() {
         const sheetNames = holidayExcelData.SheetNames;
         console.log('Available sheets:', sheetNames);
         
-        // Look for Holiday Dates sheet or first sheet
-        let datesSheet = null;
+        // Look for HOLIDAY STAFFING sheet specifically
         let supportSheet = null;
+        let selectedSheetName = '';
         
         for (const name of sheetNames) {
             const lowerName = name.toLowerCase();
-            if (lowerName.includes('date') || lowerName.includes('holiday')) {
-                datesSheet = holidayExcelData.Sheets[name];
-            }
-            if (lowerName.includes('support') || lowerName.includes('assignment') || lowerName.includes('desk') || lowerName.includes('call')) {
+            // Look for "HOLIDAY STAFFING" or similar
+            if (lowerName.includes('holiday staffing') || lowerName.includes('holiday_staffing')) {
                 supportSheet = holidayExcelData.Sheets[name];
+                selectedSheetName = name;
+                break;
             }
         }
         
-        // If no specific sheets found, try to parse first sheet
-        if (!datesSheet && !supportSheet && sheetNames.length > 0) {
-            supportSheet = holidayExcelData.Sheets[sheetNames[0]];
+        // Fallback: look for any sheet with staffing, support, or holiday
+        if (!supportSheet) {
+            for (const name of sheetNames) {
+                const lowerName = name.toLowerCase();
+                if (lowerName.includes('staffing') || lowerName.includes('support') || lowerName.includes('holiday')) {
+                    supportSheet = holidayExcelData.Sheets[name];
+                    selectedSheetName = name;
+                    break;
+                }
+            }
         }
+        
+        // Last fallback: use first sheet
+        if (!supportSheet && sheetNames.length > 0) {
+            supportSheet = holidayExcelData.Sheets[sheetNames[0]];
+            selectedSheetName = sheetNames[0];
+        }
+        
+        console.log('Using sheet:', selectedSheetName);
         
         let importedDates = 0;
         let importedAssignments = 0;
         
-        // Parse and import support data (which includes dates)
-        if (supportSheet) {
-            const result = await parseAndImportSupportSheet(supportSheet);
-            importedDates = result.dates;
-            importedAssignments = result.assignments;
+        if (!supportSheet) {
+            showToast('Could not find a valid sheet to import', 'error');
+            return;
         }
+        
+        // Parse and import support data (which includes dates)
+        const result = await parseAndImportSupportSheet(supportSheet);
+        importedDates = result.dates;
+        importedAssignments = result.assignments;
         
         showToast(`Imported ${importedDates} holiday dates and ${importedAssignments} assignments!`, 'success');
         
@@ -7040,71 +7058,137 @@ async function importHolidayExcel() {
 
 // Parse and import support sheet
 async function parseAndImportSupportSheet(sheet) {
-    const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+    const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
     
-    if (jsonData.length < 2) {
-        throw new Error('Sheet is empty or has no data rows');
+    console.log('Total rows:', jsonData.length);
+    console.log('First 5 rows:', jsonData.slice(0, 5));
+    
+    if (jsonData.length < 3) {
+        throw new Error('Sheet is empty or has insufficient data rows');
     }
     
-    // First row should be headers: Application, Team, Date1, Date2, ...
-    const headers = jsonData[0];
-    console.log('Headers:', headers);
+    // This Excel has TWO header rows:
+    // Row 0: "Application", "Team", "PH", "PH", "AUS", "AUS", "Lean Staffing"...
+    // Row 1: empty, empty, date1, date2, date3, date4, date5...
     
-    // Find Application and Team columns
+    const countryRow = jsonData[0];
+    const dateRow = jsonData[1];
+    
+    console.log('Country row:', countryRow);
+    console.log('Date row:', dateRow);
+    
+    // Find Application and Team columns from row 0
     let appCol = -1;
     let teamCol = -1;
-    const dateColumns = [];
     
-    headers.forEach((header, idx) => {
+    countryRow.forEach((header, idx) => {
         if (!header) return;
         const h = String(header).toLowerCase().trim();
-        
         if (h === 'application' || h === 'app') {
             appCol = idx;
         } else if (h === 'team') {
             teamCol = idx;
-        } else if (h.includes('support')) {
-            // Skip support type column
-        } else {
-            // Try to parse as date or date with country tag
-            const dateInfo = parseDateHeader(header);
-            if (dateInfo) {
-                dateColumns.push({ col: idx, ...dateInfo });
-            }
         }
     });
     
-    console.log('App column:', appCol, 'Team column:', teamCol);
-    console.log('Date columns:', dateColumns);
+    // Default to columns 0 and 1 if not found
+    if (appCol === -1) appCol = 0;
+    if (teamCol === -1) teamCol = 1;
     
-    if (appCol === -1 || teamCol === -1) {
-        throw new Error('Could not find Application and Team columns');
+    console.log('App column:', appCol, 'Team column:', teamCol);
+    
+    // Build date columns from both rows
+    const dateColumns = [];
+    
+    for (let col = teamCol + 1; col < Math.max(countryRow.length, dateRow.length); col++) {
+        const countryVal = countryRow[col] ? String(countryRow[col]).trim() : '';
+        const dateVal = dateRow[col] ? String(dateRow[col]).trim() : '';
+        
+        // Determine country
+        let country = 'PH'; // default
+        const countryLower = countryVal.toLowerCase();
+        if (countryLower.includes('aus') || countryLower.includes('australia')) {
+            country = 'AUS';
+        } else if (countryLower.includes('india')) {
+            country = 'India';
+        } else if (countryLower.includes('lean')) {
+            country = 'Lean Staffing';
+        } else if (countryLower.includes('ph') || countryLower === 'ph') {
+            country = 'PH';
+        }
+        
+        // Parse the date
+        let parsedDate = null;
+        
+        if (dateVal) {
+            // Try Excel serial number first
+            const serialNum = parseFloat(dateVal);
+            if (!isNaN(serialNum) && serialNum > 1000 && serialNum < 60000) {
+                const excelEpoch = new Date(1899, 11, 30);
+                const date = new Date(excelEpoch.getTime() + serialNum * 24 * 60 * 60 * 1000);
+                parsedDate = date.toISOString().split('T')[0];
+                console.log('Parsed Excel serial:', dateVal, '->', parsedDate);
+            } else {
+                // Try parsing as date string
+                const dateInfo = parseDateHeader(dateVal);
+                if (dateInfo) {
+                    parsedDate = dateInfo.date;
+                }
+            }
+        }
+        
+        if (parsedDate) {
+            dateColumns.push({
+                col: col,
+                date: parsedDate,
+                country: country,
+                name: null
+            });
+            console.log('Date column:', col, 'Country:', country, 'Date:', parsedDate);
+        }
     }
+    
+    console.log('Total date columns found:', dateColumns.length);
     
     // Create holiday dates first
     const dateIdMap = {};
     let importedDates = 0;
     
     for (const dateCol of dateColumns) {
+        // Skip if no valid date
+        if (!dateCol.date) {
+            console.log('Skipping column with no parsed date:', dateCol);
+            continue;
+        }
+        
         try {
             // Check if date already exists
             const existingResult = await supabaseRequest('holiday_dates', 'GET', null, 
-                `?holiday_date=eq.${dateCol.date}&country=eq.${dateCol.country}`);
+                `?holiday_date=eq.${dateCol.date}&country=eq.${encodeURIComponent(dateCol.country)}`);
+            
+            console.log('Checking existing date:', dateCol.date, dateCol.country, existingResult);
             
             if (existingResult.data && existingResult.data.length > 0) {
                 dateIdMap[dateCol.col] = existingResult.data[0].id;
+                console.log('Using existing date ID:', existingResult.data[0].id);
             } else {
                 // Create new date
-                const result = await supabaseRequest('holiday_dates', 'POST', {
+                const newDate = {
                     holiday_date: dateCol.date,
                     country: dateCol.country,
                     holiday_name: dateCol.name || null,
                     year: new Date(dateCol.date).getFullYear()
-                });
+                };
+                console.log('Creating new date:', newDate);
+                
+                const result = await supabaseRequest('holiday_dates', 'POST', newDate);
+                
+                console.log('Create date result:', result);
                 
                 if (result.data && result.data.length > 0) {
                     dateIdMap[dateCol.col] = result.data[0].id;
                     importedDates++;
+                    console.log('Created date with ID:', result.data[0].id);
                 }
             }
         } catch (err) {
@@ -7112,75 +7196,160 @@ async function parseAndImportSupportSheet(sheet) {
         }
     }
     
+    console.log('Date ID map:', dateIdMap);
+    
     // Determine support type from sheet name or data
     let supportType = 'desk'; // default
     const sheetName = sheet['!ref'] ? 'unknown' : '';
     
-    // Import assignments
+    // Import assignments - data starts from row 2
     let importedAssignments = 0;
+    const startRow = 2;
     
-    for (let rowIdx = 1; rowIdx < jsonData.length; rowIdx++) {
+    console.log('Starting assignment import from row:', startRow);
+    
+    // Track current application/team for merged cells
+    let currentApp = '';
+    let currentTeam = '';
+    
+    // First pass: collect all staff names per app/team/date (handling multi-row cells)
+    const staffMap = {}; // key: "supportType|app|team|dateCol" -> array of names
+    
+    for (let rowIdx = startRow; rowIdx < jsonData.length; rowIdx++) {
         const row = jsonData[rowIdx];
-        if (!row || !row[appCol]) continue;
+        if (!row) continue;
         
-        const application = String(row[appCol]).trim();
-        const team = String(row[teamCol] || '').trim();
+        let rowApp = String(row[appCol] || '').trim();
+        let rowTeam = String(row[teamCol] || '').trim();
         
-        if (!application || !team) continue;
-        
-        // Check if row indicates support type
-        if (application.toLowerCase().includes('desk')) {
+        // Check if row indicates support type change
+        const rowAppLower = rowApp.toLowerCase();
+        if (rowAppLower.includes('desk support') || rowAppLower === 'on desk' || rowAppLower.includes('on desk')) {
             supportType = 'desk';
+            currentApp = '';
+            currentTeam = '';
+            console.log('Switched to desk support at row', rowIdx);
             continue;
-        } else if (application.toLowerCase().includes('call')) {
+        } else if (rowAppLower.includes('call support') || rowAppLower === 'on call' || rowAppLower.includes('on call')) {
             supportType = 'call';
+            currentApp = '';
+            currentTeam = '';
+            console.log('Switched to call support at row', rowIdx);
             continue;
         }
         
-        // Get staff for each date
+        // Handle merged cells - if app is empty but has team or data, use previous app
+        if (!rowApp && (rowTeam || hasAnyData(row, dateColumns))) {
+            rowApp = currentApp;
+        } else if (rowApp) {
+            currentApp = rowApp;
+        }
+        
+        // Handle merged team cells
+        if (!rowTeam && hasAnyData(row, dateColumns)) {
+            rowTeam = currentTeam;
+        } else if (rowTeam) {
+            currentTeam = rowTeam;
+        }
+        
+        console.log(`Row ${rowIdx}: App="${rowApp}", Team="${rowTeam}"`);
+        
+        // Skip if still no app/team
+        if (!rowApp || !rowTeam) continue;
+        
+        // Collect staff names for each date
         for (const dateCol of dateColumns) {
-            const staffNames = row[dateCol.col];
-            if (!staffNames) continue;
+            const staffName = String(row[dateCol.col] || '').trim();
+            if (!staffName) continue;
             
-            const holidayDateId = dateIdMap[dateCol.col];
-            if (!holidayDateId) continue;
-            
-            try {
-                // Check if assignment exists
-                const existingResult = await supabaseRequest('holiday_support', 'GET', null,
-                    `?holiday_date_id=eq.${holidayDateId}&support_type=eq.${supportType}&application=eq.${encodeURIComponent(application)}&team=eq.${encodeURIComponent(team)}`);
-                
-                if (existingResult.data && existingResult.data.length > 0) {
-                    // Update existing
-                    await supabaseRequest('holiday_support', 'PATCH', {
-                        staff_names: String(staffNames).trim(),
-                        updated_at: new Date().toISOString()
-                    }, `?id=eq.${existingResult.data[0].id}`);
-                } else {
-                    // Create new
-                    await supabaseRequest('holiday_support', 'POST', {
-                        holiday_date_id: holidayDateId,
-                        support_type: supportType,
-                        application: application,
-                        team: team,
-                        staff_names: String(staffNames).trim()
-                    });
-                    importedAssignments++;
-                }
-            } catch (err) {
-                console.error('Error creating assignment:', err);
+            const key = `${supportType}|${rowApp}|${rowTeam}|${dateCol.col}`;
+            if (!staffMap[key]) {
+                staffMap[key] = [];
             }
+            staffMap[key].push(staffName);
         }
     }
     
+    console.log('Staff map keys:', Object.keys(staffMap).length);
+    
+    // Second pass: create/update assignments from staffMap
+    for (const [key, staffArray] of Object.entries(staffMap)) {
+        const [sType, app, team, colStr] = key.split('|');
+        const col = parseInt(colStr);
+        const holidayDateId = dateIdMap[col];
+        
+        if (!holidayDateId) {
+            console.log('No date ID for column:', col);
+            continue;
+        }
+        
+        // Join all staff names
+        const staffNames = staffArray.join(', ');
+        
+        try {
+            // Check if assignment exists
+            const existingResult = await supabaseRequest('holiday_support', 'GET', null,
+                `?holiday_date_id=eq.${holidayDateId}&support_type=eq.${sType}&application=eq.${encodeURIComponent(app)}&team=eq.${encodeURIComponent(team)}`);
+            
+            if (existingResult.data && existingResult.data.length > 0) {
+                // Update existing
+                console.log('Updating existing assignment:', existingResult.data[0].id);
+                await supabaseRequest('holiday_support', 'PATCH', {
+                    staff_names: staffNames,
+                    updated_at: new Date().toISOString()
+                }, `?id=eq.${existingResult.data[0].id}`);
+            } else {
+                // Create new
+                const newAssignment = {
+                    holiday_date_id: holidayDateId,
+                    support_type: sType,
+                    application: app,
+                    team: team,
+                    staff_names: staffNames
+                };
+                console.log('Creating new assignment:', newAssignment);
+                await supabaseRequest('holiday_support', 'POST', newAssignment);
+                importedAssignments++;
+            }
+        } catch (err) {
+            console.error('Error creating assignment:', key, err);
+        }
+    }
+    
+    console.log('Import complete. Dates:', importedDates, 'Assignments:', importedAssignments);
     return { dates: importedDates, assignments: importedAssignments };
 }
 
-// Parse date header (e.g., "PH\n8-Dec" or "8-Dec (PH)" or "25-Dec AUS")
+// Helper to check if row has any data in date columns
+function hasAnyData(row, dateColumns) {
+    for (const dc of dateColumns) {
+        if (row[dc.col] && String(row[dc.col]).trim()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Parse date header (e.g., "PH\n8-Dec" or "8-Dec (PH)" or "25-Dec AUS" or Excel serial number)
 function parseDateHeader(header) {
     if (!header) return null;
     
-    const headerStr = String(header).trim();
+    let headerStr = String(header).trim();
+    
+    // Check if it's an Excel serial date number
+    const serialNum = parseFloat(headerStr);
+    if (!isNaN(serialNum) && serialNum > 40000 && serialNum < 60000) {
+        // Excel serial date (days since 1900-01-01, with Excel bug for 1900)
+        const excelEpoch = new Date(1899, 11, 30);
+        const date = new Date(excelEpoch.getTime() + serialNum * 24 * 60 * 60 * 1000);
+        const dateFormatted = date.toISOString().split('T')[0];
+        console.log('Parsed Excel serial date:', serialNum, '->', dateFormatted);
+        return {
+            date: dateFormatted,
+            country: 'PH',
+            name: null
+        };
+    }
     
     // Try to extract country tag
     let country = 'PH'; // default
@@ -7190,9 +7359,10 @@ function parseDateHeader(header) {
     const countryPatterns = [
         { pattern: /\bPH\b/i, country: 'PH' },
         { pattern: /\bAUS\b/i, country: 'AUS' },
+        { pattern: /\bAustralia\b/i, country: 'AUS' },
         { pattern: /\bIndia\b/i, country: 'India' },
-        { pattern: /\bLean\b/i, country: 'Lean Staffing' },
-        { pattern: /\bLean\s*Staffing\b/i, country: 'Lean Staffing' }
+        { pattern: /\bLean\s*Staffing\b/i, country: 'Lean Staffing' },
+        { pattern: /\bLean\b/i, country: 'Lean Staffing' }
     ];
     
     for (const cp of countryPatterns) {
@@ -7204,49 +7374,71 @@ function parseDateHeader(header) {
     }
     
     // Clean up date string
-    dateStr = dateStr.replace(/[\n\r\(\)]/g, ' ').trim();
+    dateStr = dateStr.replace(/[\n\r\(\)\[\]]/g, ' ').replace(/\s+/g, ' ').trim();
     
-    // Try to parse date
-    const dateFormats = [
-        /(\d{1,2})[-\/]([A-Za-z]{3})/,  // 8-Dec, 25/Dec
-        /([A-Za-z]{3})[-\/](\d{1,2})/,  // Dec-8, Dec/25
-        /(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})/, // 8/12/2026
-    ];
+    console.log('Parsing date string:', dateStr, 'from header:', headerStr);
     
+    // Try to parse date with various formats
     const months = {
-        'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'may': 4, 'jun': 5,
-        'jul': 6, 'aug': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dec': 11
+        'jan': 0, 'january': 0,
+        'feb': 1, 'february': 1,
+        'mar': 2, 'march': 2,
+        'apr': 3, 'april': 3,
+        'may': 4,
+        'jun': 5, 'june': 5,
+        'jul': 6, 'july': 6,
+        'aug': 7, 'august': 7,
+        'sep': 8, 'sept': 8, 'september': 8,
+        'oct': 9, 'october': 9,
+        'nov': 10, 'november': 10,
+        'dec': 11, 'december': 11
     };
+    
+    const dateFormats = [
+        /(\d{1,2})[-\/\s]([A-Za-z]+)/,        // 8-Dec, 25/Dec, 8 Dec
+        /([A-Za-z]+)[-\/\s](\d{1,2})/,        // Dec-8, Dec/25, Dec 8
+        /(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})/, // 8/12/2026, 12-25-2026
+        /(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/, // 2026-12-25
+        /(\d{1,2})[-\/](\d{1,2})/,            // 12/25, 8-12
+    ];
     
     for (const format of dateFormats) {
         const match = dateStr.match(format);
         if (match) {
             let day, month, year = new Date().getFullYear();
             
-            if (match.length === 3 && isNaN(match[2])) {
+            if (match.length === 3 && isNaN(parseInt(match[2]))) {
                 // Format: 8-Dec
                 day = parseInt(match[1]);
-                month = months[match[2].toLowerCase()];
-            } else if (match.length === 3 && isNaN(match[1])) {
+                const monthStr = match[2].toLowerCase();
+                month = months[monthStr];
+            } else if (match.length === 3 && isNaN(parseInt(match[1]))) {
                 // Format: Dec-8
                 day = parseInt(match[2]);
-                month = months[match[1].toLowerCase()];
+                const monthStr = match[1].toLowerCase();
+                month = months[monthStr];
+            } else if (match.length === 4 && match[1].length === 4) {
+                // Format: 2026-12-25
+                year = parseInt(match[1]);
+                month = parseInt(match[2]) - 1;
+                day = parseInt(match[3]);
             } else if (match.length === 4) {
-                // Format: 8/12/2026
+                // Format: 8/12/2026 or 12-25-2026
                 day = parseInt(match[1]);
                 month = parseInt(match[2]) - 1;
                 year = parseInt(match[3]);
                 if (year < 100) year += 2000;
+            } else if (match.length === 3 && !isNaN(parseInt(match[1])) && !isNaN(parseInt(match[2]))) {
+                // Format: 12/25 (month/day)
+                month = parseInt(match[1]) - 1;
+                day = parseInt(match[2]);
             }
             
-            if (day && month !== undefined) {
-                // If month is December and we're past December, assume next year
-                if (month === 11 && new Date().getMonth() > 0) {
-                    // Keep current year for December if we're in early year
-                }
-                
+            if (day && month !== undefined && month >= 0 && month <= 11) {
                 const date = new Date(year, month, day);
                 const dateFormatted = date.toISOString().split('T')[0];
+                
+                console.log('Successfully parsed date:', dateStr, '->', dateFormatted);
                 
                 return {
                     date: dateFormatted,
@@ -7257,6 +7449,7 @@ function parseDateHeader(header) {
         }
     }
     
+    console.log('Could not parse date from:', headerStr);
     return null;
 }
 
