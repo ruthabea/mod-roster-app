@@ -5816,3 +5816,324 @@ async function fetchVacationRequestById(id) {
         return null;
     }
 }
+
+// ==================== HOLIDAY STAFFING FUNCTIONS ====================
+
+// Holiday Staffing Data (sample structure - will be stored in Supabase)
+let holidayStaffingData = {
+    periods: {
+        christmas: {
+            name: 'Christmas Period',
+            startDate: '2026-12-08',
+            endDate: '2027-01-02',
+            dates: []
+        }
+    },
+    summary: [],
+    deskSupport: [],
+    callSupport: []
+};
+
+// Switch Holiday Tab
+function switchHolidayTab(tabName, event) {
+    // Hide all holiday tab contents
+    document.querySelectorAll('#holidayScreen .tab-content').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    
+    // Remove active from all holiday tabs
+    document.querySelectorAll('#holidayScreen .tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    
+    // Show selected tab content
+    const targetTab = document.getElementById(`holiday-${tabName}Tab`);
+    if (targetTab) {
+        targetTab.classList.add('active');
+    }
+    
+    // Add active to clicked tab button
+    if (event && event.target) {
+        event.target.classList.add('active');
+    }
+    
+    // Load data for the tab
+    if (tabName === 'summary') {
+        loadHolidaySummary();
+    } else if (tabName === 'support') {
+        loadHolidaySupport();
+    }
+}
+
+// Generate date headers for holiday period
+function generateHolidayDates(startDate, endDate) {
+    const dates = [];
+    const current = new Date(startDate);
+    const end = new Date(endDate);
+    
+    while (current <= end) {
+        dates.push({
+            date: current.toISOString().split('T')[0],
+            display: current.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }),
+            dayOfWeek: current.toLocaleDateString('en-US', { weekday: 'short' }),
+            isWeekend: current.getDay() === 0 || current.getDay() === 6
+        });
+        current.setDate(current.getDate() + 1);
+    }
+    
+    return dates;
+}
+
+// Load Holiday Summary
+function loadHolidaySummary() {
+    const loadingEl = document.getElementById('holidaySummaryLoading');
+    const emptyEl = document.getElementById('holidaySummaryEmpty');
+    const tableEl = document.getElementById('holidaySummaryTable');
+    
+    if (loadingEl) loadingEl.classList.remove('hidden');
+    if (emptyEl) emptyEl.classList.add('hidden');
+    if (tableEl) tableEl.classList.add('hidden');
+    
+    // Get selected period
+    const periodSelect = document.getElementById('holidaySummaryPeriod');
+    const selectedPeriod = periodSelect?.value || 'christmas';
+    
+    // Generate sample data for demonstration
+    setTimeout(() => {
+        if (loadingEl) loadingEl.classList.add('hidden');
+        
+        // Generate dates for Christmas period
+        const dates = generateHolidayDates('2026-12-08', '2027-01-02');
+        
+        // Sample data structure
+        const summaryData = getSampleHolidaySummaryData();
+        
+        if (summaryData.length === 0) {
+            if (emptyEl) emptyEl.classList.remove('hidden');
+            return;
+        }
+        
+        if (tableEl) tableEl.classList.remove('hidden');
+        renderHolidaySummaryTable(dates, summaryData);
+    }, 500);
+}
+
+// Get sample holiday summary data
+function getSampleHolidaySummaryData() {
+    return [
+        { app: 'Frontend', area: 'CRM/SDP/MCC', name: 'Chirag Chourasia', site: 'India', contact: '+91 96918 86425', statuses: {} },
+        { app: 'Frontend', area: 'CRM/SDP/MCC', name: 'Pankaj Rahate', site: 'India', contact: '+91 80802 05417', statuses: {} },
+        { app: 'Frontend', area: 'CRM/SDP/MCC', name: 'Prajwal Jilate', site: 'India', contact: '+91 7499464451', statuses: {} },
+        { app: 'Frontend', area: 'OMS', name: 'Anurag Bharati', site: 'Australia', contact: '+61 484920422', statuses: {} },
+        { app: 'Backend', area: 'TC/RLC', name: 'Azim Hirani', site: 'India', contact: '+91 7350739381', statuses: {} },
+        { app: 'Backend', area: 'AR/CM', name: 'Debjyoti Ghosh', site: 'Australia', contact: '+61 485599053', statuses: {} },
+        { app: 'Backend', area: 'INV/AMDD', name: 'Prachi Dangore', site: 'India', contact: '+91 99603 76686', statuses: {} },
+        { app: 'Infra', area: 'Infra', name: 'Krishna Reddy', site: 'India', contact: '+91 8074254103', statuses: {} },
+        { app: 'ODS', area: 'ODS', name: 'Poojashri Anuse', site: 'Australia', contact: '+61 481152816', statuses: {} },
+        { app: 'Digital', area: 'Digital', name: 'Rica Aricayos', site: 'Philippines', contact: '+63 9178613885', statuses: {} },
+        { app: 'Manager', area: 'Manager', name: 'Ashwani Aggarwal', site: 'Australia', contact: '+61 478 015 240', statuses: {} },
+        { app: 'Manager', area: 'Manager', name: 'Manisha Bardiya', site: 'India', contact: '+91 90110 13931', statuses: {} },
+        { app: 'Manager', area: 'Manager', name: 'Makarand Korde', site: 'Australia', contact: '+61 420456799', statuses: {} },
+    ];
+}
+
+// Render Holiday Summary Table
+function renderHolidaySummaryTable(dates, data) {
+    const headEl = document.getElementById('holidaySummaryHead');
+    const bodyEl = document.getElementById('holidaySummaryBody');
+    
+    if (!headEl || !bodyEl) return;
+    
+    // Build header
+    let headerHtml = `
+        <tr>
+            <th rowspan="2">App</th>
+            <th rowspan="2">Application Area</th>
+            <th rowspan="2">Name</th>
+            <th rowspan="2">Site</th>
+            <th rowspan="2">Contact Number</th>
+    `;
+    
+    // Date headers with type indicators
+    dates.forEach(d => {
+        const headerClass = d.isWeekend ? 'lean-header' : 'date-header';
+        headerHtml += `<th class="${headerClass} date-header">${d.display}</th>`;
+    });
+    headerHtml += '</tr>';
+    
+    headEl.innerHTML = headerHtml;
+    
+    // Build body
+    let bodyHtml = '';
+    data.forEach(row => {
+        const appClass = `app-${row.app.toLowerCase().replace(/\s+/g, '')}`;
+        bodyHtml += `
+            <tr class="${appClass}">
+                <td class="app-cell">${escapeHtml(row.app)}</td>
+                <td class="name-cell">${escapeHtml(row.area)}</td>
+                <td class="name-cell">${escapeHtml(row.name)}</td>
+                <td class="site-cell">${escapeHtml(row.site)}</td>
+                <td>${escapeHtml(row.contact)}</td>
+        `;
+        
+        dates.forEach(d => {
+            const status = row.statuses[d.date] || '';
+            const statusClass = status ? `status-${status.toLowerCase()}` : '';
+            bodyHtml += `<td class="${statusClass}">${escapeHtml(status)}</td>`;
+        });
+        
+        bodyHtml += '</tr>';
+    });
+    
+    bodyEl.innerHTML = bodyHtml;
+}
+
+// Load Holiday Support
+function loadHolidaySupport() {
+    const loadingEl = document.getElementById('holidaySupportLoading');
+    const emptyEl = document.getElementById('holidaySupportEmpty');
+    const contentEl = document.getElementById('holidaySupportContent');
+    
+    if (loadingEl) loadingEl.classList.remove('hidden');
+    if (emptyEl) emptyEl.classList.add('hidden');
+    if (contentEl) contentEl.classList.add('hidden');
+    
+    setTimeout(() => {
+        if (loadingEl) loadingEl.classList.add('hidden');
+        
+        // Sample data
+        const supportData = getSampleHolidaySupportData();
+        
+        if (!supportData.desk.length && !supportData.call.length) {
+            if (emptyEl) emptyEl.classList.remove('hidden');
+            return;
+        }
+        
+        if (contentEl) contentEl.classList.remove('hidden');
+        
+        const dates = generateHolidayDates('2026-12-08', '2027-01-02');
+        renderHolidaySupportTable('desk', dates, supportData.desk);
+        renderHolidaySupportTable('call', dates, supportData.call);
+    }, 500);
+}
+
+// Get sample holiday support data
+function getSampleHolidaySupportData() {
+    return {
+        desk: [
+            { app: 'Frontend', team: 'ASOM/Fallout', staff: { '2026-12-08': ['Ganesh', 'Yash'], '2026-12-24': ['Ganesh', 'Yash'] } },
+            { app: 'Frontend', team: 'OMS', staff: { '2026-12-08': ['India Team'], '2026-12-24': ['India Team'] } },
+            { app: 'Frontend', team: 'CRM/SDP/MCO/WSF', staff: { '2026-12-08': ['Chirag Chourasia', 'Pankaj Rahate', 'Prajwal Jilate'] } },
+            { app: 'Backend', team: 'INV/AmDD', staff: { '2026-12-08': ['India Team'], '2026-12-24': ['Jerome'] } },
+            { app: 'Backend', team: 'CM/AR/CL', staff: { '2026-12-08': ['India Team'], '2026-12-24': ['Jerome'] } },
+            { app: 'Backend', team: 'TC/AEM/OFCA', staff: { '2026-12-08': ['Ganesh', 'Hendry'], '2026-12-24': ['Ganesh'] } },
+            { app: 'ODS', team: 'ODS', staff: { '2026-12-08': ['Offshore'], '2026-12-24': ['Suraj Kadam'] } },
+            { app: 'Digital', team: 'Digital', staff: { '2026-12-08': ['India Team'], '2026-12-24': ['India Team'] } },
+            { app: 'B2B', team: 'CPQ/COM/LCEP', staff: { '2026-12-08': ['Praveen', 'Sandeep'] } },
+        ],
+        call: [
+            { app: 'Frontend', team: 'ASOM', staff: { '2026-12-08': ['Anurag', 'Yash'], '2026-12-24': ['Anurag', 'Yash'] } },
+            { app: 'Frontend', team: 'OMS', staff: { '2026-12-08': ['Anurag', 'Bhomesh'], '2026-12-24': ['Aditya'] } },
+            { app: 'Frontend', team: 'CRM/SDP/MCO/WSF', staff: { '2026-12-08': ['Ruth'], '2026-12-24': ['Chirag'] } },
+            { app: 'Infra', team: 'Infra', staff: { '2026-12-08': ['Rohan'], '2026-12-24': ['Sakshi'] } },
+            { app: 'Backend', team: 'INV/AmDD', staff: { '2026-12-08': ['Akash'], '2026-12-24': ['Tejal'] } },
+            { app: 'Backend', team: 'CM/AR/CL', staff: { '2026-12-08': ['Tanvi'], '2026-12-24': ['Debjyoti'] } },
+            { app: 'Backend', team: 'TC/AEM/OFCA', staff: { '2026-12-08': ['Hendry', 'Mariel'], '2026-12-24': ['Hendry', 'Kevin'] } },
+            { app: 'ODS', team: 'ODS', staff: { '2026-12-08': ['Abhishek Mahajan'], '2026-12-24': ['Suraj Kadam'] } },
+            { app: 'ODS', team: 'ODS Infra', staff: { '2026-12-08': ['Rodel', 'Rahul M'] } },
+            { app: 'Digital', team: 'Digital', staff: { '2026-12-08': ['Gaurav'] } },
+            { app: 'B2B', team: 'CPQ/COM/LCEP', staff: { '2026-12-08': ['Praveen', 'Sandeep'] } },
+            { app: 'MOD', team: 'Onshore', staff: { '2026-12-08': ['Mak'], '2026-12-24': ['Vikram'] } },
+            { app: 'MOD', team: 'Offshore', staff: { '2026-12-08': ['Saurabh'], '2026-12-24': ['Neil'] } },
+        ]
+    };
+}
+
+// Render Holiday Support Table
+function renderHolidaySupportTable(type, dates, data) {
+    const headId = type === 'desk' ? 'deskSupportHead' : 'callSupportHead';
+    const bodyId = type === 'desk' ? 'deskSupportBody' : 'callSupportBody';
+    
+    const headEl = document.getElementById(headId);
+    const bodyEl = document.getElementById(bodyId);
+    
+    if (!headEl || !bodyEl) return;
+    
+    // Build header
+    let headerHtml = '<tr><th class="app-header">Application</th><th class="team-header">Team</th>';
+    
+    dates.forEach(d => {
+        // Determine header type (PH = Philippines holiday, AUS = Australia holiday, Lean = Lean staffing)
+        const dayOfWeek = new Date(d.date).getDay();
+        let headerClass = 'ph-date';
+        if (dayOfWeek === 0 || dayOfWeek === 6) {
+            headerClass = 'lean-date';
+        } else if (d.date >= '2026-12-25' && d.date <= '2026-12-26') {
+            headerClass = 'aus-date';
+        }
+        headerHtml += `<th class="${headerClass}">${d.display}</th>`;
+    });
+    headerHtml += '</tr>';
+    
+    headEl.innerHTML = headerHtml;
+    
+    // Build body
+    let bodyHtml = '';
+    data.forEach(row => {
+        const appClass = `row-${row.app.toLowerCase().replace(/\s+/g, '')}`;
+        const teamClass = `team-${row.team.toLowerCase().replace(/[\/\s]+/g, '')}`;
+        
+        bodyHtml += `
+            <tr class="${appClass}">
+                <td class="app-col">${escapeHtml(row.app)}</td>
+                <td class="team-col ${teamClass}">${escapeHtml(row.team)}</td>
+        `;
+        
+        dates.forEach(d => {
+            const staff = row.staff[d.date] || [];
+            const staffText = Array.isArray(staff) ? staff.join('<br>') : staff;
+            const isOnCallOnly = staffText.toLowerCase().includes('on call only');
+            const cellClass = isOnCallOnly ? 'staff-cell oncall-only' : 'staff-cell';
+            bodyHtml += `<td class="${cellClass}">${staffText}</td>`;
+        });
+        
+        bodyHtml += '</tr>';
+    });
+    
+    bodyEl.innerHTML = bodyHtml;
+}
+
+// Export Holiday Summary
+function exportHolidaySummary() {
+    showToast('Export feature coming soon', 'info');
+}
+
+// Export Holiday Support
+function exportHolidaySupport() {
+    showToast('Export feature coming soon', 'info');
+}
+
+// Open Add Holiday Entry Modal
+function openAddHolidayEntryModal() {
+    showToast('Add entry feature coming soon', 'info');
+}
+
+// Open Edit Holiday Support Modal
+function openEditHolidaySupportModal() {
+    showToast('Edit schedule feature coming soon', 'info');
+}
+
+// Initialize Holiday Staffing when switching to it
+document.addEventListener('DOMContentLoaded', function() {
+    const originalSwitchMainScreen = window.switchMainScreen;
+    if (originalSwitchMainScreen) {
+        const newSwitchMainScreen = function(screen, clickEvent = null) {
+            originalSwitchMainScreen(screen, clickEvent);
+            
+            if (screen === 'holiday') {
+                loadHolidaySummary();
+            }
+        };
+        window.switchMainScreen = newSwitchMainScreen;
+    }
+});

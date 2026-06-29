@@ -130,6 +130,14 @@
             </span>
             Vacation Requests
         </button>
+        <button class="main-screen-tab" onclick="switchMainScreen('holiday', event)">
+            <span class="main-tab-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
+                </svg>
+            </span>
+            Holiday Staffing
+        </button>
     </div>
 
     <!-- ==================== MOD SCHEDULE SCREEN ==================== -->
@@ -2378,6 +2386,165 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- ==================== HOLIDAY STAFFING SCREEN ==================== -->
+    <div id="holidayScreen" class="main-screen">
+        <div class="container">
+            <header>
+                <h1>Holiday Staffing</h1>
+                <p class="subtitle">Plan and manage staffing coverage for upcoming holidays</p>
+            </header>
+
+            <!-- Holiday Staffing Sub-tabs -->
+            <div class="tab-container">
+                <button class="tab active" onclick="switchHolidayTab('summary', event)">Summary</button>
+                <button class="tab" onclick="switchHolidayTab('support', event)">Holiday Support</button>
+            </div>
+
+            <!-- Holiday Summary Tab -->
+            <section id="holiday-summaryTab" class="tab-content active">
+                <div class="card">
+                    <div class="vacation-header">
+                        <div>
+                            <h2>Staff Availability Summary</h2>
+                            <p class="help-text">Overview of staff leave and availability during holiday periods</p>
+                        </div>
+                        <div class="holiday-filters">
+                            <select id="holidaySummaryPeriod" onchange="loadHolidaySummary()">
+                                <option value="christmas">Christmas Period (Dec 20 - Jan 2)</option>
+                                <option value="easter">Easter Period</option>
+                                <option value="custom">Custom Period</option>
+                            </select>
+                            <button class="btn btn-outline" onclick="exportHolidaySummary()">Export</button>
+                            <button class="btn btn-primary" onclick="openAddHolidayEntryModal()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                                Add Entry
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Legend -->
+                    <div class="holiday-legend">
+                        <span class="legend-item"><span class="legend-color vl"></span> VL - Vacation Leave</span>
+                        <span class="legend-item"><span class="legend-color al"></span> AL - Annual Leave</span>
+                        <span class="legend-item"><span class="legend-color pl"></span> PL - Public Holiday Leave</span>
+                        <span class="legend-item"><span class="legend-color wc"></span> WC - Working Coverage</span>
+                    </div>
+                    
+                    <div id="holidaySummaryLoading" class="loading-state">
+                        <div class="spinner"></div>
+                        <p>Loading holiday summary...</p>
+                    </div>
+                    
+                    <div id="holidaySummaryEmpty" class="empty-state hidden">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
+                        </svg>
+                        <h3>No Holiday Data</h3>
+                        <p>Click "Add Entry" to start planning holiday staffing.</p>
+                    </div>
+                    
+                    <div id="holidaySummaryTable" class="holiday-table-wrapper hidden">
+                        <table class="holiday-summary-table">
+                            <thead id="holidaySummaryHead">
+                                <!-- Dynamic headers -->
+                            </thead>
+                            <tbody id="holidaySummaryBody">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Holiday Support Tab -->
+            <section id="holiday-supportTab" class="tab-content">
+                <div class="card">
+                    <div class="vacation-header">
+                        <div>
+                            <h2>Holiday Support Schedule</h2>
+                            <p class="help-text">On-desk and On-call support assignments during holiday periods</p>
+                        </div>
+                        <div class="holiday-filters">
+                            <select id="holidaySupportPeriod" onchange="loadHolidaySupport()">
+                                <option value="christmas">Christmas Period (Dec 20 - Jan 2)</option>
+                                <option value="easter">Easter Period</option>
+                                <option value="custom">Custom Period</option>
+                            </select>
+                            <button class="btn btn-outline" onclick="exportHolidaySupport()">Export</button>
+                            <button class="btn btn-primary" onclick="openEditHolidaySupportModal()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                </svg>
+                                Edit Schedule
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="holidaySupportLoading" class="loading-state">
+                        <div class="spinner"></div>
+                        <p>Loading holiday support schedule...</p>
+                    </div>
+                    
+                    <div id="holidaySupportEmpty" class="empty-state hidden">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
+                        </svg>
+                        <h3>No Support Schedule</h3>
+                        <p>Click "Edit Schedule" to assign support coverage.</p>
+                    </div>
+                    
+                    <div id="holidaySupportContent" class="hidden">
+                        <!-- ON DESK SUPPORT Section -->
+                        <div class="holiday-support-section">
+                            <h3 class="support-section-title desk-support">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                                    <line x1="8" y1="21" x2="16" y2="21"></line>
+                                    <line x1="12" y1="17" x2="12" y2="21"></line>
+                                </svg>
+                                ON DESK SUPPORT
+                            </h3>
+                            <div class="holiday-table-wrapper">
+                                <table class="holiday-support-table">
+                                    <thead id="deskSupportHead">
+                                        <!-- Dynamic headers -->
+                                    </thead>
+                                    <tbody id="deskSupportBody">
+                                        <!-- Dynamic rows -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- ON CALL SUPPORT Section -->
+                        <div class="holiday-support-section">
+                            <h3 class="support-section-title call-support">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                                </svg>
+                                ON CALL SUPPORT
+                            </h3>
+                            <div class="holiday-table-wrapper">
+                                <table class="holiday-support-table">
+                                    <thead id="callSupportHead">
+                                        <!-- Dynamic headers -->
+                                    </thead>
+                                    <tbody id="callSupportBody">
+                                        <!-- Dynamic rows -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
         </div>
     </div>
 

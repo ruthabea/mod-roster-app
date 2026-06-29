@@ -5438,3 +5438,300 @@ select.prompt-modal-input:focus {
 .notification-modal-btn.btn-secondary:hover {
     background: #e2e8f0;
 }
+
+/* ==================== HOLIDAY STAFFING STYLES ==================== */
+
+.holiday-filters {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.holiday-filters select {
+    padding: 0.5rem 1rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    min-width: 200px;
+    background: white;
+}
+
+/* Holiday Legend */
+.holiday-legend {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: #475569;
+}
+
+.legend-color {
+    width: 24px;
+    height: 18px;
+    border-radius: 3px;
+    border: 1px solid rgba(0,0,0,0.1);
+}
+
+.legend-color.vl { background-color: #fef3c7; }
+.legend-color.al { background-color: #dbeafe; }
+.legend-color.pl { background-color: #dcfce7; }
+.legend-color.wc { background-color: #e0e7ff; }
+
+/* Holiday Table Wrapper */
+.holiday-table-wrapper {
+    overflow-x: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+}
+
+/* Holiday Summary Table */
+.holiday-summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+    min-width: 1200px;
+}
+
+.holiday-summary-table th,
+.holiday-summary-table td {
+    padding: 8px 10px;
+    border: 1px solid #e2e8f0;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.holiday-summary-table thead th {
+    background: #1e293b;
+    color: white;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.holiday-summary-table thead th.date-header {
+    min-width: 70px;
+}
+
+.holiday-summary-table thead th.ph-header {
+    background: #7c3aed;
+}
+
+.holiday-summary-table thead th.aus-header {
+    background: #059669;
+}
+
+.holiday-summary-table thead th.lean-header {
+    background: #d97706;
+}
+
+.holiday-summary-table tbody tr:nth-child(even) {
+    background: #f8fafc;
+}
+
+.holiday-summary-table tbody tr:hover {
+    background: #f1f5f9;
+}
+
+.holiday-summary-table td.app-cell {
+    background: #f1f5f9;
+    font-weight: 600;
+    text-align: left;
+    position: sticky;
+    left: 0;
+    z-index: 5;
+}
+
+.holiday-summary-table td.name-cell {
+    text-align: left;
+    font-weight: 500;
+}
+
+.holiday-summary-table td.site-cell {
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+/* Status cells */
+.holiday-summary-table td.status-vl {
+    background-color: #fef3c7;
+    color: #92400e;
+    font-weight: 600;
+}
+
+.holiday-summary-table td.status-al {
+    background-color: #dbeafe;
+    color: #1e40af;
+    font-weight: 600;
+}
+
+.holiday-summary-table td.status-pl {
+    background-color: #dcfce7;
+    color: #166534;
+    font-weight: 600;
+}
+
+.holiday-summary-table td.status-wc {
+    background-color: #e0e7ff;
+    color: #3730a3;
+    font-weight: 600;
+}
+
+/* Application row colors */
+.holiday-summary-table tr.app-frontend td.app-cell { background: #fecaca; }
+.holiday-summary-table tr.app-backend td.app-cell { background: #bbf7d0; }
+.holiday-summary-table tr.app-infra td.app-cell { background: #a5f3fc; }
+.holiday-summary-table tr.app-ods td.app-cell { background: #c4b5fd; }
+.holiday-summary-table tr.app-digital td.app-cell { background: #fde68a; }
+.holiday-summary-table tr.app-b2b td.app-cell { background: #fbcfe8; }
+.holiday-summary-table tr.app-manager td.app-cell { background: #fcd34d; font-weight: 700; }
+
+/* Holiday Support Section */
+.holiday-support-section {
+    margin-bottom: 2rem;
+}
+
+.support-section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    margin: 0 0 1rem 0;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 700;
+    color: white;
+}
+
+.support-section-title.desk-support {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+}
+
+.support-section-title.call-support {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+}
+
+/* Holiday Support Table */
+.holiday-support-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+    min-width: 1000px;
+}
+
+.holiday-support-table th,
+.holiday-support-table td {
+    padding: 10px 12px;
+    border: 1px solid #e2e8f0;
+    text-align: center;
+    vertical-align: top;
+}
+
+.holiday-support-table thead th {
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.holiday-support-table thead th.app-header {
+    background: #374151;
+    color: white;
+    text-align: left;
+    width: 100px;
+}
+
+.holiday-support-table thead th.team-header {
+    background: #4b5563;
+    color: white;
+    text-align: left;
+    width: 120px;
+}
+
+.holiday-support-table thead th.ph-date {
+    background: #7c3aed;
+    color: white;
+}
+
+.holiday-support-table thead th.aus-date {
+    background: #059669;
+    color: white;
+}
+
+.holiday-support-table thead th.lean-date {
+    background: #d97706;
+    color: white;
+}
+
+.holiday-support-table tbody td.app-col {
+    font-weight: 700;
+    text-align: left;
+    vertical-align: middle;
+}
+
+.holiday-support-table tbody td.team-col {
+    font-weight: 600;
+    text-align: left;
+    background: #f8fafc;
+}
+
+.holiday-support-table tbody td.staff-cell {
+    font-size: 0.75rem;
+    line-height: 1.4;
+    min-width: 100px;
+}
+
+.holiday-support-table tbody td.oncall-only {
+    background: #fef3c7;
+    color: #92400e;
+    font-style: italic;
+}
+
+/* Application colors for support table */
+.holiday-support-table tr.row-frontend td.app-col { background: #fecaca; }
+.holiday-support-table tr.row-backend td.app-col { background: #bbf7d0; }
+.holiday-support-table tr.row-infra td.app-col { background: #a5f3fc; }
+.holiday-support-table tr.row-ods td.app-col { background: #c4b5fd; }
+.holiday-support-table tr.row-digital td.app-col { background: #fde68a; }
+.holiday-support-table tr.row-b2b td.app-col { background: #fbcfe8; }
+.holiday-support-table tr.row-mod td.app-col { background: #fcd34d; font-weight: 700; }
+
+/* Team colors */
+.holiday-support-table td.team-asom { background: #fee2e2 !important; }
+.holiday-support-table td.team-oms { background: #fef3c7 !important; }
+.holiday-support-table td.team-crm { background: #dbeafe !important; }
+.holiday-support-table td.team-infra { background: #ccfbf1 !important; }
+.holiday-support-table td.team-inv { background: #e0e7ff !important; }
+.holiday-support-table td.team-cm { background: #fce7f3 !important; }
+.holiday-support-table td.team-tc { background: #dcfce7 !important; }
+.holiday-support-table td.team-anm { background: #f3e8ff !important; }
+.holiday-support-table td.team-ods { background: #cffafe !important; }
+.holiday-support-table td.team-digital { background: #fef9c3 !important; }
+.holiday-support-table td.team-b2b { background: #fbcfe8 !important; }
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .holiday-filters {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .holiday-filters select {
+        width: 100%;
+    }
+    
+    .holiday-legend {
+        gap: 1rem;
+    }
+}
