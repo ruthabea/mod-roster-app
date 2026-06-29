@@ -2618,6 +2618,163 @@
         </div>
     </div>
 
+    <!-- Holiday Schedule Edit Modal -->
+    <div id="holidayScheduleModal" class="modal hidden">
+        <div class="modal-content" style="max-width: 900px; max-height: 90vh;">
+            <div class="modal-header">
+                <h3>Edit Holiday Schedule</h3>
+                <button class="modal-close" onclick="closeHolidayScheduleModal()">&times;</button>
+            </div>
+            
+            <!-- Modal Tabs -->
+            <div class="modal-tabs">
+                <button class="modal-tab active" onclick="switchHolidayModalTab('dates', event)">Manage Holiday Dates</button>
+                <button class="modal-tab" onclick="switchHolidayModalTab('assignments', event)">Staff Assignments</button>
+            </div>
+            
+            <!-- Tab 1: Manage Holiday Dates -->
+            <div id="holidayDatesTab" class="modal-tab-content active">
+                <div class="form-section">
+                    <h4>Add New Holiday Date</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="newHolidayDate">Date *</label>
+                            <input type="date" id="newHolidayDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="newHolidayCountry">Country/Type *</label>
+                            <select id="newHolidayCountry" required>
+                                <option value="">Select...</option>
+                                <option value="PH">PH - Philippines</option>
+                                <option value="AUS">AUS - Australia</option>
+                                <option value="India">India</option>
+                                <option value="Lean Staffing">Lean Staffing</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="newHolidayName">Holiday Name</label>
+                            <input type="text" id="newHolidayName" placeholder="e.g., Christmas Day">
+                        </div>
+                        <div class="form-group" style="align-self: flex-end;">
+                            <button class="btn btn-primary" onclick="addHolidayDate()">Add Date</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-section">
+                    <h4>Existing Holiday Dates</h4>
+                    <div class="filter-row">
+                        <label>Filter by Year:</label>
+                        <select id="holidayDatesYearFilter" onchange="loadHolidayDates()">
+                            <!-- Populated by JS -->
+                        </select>
+                    </div>
+                    <div class="table-container" style="max-height: 300px; overflow-y: auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Country/Type</th>
+                                    <th>Holiday Name</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="holidayDatesTableBody">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tab 2: Staff Assignments -->
+            <div id="holidayAssignmentsTab" class="modal-tab-content hidden">
+                <div class="form-section">
+                    <h4>Add/Edit Staff Assignment</h4>
+                    <input type="hidden" id="editAssignmentId" value="">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="assignmentHolidayDate">Holiday Date *</label>
+                            <select id="assignmentHolidayDate" required>
+                                <option value="">Select holiday date...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="assignmentSupportType">Support Type *</label>
+                            <select id="assignmentSupportType" required>
+                                <option value="">Select...</option>
+                                <option value="desk">On Desk Support</option>
+                                <option value="call">On Call Support</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="assignmentApplication">Application *</label>
+                            <select id="assignmentApplication" required>
+                                <option value="">Select...</option>
+                                <option value="Frontend">Frontend</option>
+                                <option value="Backend">Backend</option>
+                                <option value="Digital">Digital</option>
+                                <option value="Infra">Infra</option>
+                                <option value="ODS">ODS</option>
+                                <option value="B2B">B2B</option>
+                                <option value="MOD">MOD</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="assignmentTeam">Team *</label>
+                            <input type="text" id="assignmentTeam" required placeholder="e.g., ASOM, OMS, CRM/SDP">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 2;">
+                            <label for="assignmentStaff">Staff Names (comma-separated)</label>
+                            <input type="text" id="assignmentStaff" placeholder="e.g., John, Jane, Bob">
+                        </div>
+                        <div class="form-group" style="align-self: flex-end;">
+                            <button class="btn btn-primary" onclick="saveStaffAssignment()">Save Assignment</button>
+                            <button class="btn btn-outline" onclick="clearAssignmentForm()">Clear</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-section">
+                    <h4>Existing Assignments</h4>
+                    <div class="filter-row">
+                        <label>Filter:</label>
+                        <select id="assignmentTypeFilter" onchange="loadStaffAssignments()">
+                            <option value="">All Types</option>
+                            <option value="desk">On Desk Support</option>
+                            <option value="call">On Call Support</option>
+                        </select>
+                    </div>
+                    <div class="table-container" style="max-height: 250px; overflow-y: auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Application</th>
+                                    <th>Team</th>
+                                    <th>Staff</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="assignmentsTableBody">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeHolidayScheduleModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
     </div><!-- End of appContainer -->
 
     <!-- SheetJS for Excel export -->

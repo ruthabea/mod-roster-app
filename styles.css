@@ -5787,6 +5787,7 @@ select.prompt-modal-input:focus {
 .support-section-title {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 0.75rem;
     padding: 1rem 1.25rem;
     margin: 0 0 1rem 0;
@@ -5794,6 +5795,7 @@ select.prompt-modal-input:focus {
     font-size: 1rem;
     font-weight: 700;
     color: white;
+    text-align: center;
 }
 
 .support-section-title.desk-support {
@@ -5802,6 +5804,177 @@ select.prompt-modal-input:focus {
 
 .support-section-title.call-support {
     background: linear-gradient(135deg, #059669 0%, #047857 100%);
+}
+
+/* Modal Tabs */
+.modal-tabs {
+    display: flex;
+    border-bottom: 2px solid #e5e7eb;
+    margin-bottom: 1rem;
+}
+
+.modal-tab {
+    padding: 0.75rem 1.5rem;
+    background: none;
+    border: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #6b7280;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s;
+}
+
+.modal-tab:hover {
+    color: #3b82f6;
+}
+
+.modal-tab.active {
+    color: #3b82f6;
+    border-bottom-color: #3b82f6;
+}
+
+.modal-tab-content {
+    display: none;
+    padding: 1rem 0;
+}
+
+.modal-tab-content.active {
+    display: block;
+}
+
+.form-section {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.form-section:last-child {
+    border-bottom: none;
+}
+
+.form-section h4 {
+    margin: 0 0 1rem 0;
+    font-size: 1rem;
+    color: #374151;
+}
+
+.filter-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.filter-row label {
+    font-weight: 500;
+    color: #4b5563;
+}
+
+.filter-row select {
+    padding: 0.4rem 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.data-table th,
+.data-table td {
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    border: 1px solid #e5e7eb;
+}
+
+.data-table th {
+    background: #f3f4f6;
+    font-weight: 600;
+    color: #374151;
+}
+
+.data-table tr:hover {
+    background: #f9fafb;
+}
+
+.data-table .btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+/* Country badges */
+.country-badge {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.country-badge.country-ph {
+    background: #f87171;
+    color: white;
+}
+
+.country-badge.country-aus {
+    background: #60a5fa;
+    color: white;
+}
+
+.country-badge.country-india {
+    background: #34d399;
+    color: white;
+}
+
+.country-badge.country-lean-staffing {
+    background: #fbbf24;
+    color: #1f2937;
+}
+
+/* Holiday support table header country tags */
+.country-tag {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 1px 4px;
+    border-radius: 2px;
+    margin-bottom: 2px;
+}
+
+.ph-date {
+    background: #dc2626 !important;
+}
+
+.ph-date .country-tag {
+    background: rgba(255,255,255,0.3);
+}
+
+.aus-date {
+    background: #2563eb !important;
+}
+
+.aus-date .country-tag {
+    background: rgba(255,255,255,0.3);
+}
+
+.india-date {
+    background: #059669 !important;
+}
+
+.india-date .country-tag {
+    background: rgba(255,255,255,0.3);
+}
+
+.lean-date {
+    background: #d97706 !important;
+}
+
+.lean-date .country-tag {
+    background: rgba(255,255,255,0.3);
 }
 
 /* Holiday Support Table */
