@@ -4976,7 +4976,7 @@ async function submitVacationRequest(event) {
 
 // TEST MODE: Set this to your email to receive all vacation notifications for testing
 // Set to null or empty string to disable test mode and send to actual recipients
-const VACATION_TEST_EMAIL = 'ruthabegail.adraneda@amdocs.com'; // Change to null for production
+const VACATION_TEST_EMAIL = null; // Production mode - sends to actual recipients
 
 // Send vacation notification email
 async function sendVacationNotification(request, notificationType) {
