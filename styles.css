@@ -5839,12 +5839,11 @@ select.prompt-modal-input:focus {
 }
 
 .modal-tab-content {
-    display: none;
     padding: 0.5rem 0;
 }
 
-.modal-tab-content.active {
-    display: block;
+.modal-tab-content.hidden {
+    display: none !important;
 }
 
 /* Holiday Schedule Modal specific */

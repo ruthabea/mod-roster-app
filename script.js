@@ -6666,15 +6666,21 @@ function closeHolidayScheduleModal() {
 // Switch tabs in the modal
 function switchHolidayModalTab(tabName, event) {
     // Update tab buttons
-    document.querySelectorAll('.modal-tab').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('#holidayScheduleModal .modal-tab').forEach(btn => btn.classList.remove('active'));
     if (event && event.target) event.target.classList.add('active');
     
-    // Update tab content
-    document.querySelectorAll('.modal-tab-content').forEach(content => content.classList.remove('active'));
+    // Hide all tab content
+    document.getElementById('holidayDatesTab').classList.add('hidden');
+    document.getElementById('holidayDatesTab').classList.remove('active');
+    document.getElementById('holidayAssignmentsTab').classList.add('hidden');
+    document.getElementById('holidayAssignmentsTab').classList.remove('active');
     
+    // Show selected tab
     if (tabName === 'dates') {
+        document.getElementById('holidayDatesTab').classList.remove('hidden');
         document.getElementById('holidayDatesTab').classList.add('active');
     } else {
+        document.getElementById('holidayAssignmentsTab').classList.remove('hidden');
         document.getElementById('holidayAssignmentsTab').classList.add('active');
     }
 }
