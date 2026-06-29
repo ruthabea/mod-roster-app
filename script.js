@@ -3041,15 +3041,14 @@ async function loadRosterDataForMonth() {
     
     if (useDatabase) {
         try {
-            const { data, error } = await supabase
-                .from('roster')
-                .select('*')
-                .gte('week_start', startStr)
-                .lte('week_start', endStr)
-                .order('week_start', { ascending: true })
-                .order('sort_order', { ascending: true });
+            // Use REST API query format: gte and lte filters
+            const query = `?week_start=gte.${startStr}&week_start=lte.${endStr}&order=week_start,sort_order`;
+            const { data, error } = await supabaseRequest('roster', 'GET', null, query);
             
-            if (error) throw error;
+            if (error) {
+                console.error('Error loading roster for month:', error);
+                return;
+            }
             
             // Group by week_start
             if (data && data.length > 0) {
@@ -3088,13 +3087,14 @@ async function showAllRosterWeeks() {
     
     if (useDatabase) {
         try {
-            const { data, error } = await supabase
-                .from('roster')
-                .select('*')
-                .order('week_start', { ascending: false })
-                .order('sort_order', { ascending: true });
+            // Use REST API query format
+            const query = '?order=week_start.desc,sort_order';
+            const { data, error } = await supabaseRequest('roster', 'GET', null, query);
             
-            if (error) throw error;
+            if (error) {
+                console.error('Error loading all roster weeks:', error);
+                return;
+            }
             
             if (data && data.length > 0) {
                 data.forEach(row => {
@@ -3268,12 +3268,11 @@ async function deleteRosterEntryByWeek(weekStart, idx) {
     
     if (useDatabase && entry.id) {
         try {
-            const { error } = await supabase
-                .from('roster')
-                .delete()
-                .eq('id', entry.id);
+            const success = await db.deleteRosterEntry(entry.id);
             
-            if (error) throw error;
+            if (!success) {
+                throw new Error('Delete failed');
+            }
             
             // Remove from local data
             weekData.splice(idx, 1);
@@ -3282,6 +3281,7 @@ async function deleteRosterEntryByWeek(weekStart, idx) {
             }
             
             renderRosterByMonth();
+            showToast('Roster entry deleted');
         } catch (err) {
             console.error('Error deleting roster entry:', err);
             alert('Failed to delete roster entry');
