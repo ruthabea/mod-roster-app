@@ -6066,20 +6066,45 @@ select.prompt-modal-input:focus {
     background: rgba(255,255,255,0.3);
 }
 
+/* Holiday Support Section Container */
+.holiday-support-section {
+    margin-bottom: 2.5rem;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+}
+
+.holiday-support-section .holiday-table-wrapper {
+    padding: 0;
+    border: none;
+    border-radius: 0;
+}
+
 /* Holiday Support Table */
 .holiday-support-table {
     width: 100%;
-    border-collapse: collapse;
-    font-size: 0.8rem;
-    min-width: 1000px;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.85rem;
 }
 
 .holiday-support-table th,
 .holiday-support-table td {
-    padding: 10px 12px;
-    border: 1px solid #e2e8f0;
+    padding: 12px 16px;
+    border-bottom: 1px solid #e5e7eb;
+    border-right: 1px solid #e5e7eb;
     text-align: center;
-    vertical-align: top;
+    vertical-align: middle;
+}
+
+.holiday-support-table th:last-child,
+.holiday-support-table td:last-child {
+    border-right: none;
+}
+
+.holiday-support-table tbody tr:last-child td {
+    border-bottom: none;
 }
 
 .holiday-support-table thead th {
@@ -6087,53 +6112,96 @@ select.prompt-modal-input:focus {
     position: sticky;
     top: 0;
     z-index: 10;
+    padding: 14px 16px;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
 }
 
 .holiday-support-table thead th.app-header {
-    background: #374151;
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
     color: white;
-    text-align: left;
-    width: 100px;
+    text-align: center;
+    min-width: 100px;
+    border-right: 2px solid #475569;
 }
 
 .holiday-support-table thead th.team-header {
-    background: #4b5563;
+    background: linear-gradient(135deg, #374151 0%, #4b5563 100%);
     color: white;
-    text-align: left;
-    width: 120px;
+    text-align: center;
+    min-width: 130px;
+    border-right: 2px solid #6b7280;
 }
 
 .holiday-support-table thead th.ph-date {
-    background: #7c3aed;
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
     color: white;
+    min-width: 110px;
 }
 
 .holiday-support-table thead th.aus-date {
-    background: #059669;
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
     color: white;
+    min-width: 110px;
+}
+
+.holiday-support-table thead th.india-date {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    color: white;
+    min-width: 110px;
 }
 
 .holiday-support-table thead th.lean-date {
-    background: #d97706;
+    background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
     color: white;
+    min-width: 110px;
+}
+
+.holiday-support-table thead th .country-tag {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+    padding: 2px 8px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    letter-spacing: 0.05em;
+}
+
+.holiday-support-table tbody tr {
+    transition: background-color 0.15s ease;
+}
+
+.holiday-support-table tbody tr:hover {
+    background-color: #f8fafc;
 }
 
 .holiday-support-table tbody td.app-col {
     font-weight: 700;
-    text-align: left;
+    text-align: center;
     vertical-align: middle;
+    font-size: 0.85rem;
+    border-right: 2px solid #d1d5db;
 }
 
 .holiday-support-table tbody td.team-col {
     font-weight: 600;
-    text-align: left;
-    background: #f8fafc;
+    text-align: center;
+    font-size: 0.8rem;
+    border-right: 2px solid #e5e7eb;
 }
 
 .holiday-support-table tbody td.staff-cell {
-    font-size: 0.75rem;
-    line-height: 1.4;
-    min-width: 100px;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    min-width: 110px;
+    color: #374151;
+    background: #fafbfc;
+}
+
+.holiday-support-table tbody td.staff-cell:hover {
+    background: #f1f5f9;
 }
 
 .holiday-support-table tbody td.oncall-only {
@@ -6142,27 +6210,13 @@ select.prompt-modal-input:focus {
     font-style: italic;
 }
 
-/* Application colors for support table */
-.holiday-support-table tr.row-frontend td.app-col { background: #fecaca; }
-.holiday-support-table tr.row-backend td.app-col { background: #bbf7d0; }
-.holiday-support-table tr.row-infra td.app-col { background: #a5f3fc; }
-.holiday-support-table tr.row-ods td.app-col { background: #c4b5fd; }
-.holiday-support-table tr.row-digital td.app-col { background: #fde68a; }
-.holiday-support-table tr.row-b2b td.app-col { background: #fbcfe8; }
-.holiday-support-table tr.row-mod td.app-col { background: #fcd34d; font-weight: 700; }
-
-/* Team colors */
-.holiday-support-table td.team-asom { background: #fee2e2 !important; }
-.holiday-support-table td.team-oms { background: #fef3c7 !important; }
-.holiday-support-table td.team-crm { background: #dbeafe !important; }
-.holiday-support-table td.team-infra { background: #ccfbf1 !important; }
-.holiday-support-table td.team-inv { background: #e0e7ff !important; }
-.holiday-support-table td.team-cm { background: #fce7f3 !important; }
-.holiday-support-table td.team-tc { background: #dcfce7 !important; }
-.holiday-support-table td.team-anm { background: #f3e8ff !important; }
-.holiday-support-table td.team-ods { background: #cffafe !important; }
-.holiday-support-table td.team-digital { background: #fef9c3 !important; }
-.holiday-support-table td.team-b2b { background: #fbcfe8 !important; }
+/* Empty state for tables */
+.holiday-support-table tbody td[colspan] {
+    padding: 2rem;
+    color: #6b7280;
+    font-size: 0.9rem;
+    background: #f9fafb;
+}
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
