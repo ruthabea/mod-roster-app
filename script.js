@@ -3941,7 +3941,9 @@ async function saveRosterEntry(event) {
     if (event) event.preventDefault();
     
     const editIndex = parseInt(document.getElementById('rosterEditIndex').value);
-    const weekStart = getCurrentWeekStart();
+    
+    // Use currentEditWeek if set (from month view), otherwise use getCurrentWeekStart
+    const weekStart = currentEditWeek || getCurrentWeekStart();
     
     const entry = {
         time: document.getElementById('rosterTime').value.trim(),
@@ -3968,6 +3970,38 @@ async function saveRosterEntry(event) {
         if (!proceed) return;
     }
     
+    // Check if we're editing from month view
+    if (currentEditWeek && rosterMonthData[currentEditWeek]) {
+        const weekData = rosterMonthData[currentEditWeek];
+        
+        if (useDatabase) {
+            if (editIndex >= 0 && weekData[editIndex]) {
+                const id = weekData[editIndex].id;
+                await db.updateRosterEntry(id, entry);
+                showToast('Roster entry updated');
+                
+                // Update local data
+                weekData[editIndex] = { ...weekData[editIndex], ...entry, days: entry.days };
+            } else {
+                await db.saveRosterEntry(entry, weekData.length, currentEditWeek);
+                showToast('Roster entry added');
+                
+                // Reload month data
+                await loadRosterDataForMonth();
+            }
+        }
+        
+        // Reset edit context
+        currentEditWeek = null;
+        currentEditIndex = null;
+        
+        // Render the selected week
+        await renderSelectedWeek();
+        closeRosterModal();
+        return;
+    }
+    
+    // Legacy behavior for non-month view
     if (useDatabase) {
         if (editIndex >= 0 && rosterData[editIndex]) {
             const id = rosterData[editIndex]._id;
