@@ -693,14 +693,15 @@
                         </div>
                     </div>
                     
-                    <!-- Month Filter -->
+                    <!-- Month and Week Filter -->
                     <div class="roster-week-selector">
                         <label>Month:</label>
                         <input type="month" id="rosterMonthFilter" onchange="onRosterMonthChange()">
-                        <button class="btn btn-sm btn-outline" onclick="changeRosterMonth(-1)">← Prev</button>
-                        <button class="btn btn-sm btn-outline" onclick="changeRosterMonth(1)">Next →</button>
-                        <button class="btn btn-sm btn-outline" onclick="goToCurrentMonth()">This Month</button>
-                        <button class="btn btn-sm btn-outline" onclick="showAllRosterWeeks()">Show All</button>
+                        <label style="margin-left: 1rem;">Week:</label>
+                        <select id="rosterWeekSelect" onchange="onRosterWeekSelect()"></select>
+                        <button class="btn btn-sm btn-outline" onclick="changeRosterWeekInMonth(-1)">← Prev</button>
+                        <button class="btn btn-sm btn-outline" onclick="changeRosterWeekInMonth(1)">Next →</button>
+                        <button class="btn btn-sm btn-outline" onclick="goToCurrentWeekInMonth()">This Week</button>
                     </div>
                     
                     <!-- Roster Modal -->

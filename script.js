@@ -2991,7 +2991,9 @@ async function initializeRosterData() {
     // Then load data for that month
     await loadRosterDataForMonth();
     
-    renderRosterByMonth();
+    // Select current week and render
+    selectCurrentWeekInMonth();
+    renderSelectedWeek();
 }
 
 // Month filter functions
@@ -3006,22 +3008,87 @@ function goToCurrentMonth() {
 
 async function onRosterMonthChange() {
     await loadRosterDataForMonth();
-    renderRosterByMonth();
+    populateWeekDropdown();
+    selectCurrentWeekInMonth();
+    renderSelectedWeek();
 }
 
-async function changeRosterMonth(delta) {
-    const input = document.getElementById('rosterMonthFilter');
-    if (!input || !input.value) {
-        goToCurrentMonth();
+function populateWeekDropdown() {
+    const weekSelect = document.getElementById('rosterWeekSelect');
+    if (!weekSelect) return;
+    
+    const weeks = Object.keys(rosterMonthData).sort();
+    weekSelect.innerHTML = '';
+    
+    if (weeks.length === 0) {
+        weekSelect.innerHTML = '<option value="">No weeks available</option>';
         return;
     }
     
-    const [year, month] = input.value.split('-').map(Number);
-    const newDate = new Date(year, month - 1 + delta, 1);
-    input.value = `${newDate.getFullYear()}-${String(newDate.getMonth() + 1).padStart(2, '0')}`;
+    weeks.forEach(weekStart => {
+        const startDate = new Date(weekStart);
+        const endDate = new Date(startDate);
+        endDate.setDate(startDate.getDate() + 6);
+        
+        const label = `${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+        const option = document.createElement('option');
+        option.value = weekStart;
+        option.textContent = label;
+        weekSelect.appendChild(option);
+    });
+}
+
+function selectCurrentWeekInMonth() {
+    const weekSelect = document.getElementById('rosterWeekSelect');
+    if (!weekSelect) return;
     
-    await loadRosterDataForMonth();
-    renderRosterByMonth();
+    const weeks = Object.keys(rosterMonthData).sort();
+    if (weeks.length === 0) return;
+    
+    // Find the week that contains today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    let selectedWeek = weeks[0]; // Default to first week
+    
+    for (const weekStart of weeks) {
+        const startDate = new Date(weekStart);
+        const endDate = new Date(startDate);
+        endDate.setDate(startDate.getDate() + 6);
+        
+        if (today >= startDate && today <= endDate) {
+            selectedWeek = weekStart;
+            break;
+        } else if (startDate > today) {
+            break;
+        }
+        selectedWeek = weekStart;
+    }
+    
+    weekSelect.value = selectedWeek;
+}
+
+function onRosterWeekSelect() {
+    renderSelectedWeek();
+}
+
+function changeRosterWeekInMonth(delta) {
+    const weekSelect = document.getElementById('rosterWeekSelect');
+    if (!weekSelect) return;
+    
+    const options = Array.from(weekSelect.options);
+    const currentIndex = weekSelect.selectedIndex;
+    const newIndex = currentIndex + delta;
+    
+    if (newIndex >= 0 && newIndex < options.length) {
+        weekSelect.selectedIndex = newIndex;
+        renderSelectedWeek();
+    }
+}
+
+function goToCurrentWeekInMonth() {
+    selectCurrentWeekInMonth();
+    renderSelectedWeek();
 }
 
 let rosterMonthData = {}; // Stores roster data grouped by week_start
@@ -3075,159 +3142,105 @@ async function loadRosterDataForMonth() {
                     });
                 });
             }
+            
+            // Populate the week dropdown
+            populateWeekDropdown();
         } catch (err) {
             console.error('Error loading roster for month:', err);
         }
     }
 }
 
-async function showAllRosterWeeks() {
-    // Load all available weeks from the database
-    rosterMonthData = {};
-    
-    if (useDatabase) {
-        try {
-            // Use REST API query format
-            const query = '?order=week_start.desc,sort_order';
-            const { data, error } = await supabaseRequest('roster', 'GET', null, query);
-            
-            if (error) {
-                console.error('Error loading all roster weeks:', error);
-                return;
-            }
-            
-            if (data && data.length > 0) {
-                data.forEach(row => {
-                    const weekKey = row.week_start;
-                    if (!rosterMonthData[weekKey]) {
-                        rosterMonthData[weekKey] = [];
-                    }
-                    rosterMonthData[weekKey].push({
-                        id: row.id,
-                        time: row.time_shift,
-                        app: row.app,
-                        team: row.team,
-                        days: {
-                            mon: row.mon || '',
-                            tue: row.tue || '',
-                            wed: row.wed || '',
-                            thu: row.thu || '',
-                            fri: row.fri || '',
-                            sat: row.sat || '',
-                            sun: row.sun || ''
-                        },
-                        sortOrder: row.sort_order
-                    });
-                });
-            }
-        } catch (err) {
-            console.error('Error loading all roster weeks:', err);
-        }
-    }
-    
-    // Clear month filter to indicate "All"
-    const monthInput = document.getElementById('rosterMonthFilter');
-    if (monthInput) monthInput.value = '';
-    
-    renderRosterByMonth();
-}
-
-async function renderRosterByMonth() {
+async function renderSelectedWeek() {
+    const weekSelect = document.getElementById('rosterWeekSelect');
     const tbody = document.getElementById('rosterTableBody');
     const thead = document.getElementById('rosterTableHead');
+    
     if (!tbody || !thead) return;
     
-    const weeks = Object.keys(rosterMonthData).sort();
+    const selectedWeek = weekSelect?.value;
     
-    if (weeks.length === 0) {
+    if (!selectedWeek || !rosterMonthData[selectedWeek]) {
         thead.innerHTML = '';
-        tbody.innerHTML = '<tr><td colspan="11" class="empty-state-cell">No roster data found for the selected period</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" class="empty-state-cell">No roster data found for the selected week</td></tr>';
         return;
     }
     
-    let fullHtml = '';
+    const weekData = rosterMonthData[selectedWeek];
+    const startDate = new Date(selectedWeek);
     
-    for (const weekStart of weeks) {
-        const weekData = rosterMonthData[weekStart];
-        const startDate = new Date(weekStart);
-        
-        // Calculate end of week (Sunday)
-        const endDate = new Date(startDate);
-        endDate.setDate(startDate.getDate() + 6);
-        
-        const weekLabel = `Week of ${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
-        
-        // Week header row
-        fullHtml += `<tr class="week-separator-row"><td colspan="11" class="week-separator-cell">${weekLabel}</td></tr>`;
-        
-        // Column headers for this week
-        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        const dates = [];
-        for (let i = 0; i < 7; i++) {
-            const d = new Date(startDate);
-            d.setDate(startDate.getDate() + i);
-            dates.push(d);
-        }
-        
-        fullHtml += '<tr class="week-header-row">';
-        fullHtml += '<th class="time-header">Time</th>';
-        fullHtml += '<th class="app-header">Application</th>';
-        fullHtml += '<th class="roster-team-col">Team</th>';
-        dates.forEach((d, i) => {
-            const dayName = days[i];
-            const dateStr = `${d.getDate()}-${d.toLocaleString('default', { month: 'short' })}`;
-            const isWeekend = i >= 5;
-            fullHtml += `<th class="day-header ${isWeekend ? 'weekend' : ''}">${dateStr}<br>${dayName}</th>`;
-        });
-        fullHtml += '<th class="actions-col">Actions</th>';
-        fullHtml += '</tr>';
-        
-        // Fetch vacation conflicts for this week
-        const vacationConflicts = await fetchVacationConflicts(weekStart);
-        
-        // Data rows for this week
-        weekData.forEach((row, idx) => {
-            const appClass = getAppClass(row.app);
-            const teamClass = getTeamClass(row.team);
-            
-            fullHtml += `<tr data-week="${weekStart}" data-index="${idx}">`;
-            fullHtml += `<td class="time-cell">${escapeHtml(row.time)}</td>`;
-            fullHtml += `<td class="app-cell ${appClass}">${escapeHtml(row.app)}</td>`;
-            fullHtml += `<td class="team-cell ${teamClass}">${escapeHtml(row.team)}</td>`;
-            
-            const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-            dayKeys.forEach((key, i) => {
-                const isWeekend = i >= 5;
-                const personName = row.days[key] || '';
-                const hasConflict = hasVacationConflict(personName, key, vacationConflicts);
-                const conflictClass = hasConflict ? 'vacation-conflict' : '';
-                const conflictTooltip = hasConflict ? getVacationTooltip(personName, vacationConflicts) : '';
-                const conflictIcon = hasConflict ? '<span class="conflict-icon" title="' + conflictTooltip + '">⚠️</span>' : '';
-                
-                fullHtml += `<td class="day-cell ${isWeekend ? 'weekend' : ''} ${conflictClass}" ${conflictTooltip ? 'title="' + conflictTooltip + '"' : ''}>${escapeHtml(personName)}${conflictIcon}</td>`;
-            });
-            
-            fullHtml += `<td class="actions-col">
-                <button class="action-btn edit-btn" onclick="editRosterEntryByWeek('${weekStart}', ${idx})" title="Edit">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                    </svg>
-                </button>
-                <button class="action-btn delete-btn" onclick="deleteRosterEntryByWeek('${weekStart}', ${idx})" title="Delete">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="3 6 5 6 21 6"/>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                    </svg>
-                </button>
-            </td>`;
-            fullHtml += '</tr>';
-        });
+    // Generate header with dates
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const dates = [];
+    for (let i = 0; i < 7; i++) {
+        const d = new Date(startDate);
+        d.setDate(startDate.getDate() + i);
+        dates.push(d);
     }
     
-    // Clear the thead and put everything in tbody for grouped display
-    thead.innerHTML = '';
-    tbody.innerHTML = fullHtml;
+    let headerHtml = '<tr>';
+    headerHtml += '<th class="time-header">Time</th>';
+    headerHtml += '<th class="app-header">Application</th>';
+    headerHtml += '<th class="roster-team-col">Team</th>';
+    dates.forEach((d, i) => {
+        const dayName = days[i];
+        const dateStr = `${d.getDate()}-${d.toLocaleString('default', { month: 'short' })}`;
+        const isWeekend = i >= 5;
+        headerHtml += `<th class="day-header ${isWeekend ? 'weekend' : ''}">${dateStr}<br>${dayName}</th>`;
+    });
+    headerHtml += '<th class="actions-col">Actions</th>';
+    headerHtml += '</tr>';
+    thead.innerHTML = headerHtml;
+    
+    // Fetch vacation conflicts for this week
+    const vacationConflicts = await fetchVacationConflicts(selectedWeek);
+    
+    // Generate body
+    let bodyHtml = '';
+    weekData.forEach((row, idx) => {
+        const appClass = getAppClass(row.app);
+        const teamClass = getTeamClass(row.team);
+        
+        bodyHtml += `<tr data-week="${selectedWeek}" data-index="${idx}">`;
+        bodyHtml += `<td class="time-cell">${escapeHtml(row.time)}</td>`;
+        bodyHtml += `<td class="app-cell ${appClass}">${escapeHtml(row.app)}</td>`;
+        bodyHtml += `<td class="team-cell ${teamClass}">${escapeHtml(row.team)}</td>`;
+        
+        const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+        dayKeys.forEach((key, i) => {
+            const isWeekend = i >= 5;
+            const personName = row.days[key] || '';
+            const hasConflict = hasVacationConflict(personName, key, vacationConflicts);
+            const conflictClass = hasConflict ? 'vacation-conflict' : '';
+            const conflictTooltip = hasConflict ? getVacationTooltip(personName, vacationConflicts) : '';
+            const conflictIcon = hasConflict ? '<span class="conflict-icon" title="' + conflictTooltip + '">⚠️</span>' : '';
+            
+            bodyHtml += `<td class="day-cell ${isWeekend ? 'weekend' : ''} ${conflictClass}" ${conflictTooltip ? 'title="' + conflictTooltip + '"' : ''}>${escapeHtml(personName)}${conflictIcon}</td>`;
+        });
+        
+        bodyHtml += `<td class="actions-col">
+            <button class="action-btn edit-btn" onclick="editRosterEntryByWeek('${selectedWeek}', ${idx})" title="Edit">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+            </button>
+            <button class="action-btn delete-btn" onclick="deleteRosterEntryByWeek('${selectedWeek}', ${idx})" title="Delete">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                </svg>
+            </button>
+        </td>`;
+        bodyHtml += '</tr>';
+    });
+    
+    tbody.innerHTML = bodyHtml;
+}
+
+// Legacy function - now just renders selected week
+async function renderRosterByMonth() {
+    await renderSelectedWeek();
 }
 
 function editRosterEntryByWeek(weekStart, idx) {

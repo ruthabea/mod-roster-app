@@ -1018,11 +1018,17 @@ body {
 }
 
 .roster-week-selector input[type="date"],
-.roster-week-selector input[type="month"] {
+.roster-week-selector input[type="month"],
+.roster-week-selector select {
     padding: 0.5rem 0.75rem;
     border: 1px solid var(--border-color);
     border-radius: 6px;
     font-size: 0.9rem;
+    background: white;
+}
+
+.roster-week-selector select {
+    min-width: 160px;
 }
 
 /* Week separator styling for month view */
