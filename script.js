@@ -4081,19 +4081,36 @@ async function deleteRosterEntry(index) {
 }
 
 function exportRosterExcel() {
-    if (!rosterData || rosterData.length === 0) {
-        showToast('No roster data to export', 'error');
-        return;
-    }
-    
     // Check if SheetJS is loaded
     if (typeof XLSX === 'undefined') {
         showToast('Excel library not loaded. Please refresh and try again.', 'error');
         return;
     }
     
-    // Get the selected week start date
-    const weekStartStr = getCurrentWeekStart();
+    // Get the selected week from the week dropdown (month view)
+    const weekSelect = document.getElementById('rosterWeekSelect');
+    const selectedWeek = weekSelect?.value;
+    
+    // Determine which data source to use
+    let dataToExport = [];
+    let weekStartStr = '';
+    
+    if (selectedWeek && rosterMonthData && rosterMonthData[selectedWeek]) {
+        // Use month view data
+        dataToExport = rosterMonthData[selectedWeek];
+        weekStartStr = selectedWeek;
+    } else if (rosterData && rosterData.length > 0) {
+        // Fallback to old rosterData
+        dataToExport = rosterData;
+        weekStartStr = getCurrentWeekStart();
+    }
+    
+    if (!dataToExport || dataToExport.length === 0) {
+        showToast('No roster data to export', 'error');
+        return;
+    }
+    
+    // Get the week start date
     const weekStart = weekStartStr ? new Date(weekStartStr) : new Date();
     
     // Calculate dates for each day of the week
@@ -4107,7 +4124,7 @@ function exportRosterExcel() {
     }
     
     // Prepare data for Excel with dates in headers
-    const exportData = rosterData.map(r => {
+    const exportData = dataToExport.map(r => {
         const row = {
             'Time / Shift': r.time,
             'Application': r.app,
@@ -4151,6 +4168,8 @@ function exportRosterExcel() {
     
     // Generate filename with week range
     const filename = `OnCall_Roster_${weekRange}.xlsx`;
+    
+    console.log('Exporting roster data:', dataToExport.length, 'entries for week:', weekStartStr);
     
     // Download the file
     XLSX.writeFile(wb, filename);
