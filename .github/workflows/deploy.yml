@@ -26,22 +26,41 @@ jobs:
 
       - name: Inject secrets into config.js
         run: |
-          # Copy template to config.js
           cp config.template.js config.js
           
-          # Replace placeholders with actual secrets
-          sed -i "s|__SUPABASE_URL__|${{ secrets.SUPABASE_URL }}|g" config.js
-          sed -i "s|__SUPABASE_ANON_KEY__|${{ secrets.SUPABASE_ANON_KEY }}|g" config.js
-          sed -i "s|__TEAMS_WEBHOOK_URL__|${{ secrets.TEAMS_WEBHOOK_URL }}|g" config.js
+          echo "Checking secrets..."
+          echo "SUPABASE_URL length: ${#SUPABASE_URL}"
+          echo "SUPABASE_ANON_KEY length: ${#SUPABASE_ANON_KEY}"
+          echo "TEAMS_WEBHOOK_URL length: ${#TEAMS_WEBHOOK_URL}"
           
-          # Verify replacements (without exposing secrets)
+          sed -i "s|__SUPABASE_URL__|${SUPABASE_URL}|g" config.js
+          sed -i "s|__SUPABASE_ANON_KEY__|${SUPABASE_ANON_KEY}|g" config.js
+          sed -i "s|__TEAMS_WEBHOOK_URL__|${TEAMS_WEBHOOK_URL}|g" config.js
+          
           echo "Config.js generated successfully"
-          echo "Checking for remaining placeholders..."
-          if grep -q "__SUPABASE_URL__\|__SUPABASE_ANON_KEY__\|__TEAMS_WEBHOOK_URL__" config.js; then
-            echo "WARNING: Some placeholders were not replaced. Check your GitHub Secrets."
+          
+          FAILED=0
+          if grep -q "__SUPABASE_URL__" config.js; then
+            echo "ERROR: SUPABASE_URL secret is missing"
+            FAILED=1
+          fi
+          if grep -q "__SUPABASE_ANON_KEY__" config.js; then
+            echo "ERROR: SUPABASE_ANON_KEY secret is missing"
+            FAILED=1
+          fi
+          if grep -q "__TEAMS_WEBHOOK_URL__" config.js; then
+            echo "ERROR: TEAMS_WEBHOOK_URL secret is missing"
+            FAILED=1
+          fi
+          
+          if [ $FAILED -eq 1 ]; then
             exit 1
           fi
           echo "All placeholders replaced successfully!"
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
