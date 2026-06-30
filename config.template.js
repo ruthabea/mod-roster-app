@@ -15,7 +15,7 @@ function isEdgeFunctionConfigured() {
 const TEAMS_WEBHOOK_URL = '__TEAMS_WEBHOOK_URL__';
 
 function isTeamsConfigured() {
-    return TEAMS_WEBHOOK_URL && TEAMS_WEBHOOK_URL.length > 0 && TEAMS_WEBHOOK_URL !== '__TEAMS_WEBHOOK_URL__';
+    return TEAMS_WEBHOOK_URL && TEAMS_WEBHOOK_URL.length > 50 && TEAMS_WEBHOOK_URL.startsWith('https://');
 }
 
 // REST API helper
@@ -49,7 +49,9 @@ async function supabaseRequest(table, method = 'GET', data = null, query = '') {
 
 // Check if Supabase is configured
 function isSupabaseConfigured() {
-    return SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL !== '__SUPABASE_URL__';
+    return SUPABASE_URL && SUPABASE_ANON_KEY && 
+           SUPABASE_URL.startsWith('https://') && 
+           SUPABASE_ANON_KEY.length > 50;
 }
 
 // Database helper functions using REST API
