@@ -25,31 +25,63 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Inject secrets into config.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
         run: |
+          # Copy template to config.js
           cp config.template.js config.js
           
+          # Debug: Check if secrets are set (show length only, not values)
           echo "Checking secrets..."
           echo "SUPABASE_URL length: ${#SUPABASE_URL}"
           echo "SUPABASE_ANON_KEY length: ${#SUPABASE_ANON_KEY}"
           echo "TEAMS_WEBHOOK_URL length: ${#TEAMS_WEBHOOK_URL}"
           
-          sed -i "s|__SUPABASE_URL__|${SUPABASE_URL}|g" config.js
-          sed -i "s|__SUPABASE_ANON_KEY__|${SUPABASE_ANON_KEY}|g" config.js
-          sed -i "s|__TEAMS_WEBHOOK_URL__|${TEAMS_WEBHOOK_URL}|g" config.js
+          # Write Python script to file
+          cat > replace_secrets.py << 'PYEOF'
+          import os
+          import sys
+
+          with open('config.js', 'r') as f:
+              content = f.read()
+
+          supabase_url = os.environ.get('SUPABASE_URL', '')
+          supabase_key = os.environ.get('SUPABASE_ANON_KEY', '')
+          teams_url = os.environ.get('TEAMS_WEBHOOK_URL', '')
+
+          print(f"Python received - SUPABASE_URL: {len(supabase_url)} chars")
+          print(f"Python received - SUPABASE_ANON_KEY: {len(supabase_key)} chars")
+          print(f"Python received - TEAMS_WEBHOOK_URL: {len(teams_url)} chars")
+
+          content = content.replace('__SUPABASE_URL__', supabase_url)
+          content = content.replace('__SUPABASE_ANON_KEY__', supabase_key)
+          content = content.replace('__TEAMS_WEBHOOK_URL__', teams_url)
+
+          with open('config.js', 'w') as f:
+              f.write(content)
+
+          print("Config.js updated successfully")
+          PYEOF
           
-          echo "Config.js generated successfully"
+          # Run the Python script
+          python3 replace_secrets.py
+          
+          # Verify replacements
+          echo "Checking for remaining placeholders..."
           
           FAILED=0
           if grep -q "__SUPABASE_URL__" config.js; then
-            echo "ERROR: SUPABASE_URL secret is missing"
+            echo "ERROR: __SUPABASE_URL__ was not replaced."
             FAILED=1
           fi
           if grep -q "__SUPABASE_ANON_KEY__" config.js; then
-            echo "ERROR: SUPABASE_ANON_KEY secret is missing"
+            echo "ERROR: __SUPABASE_ANON_KEY__ was not replaced."
             FAILED=1
           fi
           if grep -q "__TEAMS_WEBHOOK_URL__" config.js; then
-            echo "ERROR: TEAMS_WEBHOOK_URL secret is missing"
+            echo "ERROR: __TEAMS_WEBHOOK_URL__ was not replaced."
             FAILED=1
           fi
           
@@ -57,10 +89,6 @@ jobs:
             exit 1
           fi
           echo "All placeholders replaced successfully!"
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
