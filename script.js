@@ -4181,6 +4181,239 @@ function exportRosterJSON() {
     exportRosterExcel();
 }
 
+// Import On-Call Roster from Excel
+async function handleRosterExcelImport(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    // Check if SheetJS is loaded
+    if (typeof XLSX === 'undefined') {
+        showToast('Excel library not loaded. Please refresh and try again.', 'error');
+        return;
+    }
+    
+    try {
+        showToast('Reading Excel file...');
+        
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                
+                // Get the first sheet (should be "On-Call Roster")
+                const sheetName = workbook.SheetNames[0];
+                const sheet = workbook.Sheets[sheetName];
+                
+                // Convert to JSON with headers
+                const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
+                
+                if (jsonData.length < 2) {
+                    showToast('Excel file is empty or has no data rows', 'error');
+                    return;
+                }
+                
+                // Parse headers to extract week start date
+                const headers = jsonData[0];
+                console.log('Excel headers:', headers);
+                
+                // Find the week start date from the day columns (e.g., "Mon (8-Jun)")
+                const weekStartDate = parseWeekStartFromHeaders(headers);
+                if (!weekStartDate) {
+                    showToast('Could not determine week start date from headers. Expected format: Mon (8-Jun)', 'error');
+                    return;
+                }
+                
+                console.log('Detected week start:', weekStartDate);
+                
+                // Map column indices
+                const timeIdx = headers.findIndex(h => h && h.toLowerCase().includes('time') || h && h.toLowerCase().includes('shift'));
+                const appIdx = headers.findIndex(h => h && h.toLowerCase() === 'application');
+                const teamIdx = headers.findIndex(h => h && h.toLowerCase() === 'team');
+                
+                // Find day columns
+                const dayColumns = {};
+                const dayPatterns = {
+                    mon: /^mon\s*\(/i,
+                    tue: /^tue\s*\(/i,
+                    wed: /^wed\s*\(/i,
+                    thu: /^thu\s*\(/i,
+                    fri: /^fri\s*\(/i,
+                    sat: /^sat\s*\(/i,
+                    sun: /^sun\s*\(/i
+                };
+                
+                headers.forEach((h, idx) => {
+                    if (!h) return;
+                    for (const [day, pattern] of Object.entries(dayPatterns)) {
+                        if (pattern.test(h)) {
+                            dayColumns[day] = idx;
+                            break;
+                        }
+                    }
+                });
+                
+                console.log('Column mapping:', { timeIdx, appIdx, teamIdx, dayColumns });
+                
+                // Parse data rows
+                const rosterEntries = [];
+                for (let i = 1; i < jsonData.length; i++) {
+                    const row = jsonData[i];
+                    
+                    // Skip empty rows
+                    const hasData = row.some(cell => cell && cell.toString().trim() !== '');
+                    if (!hasData) continue;
+                    
+                    const time = (timeIdx >= 0 && row[timeIdx]) ? row[timeIdx].toString().trim() : '';
+                    const app = (appIdx >= 0 && row[appIdx]) ? row[appIdx].toString().trim() : '';
+                    const team = (teamIdx >= 0 && row[teamIdx]) ? row[teamIdx].toString().trim() : '';
+                    
+                    // Skip if missing essential data
+                    if (!time && !app && !team) continue;
+                    
+                    const days = {
+                        mon: dayColumns.mon !== undefined ? (row[dayColumns.mon] || '').toString().trim() : '',
+                        tue: dayColumns.tue !== undefined ? (row[dayColumns.tue] || '').toString().trim() : '',
+                        wed: dayColumns.wed !== undefined ? (row[dayColumns.wed] || '').toString().trim() : '',
+                        thu: dayColumns.thu !== undefined ? (row[dayColumns.thu] || '').toString().trim() : '',
+                        fri: dayColumns.fri !== undefined ? (row[dayColumns.fri] || '').toString().trim() : '',
+                        sat: dayColumns.sat !== undefined ? (row[dayColumns.sat] || '').toString().trim() : '',
+                        sun: dayColumns.sun !== undefined ? (row[dayColumns.sun] || '').toString().trim() : ''
+                    };
+                    
+                    rosterEntries.push({
+                        time,
+                        app,
+                        team,
+                        days,
+                        week_start: weekStartDate
+                    });
+                }
+                
+                console.log('Parsed roster entries:', rosterEntries.length);
+                
+                if (rosterEntries.length === 0) {
+                    showToast('No valid roster entries found in the Excel file', 'error');
+                    return;
+                }
+                
+                // Save to Supabase
+                await importRosterToSupabase(rosterEntries, weekStartDate);
+                
+            } catch (parseError) {
+                console.error('Error parsing Excel:', parseError);
+                showToast('Error parsing Excel file: ' + parseError.message, 'error');
+            }
+        };
+        
+        reader.readAsArrayBuffer(file);
+        
+    } catch (error) {
+        console.error('Error reading file:', error);
+        showToast('Error reading file: ' + error.message, 'error');
+    }
+    
+    // Reset file input so same file can be selected again
+    event.target.value = '';
+}
+
+// Parse week start date from Excel headers
+function parseWeekStartFromHeaders(headers) {
+    // Look for "Mon (date)" pattern to determine week start
+    for (const header of headers) {
+        if (!header) continue;
+        const match = header.match(/^Mon\s*\((\d{1,2})-([A-Za-z]{3})\)/i);
+        if (match) {
+            const day = parseInt(match[1]);
+            const monthStr = match[2];
+            const monthMap = {
+                'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'may': 4, 'jun': 5,
+                'jul': 6, 'aug': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dec': 11
+            };
+            const month = monthMap[monthStr.toLowerCase()];
+            if (month !== undefined) {
+                // Determine year - use current year, adjust if needed
+                const now = new Date();
+                let year = now.getFullYear();
+                const testDate = new Date(year, month, day);
+                
+                // If the date is more than 6 months in the past, assume next year
+                const sixMonthsAgo = new Date(now);
+                sixMonthsAgo.setMonth(now.getMonth() - 6);
+                if (testDate < sixMonthsAgo) {
+                    year++;
+                }
+                
+                const weekStart = new Date(year, month, day);
+                return formatDateForInput(weekStart);
+            }
+        }
+    }
+    return null;
+}
+
+// Import roster entries to Supabase
+async function importRosterToSupabase(entries, weekStart) {
+    try {
+        showToast('Importing roster data...');
+        
+        // First, delete existing entries for this week to avoid duplicates
+        const deleteResult = await supabaseRequest(
+            `roster?week_start=eq.${weekStart}`,
+            { method: 'DELETE' }
+        );
+        console.log('Deleted existing entries for week:', weekStart);
+        
+        // Insert new entries
+        let importedCount = 0;
+        for (let i = 0; i < entries.length; i++) {
+            const entry = entries[i];
+            const dbEntry = {
+                time: entry.time,
+                app: entry.app,
+                team: entry.team,
+                days: entry.days,
+                week_start: entry.week_start,
+                sort_order: i
+            };
+            
+            const result = await supabaseRequest('roster', {
+                method: 'POST',
+                body: dbEntry
+            });
+            
+            if (result) {
+                importedCount++;
+            }
+        }
+        
+        console.log('Imported', importedCount, 'roster entries');
+        showToast(`Successfully imported ${importedCount} roster entries for week of ${weekStart}`, 'success');
+        
+        // Update the month/week filters to show the imported week
+        const importDate = new Date(weekStart);
+        const monthSelect = document.getElementById('rosterMonthSelect');
+        if (monthSelect) {
+            const monthValue = `${importDate.getFullYear()}-${String(importDate.getMonth() + 1).padStart(2, '0')}`;
+            monthSelect.value = monthValue;
+        }
+        
+        // Reload roster data to show imported entries
+        await loadRosterMonth();
+        
+        // Set the week selector to the imported week
+        const weekSelect = document.getElementById('rosterWeekSelect');
+        if (weekSelect) {
+            weekSelect.value = weekStart;
+            renderSelectedWeek();
+        }
+        
+    } catch (error) {
+        console.error('Error importing roster:', error);
+        showToast('Error importing roster: ' + error.message, 'error');
+    }
+}
+
 // Roster Drag and Drop
 let rosterDraggedRow = null;
 

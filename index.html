@@ -665,6 +665,8 @@
                                 Add Row
                             </button>
                             <button class="btn btn-outline" onclick="exportRosterJSON()">Export</button>
+                            <button class="btn btn-outline" onclick="document.getElementById('rosterExcelFile').click()">Import</button>
+                            <input type="file" id="rosterExcelFile" accept=".xlsx,.xls" style="display: none;" onchange="handleRosterExcelImport(event)">
                             <button class="btn btn-outline" onclick="window.print()">Print</button>
                             <!-- Hidden: Manual email notifications disabled -->
                             <button class="btn btn-email hidden" onclick="sendEmailNotifications()" id="sendEmailNotificationBtn" style="display: none;">
