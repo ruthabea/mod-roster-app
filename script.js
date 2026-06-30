@@ -1634,6 +1634,168 @@ function importScheduleJSON(event, screen) {
     event.target.value = '';
 }
 
+// Import MOD Schedule from Excel (same format as export)
+function importScheduleExcel(event, screen) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    // Check if SheetJS is loaded
+    if (typeof XLSX === 'undefined') {
+        showToast('Excel library not loaded. Please refresh and try again.', 'error');
+        return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            
+            // Get the first sheet
+            const sheetName = workbook.SheetNames[0];
+            const sheet = workbook.Sheets[sheetName];
+            
+            // Convert to JSON with headers
+            const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
+            
+            if (jsonData.length < 2) {
+                showToast('Excel file is empty or has no data rows', 'error');
+                return;
+            }
+            
+            // Parse headers
+            const headers = jsonData[0];
+            console.log('Excel headers:', headers);
+            
+            // Find column indices
+            const daysIdx = headers.findIndex(h => h && h.toLowerCase() === 'days');
+            const primaryIdx = headers.findIndex(h => h && (
+                h.toLowerCase().includes('onsite') || 
+                h.toLowerCase().includes('primary')
+            ));
+            const secondaryIdx = headers.findIndex(h => h && (
+                h.toLowerCase().includes('offshore') || 
+                h.toLowerCase().includes('secondary')
+            ));
+            
+            if (daysIdx < 0 || primaryIdx < 0 || secondaryIdx < 0) {
+                showToast('Invalid Excel format. Expected columns: Days, Onsite/Primary, Offshore/Secondary', 'error');
+                return;
+            }
+            
+            console.log('Column indices:', { daysIdx, primaryIdx, secondaryIdx });
+            
+            // Parse data rows
+            const entries = [];
+            const currentYear = new Date().getFullYear();
+            
+            for (let i = 1; i < jsonData.length; i++) {
+                const row = jsonData[i];
+                
+                const dayStr = row[daysIdx]?.toString().trim();
+                const primaryName = row[primaryIdx]?.toString().trim() || '';
+                const secondaryName = row[secondaryIdx]?.toString().trim() || '';
+                
+                // Skip empty rows
+                if (!dayStr) continue;
+                
+                // Parse date from "DD-Mon" format (e.g., "1-Jun", "15-Jul")
+                const date = parseDayMonthDate(dayStr, currentYear);
+                if (!date) {
+                    console.warn('Could not parse date:', dayStr);
+                    continue;
+                }
+                
+                // Look up personnel to get full info
+                const primaryPerson = findModPersonnel(primaryName, 'onsite') || 
+                                     findModPersonnel(primaryName, 'offshore');
+                const secondaryPerson = findModPersonnel(secondaryName, 'offshore') || 
+                                       findModPersonnel(secondaryName, 'onsite');
+                
+                const entry = {
+                    date: formatDateForInput(date),
+                    primaryName: primaryName,
+                    secondaryName: secondaryName,
+                    primaryDisplay: primaryPerson ? 
+                        `${primaryPerson.name} <${primaryPerson.email}>` : primaryName,
+                    secondaryDisplay: secondaryPerson ? 
+                        `${secondaryPerson.name} <${secondaryPerson.email}>` : secondaryName
+                };
+                
+                entries.push(entry);
+            }
+            
+            if (entries.length === 0) {
+                showToast('No valid entries found in Excel file', 'error');
+                return;
+            }
+            
+            // Sort entries by date
+            entries.sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            // Create schedule data
+            const scheduleData = {
+                entries: entries,
+                primaryShiftLabel: screen === 'mod' ? '7am to 7pm AEST' : 'Primary',
+                secondaryShiftLabel: screen === 'mod' ? '7pm to 7am AEST' : 'Secondary',
+                primaryMods: modPersonnelData.onsite || [],
+                secondaryMods: modPersonnelData.offshore || []
+            };
+            
+            // Save and display
+            saveScheduleToStorage(screen, scheduleData);
+            displaySavedSchedule(screen);
+            
+            showToast(`Imported ${entries.length} schedule entries from Excel`);
+            
+        } catch (err) {
+            console.error('Error reading Excel file:', err);
+            showToast('Error reading Excel file: ' + err.message, 'error');
+        }
+    };
+    
+    reader.readAsArrayBuffer(file);
+    event.target.value = '';
+}
+
+// Parse "DD-Mon" date format (e.g., "1-Jun", "15-Jul")
+function parseDayMonthDate(dateStr, year) {
+    if (!dateStr) return null;
+    
+    const monthMap = {
+        'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'may': 4, 'jun': 5,
+        'jul': 6, 'aug': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dec': 11
+    };
+    
+    // Try "DD-Mon" format (e.g., "1-Jun", "15-Jul")
+    const match = dateStr.match(/^(\d{1,2})-([A-Za-z]{3})$/);
+    if (match) {
+        const day = parseInt(match[1]);
+        const month = monthMap[match[2].toLowerCase()];
+        if (month !== undefined && day >= 1 && day <= 31) {
+            return new Date(year, month, day);
+        }
+    }
+    
+    // Try other common formats
+    const parsed = new Date(dateStr);
+    if (!isNaN(parsed.getTime())) {
+        return parsed;
+    }
+    
+    return null;
+}
+
+// Find MOD personnel by name
+function findModPersonnel(name, type) {
+    if (!name || !modPersonnelData[type]) return null;
+    
+    const normalizedName = name.toLowerCase().trim();
+    return modPersonnelData[type].find(p => 
+        p.name && p.name.toLowerCase().trim() === normalizedName
+    );
+}
+
 function downloadFile(content, fileName, mimeType) {
     const blob = new Blob([content], { type: mimeType });
     const link = document.createElement('a');
