@@ -274,12 +274,12 @@ function showAuthenticatedApp() {
         userAvatarEl.classList.add('has-initials');
     }
     
+    // Apply role-based visibility BEFORE showing app (to prevent flash of unauthorized content)
+    applyRoleBasedAccess(userRole);
+    
     // Hide login, show app
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('appContainer').classList.remove('hidden');
-    
-    // Apply role-based visibility
-    applyRoleBasedAccess(userRole);
     
     console.log('User authenticated:', userName, '| Role:', userRole);
 }
@@ -302,19 +302,30 @@ function applyRoleBasedAccess(role) {
     document.body.classList.remove('role-manager', 'role-staff');
     document.body.classList.add(`role-${role}`);
     
-    // For staff, auto-navigate to vacation requests
+    // For staff, auto-navigate to vacation requests immediately
     if (isStaff) {
-        // Navigate to vacation screen and requests tab
+        // Hide all main screens first
+        document.querySelectorAll('.main-screen').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.main-screen-tab').forEach(t => t.classList.remove('active'));
+        
+        // Show vacation screen
+        const vacationScreen = document.getElementById('vacationScreen');
+        if (vacationScreen) {
+            vacationScreen.classList.add('active');
+        }
+        
+        // Highlight the vacation tab
+        const vacationTab = document.querySelector('.main-screen-tab[onclick*="vacation"]');
+        if (vacationTab) {
+            vacationTab.classList.add('active');
+        }
+        
+        // Use switchMainScreen if available for proper initialization
         setTimeout(() => {
-            if (typeof switchScreen === 'function') {
-                switchScreen('vacation');
+            if (typeof switchMainScreen === 'function') {
+                switchMainScreen('vacation');
             }
-            // Switch to "My Requests" tab
-            const myRequestsTab = document.querySelector('[onclick*="switchVacationTab"][onclick*="requests"]');
-            if (myRequestsTab) {
-                myRequestsTab.click();
-            }
-        }, 100);
+        }, 50);
     }
 }
 
