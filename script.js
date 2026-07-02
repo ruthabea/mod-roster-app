@@ -5673,8 +5673,18 @@ function determineVacationApprover(site, team) {
 async function populateVacationEmployeeDropdown() {
     const employeeSelect = document.getElementById('vacationEmployeeName');
     const myRequestsSelect = document.getElementById('myRequestsFilterName');
+    const myRequestsFilterContainer = document.getElementById('myRequestsFilterNameContainer');
     
     if (!employeeSelect) return;
+    
+    // Check if user is staff (limited access)
+    const isStaffUser = typeof isStaff === 'function' && isStaff();
+    const currentUser = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+    
+    // Hide name filter for staff users (they only see their own requests)
+    if (myRequestsFilterContainer && isStaffUser) {
+        myRequestsFilterContainer.style.display = 'none';
+    }
     
     try {
         // Fetch staff with site and application fields
@@ -5700,9 +5710,36 @@ async function populateVacationEmployeeDropdown() {
             employeeSelect.appendChild(option);
         });
         
-        // Also populate My Requests filter
-        if (myRequestsSelect) {
-            myRequestsSelect.innerHTML = '<option value="">Select Your Name</option>';
+        // For staff users, auto-select their name and disable dropdown
+        if (isStaffUser && currentUser) {
+            // Try to find staff by email match
+            const staffPerson = staff.find(p => 
+                p.email && currentUser.email && 
+                p.email.toLowerCase() === currentUser.email.toLowerCase()
+            );
+            
+            if (staffPerson) {
+                employeeSelect.value = staffPerson.name;
+                employeeSelect.disabled = true;
+                // Trigger change event to auto-fill other fields
+                employeeSelect.dispatchEvent(new Event('change'));
+            } else {
+                // If not found in staff_directory, try using the name from session
+                const matchByName = staff.find(p => 
+                    p.name && currentUser.name && 
+                    p.name.toLowerCase() === currentUser.name.toLowerCase()
+                );
+                if (matchByName) {
+                    employeeSelect.value = matchByName.name;
+                    employeeSelect.disabled = true;
+                    employeeSelect.dispatchEvent(new Event('change'));
+                }
+            }
+        }
+        
+        // Also populate My Requests filter (only for managers)
+        if (myRequestsSelect && !isStaffUser) {
+            myRequestsSelect.innerHTML = '<option value="">All Employees</option>';
             staff.forEach(person => {
                 const option = document.createElement('option');
                 option.value = person.name;
@@ -5955,6 +5992,16 @@ function filterMyVacationRequests() {
     const nameFilter = document.getElementById('myRequestsFilterName')?.value || '';
     
     let filtered = [...allVacationRequests];
+    
+    // For staff users, only show their own requests
+    if (typeof isStaff === 'function' && isStaff()) {
+        const currentUser = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+        if (currentUser && currentUser.email) {
+            filtered = filtered.filter(r => 
+                r.email && r.email.toLowerCase() === currentUser.email.toLowerCase()
+            );
+        }
+    }
     
     if (statusFilter) {
         filtered = filtered.filter(r => r.status === statusFilter);

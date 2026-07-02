@@ -33,6 +33,10 @@ function initializeAuth() {
     const session = getStoredSession();
     if (session && session.expiresAt > Date.now()) {
         currentUser = session.user;
+        // Ensure role is set (for backward compatibility with old sessions)
+        if (!currentUser.role) {
+            currentUser.role = 'manager';
+        }
         showAuthenticatedApp();
         return;
     }
@@ -146,24 +150,44 @@ async function validateMagicToken(token) {
             }
         );
         
-        // Get manager info
-        const managerResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/managers?email=ilike.${encodeURIComponent(tokenData.email)}&select=*`,
-            {
-                headers: {
-                    'apikey': SUPABASE_ANON_KEY,
-                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        // Get role from token data (defaults to 'manager' for backward compatibility)
+        const userRole = tokenData.role || 'manager';
+        
+        // Get user name - check managers first, then contacts
+        let userName = tokenData.email.split('@')[0];
+        
+        if (userRole === 'manager') {
+            const managerResponse = await fetch(
+                `${SUPABASE_URL}/rest/v1/managers?email=ilike.${encodeURIComponent(tokenData.email)}&select=*`,
+                {
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                    }
                 }
-            }
-        );
+            );
+            const managers = await managerResponse.json();
+            if (managers[0]?.name) userName = managers[0].name;
+        } else {
+            // Staff - get name from contacts
+            const contactResponse = await fetch(
+                `${SUPABASE_URL}/rest/v1/contacts?email=ilike.${encodeURIComponent(tokenData.email)}&select=name`,
+                {
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                    }
+                }
+            );
+            const contacts = await contactResponse.json();
+            if (contacts[0]?.name) userName = contacts[0].name;
+        }
         
-        const managers = await managerResponse.json();
-        const manager = managers[0];
-        
-        // Create session
+        // Create session with role
         currentUser = {
             email: tokenData.email,
-            name: manager?.name || tokenData.email.split('@')[0]
+            name: userName,
+            role: userRole
         };
         
         // Store session
@@ -172,7 +196,7 @@ async function validateMagicToken(token) {
         // Clear URL params
         clearUrlParams();
         
-        // Show app
+        // Show app with role-based access
         showAuthenticatedApp();
         
     } catch (error) {
@@ -235,6 +259,7 @@ function showAuthenticatedApp() {
     
     // Update user display
     const userName = currentUser?.name || currentUser?.email || 'User';
+    const userRole = currentUser?.role || 'manager';
     const userNameEl = document.getElementById('userName');
     const userAvatarEl = document.getElementById('userAvatar');
     
@@ -253,7 +278,44 @@ function showAuthenticatedApp() {
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('appContainer').classList.remove('hidden');
     
-    console.log('User authenticated:', userName);
+    // Apply role-based visibility
+    applyRoleBasedAccess(userRole);
+    
+    console.log('User authenticated:', userName, '| Role:', userRole);
+}
+
+// Apply role-based access control
+function applyRoleBasedAccess(role) {
+    const isStaff = role === 'staff';
+    
+    // Elements to hide for staff (limited access)
+    const managerOnlyElements = document.querySelectorAll('[data-role="manager"]');
+    managerOnlyElements.forEach(el => {
+        if (isStaff) {
+            el.style.display = 'none';
+        } else {
+            el.style.display = '';
+        }
+    });
+    
+    // Add body class for role-based CSS
+    document.body.classList.remove('role-manager', 'role-staff');
+    document.body.classList.add(`role-${role}`);
+    
+    // For staff, auto-navigate to vacation requests
+    if (isStaff) {
+        // Navigate to vacation screen and requests tab
+        setTimeout(() => {
+            if (typeof switchScreen === 'function') {
+                switchScreen('vacation');
+            }
+            // Switch to "My Requests" tab
+            const myRequestsTab = document.querySelector('[onclick*="switchVacationTab"][onclick*="requests"]');
+            if (myRequestsTab) {
+                myRequestsTab.click();
+            }
+        }, 100);
+    }
 }
 
 // Show login screen
@@ -338,4 +400,19 @@ function getCurrentUser() {
 // Check if user is authenticated
 function isAuthenticated() {
     return currentUser !== null;
+}
+
+// Get current user's role
+function getUserRole() {
+    return currentUser?.role || 'manager';
+}
+
+// Check if current user is a manager (full access)
+function isManager() {
+    return getUserRole() === 'manager';
+}
+
+// Check if current user is staff (limited access)
+function isStaff() {
+    return getUserRole() === 'staff';
 }
