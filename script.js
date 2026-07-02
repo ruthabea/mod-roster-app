@@ -5669,136 +5669,162 @@ function determineVacationApprover(site, team) {
     return { name: 'Not Configured', email: '' };
 }
 
-// Populate employee dropdown from staff directory
+// Auto-fill vacation form with logged-in user's info
 async function populateVacationEmployeeDropdown() {
-    const employeeSelect = document.getElementById('vacationEmployeeName');
+    const nameInput = document.getElementById('vacationEmployeeName');
+    const emailInput = document.getElementById('vacationEmployeeEmail');
+    const siteInput = document.getElementById('vacationSite');
+    const teamInput = document.getElementById('vacationTeam');
+    const approverNameInput = document.getElementById('vacationApproverName');
+    const managerEmailInput = document.getElementById('vacationManagerEmail');
     const myRequestsSelect = document.getElementById('myRequestsFilterName');
     const myRequestsFilterContainer = document.getElementById('myRequestsFilterNameContainer');
     
-    if (!employeeSelect) return;
+    if (!nameInput || !emailInput) return;
     
-    // Check if user is staff (limited access)
-    const isStaffUser = typeof isStaff === 'function' && isStaff();
+    // Get current user from session
     const currentUser = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+    const isStaffUser = typeof isStaff === 'function' && isStaff();
     
     // Hide name filter for staff users (they only see their own requests)
     if (myRequestsFilterContainer && isStaffUser) {
         myRequestsFilterContainer.style.display = 'none';
     }
     
-    try {
-        // Fetch staff with site and application fields
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/staff_directory?select=name,email,site,application&order=name`, {
-            headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+    // Populate My Requests filter for managers
+    if (myRequestsSelect && !isStaffUser) {
+        try {
+            const response = await fetch(`${SUPABASE_URL}/rest/v1/staff_directory?select=name&order=name`, {
+                headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                }
+            });
+            if (response.ok) {
+                const staff = await response.json();
+                myRequestsSelect.innerHTML = '<option value="">All Employees</option>';
+                staff.forEach(person => {
+                    const option = document.createElement('option');
+                    option.value = person.name;
+                    option.textContent = person.name;
+                    myRequestsSelect.appendChild(option);
+                });
             }
-        });
-        
-        if (!response.ok) throw new Error('Failed to fetch staff');
-        
-        const staff = await response.json();
-        
-        // Clear and populate employee dropdown
-        employeeSelect.innerHTML = '<option value="">Select your name</option>';
-        staff.forEach(person => {
-            const option = document.createElement('option');
-            option.value = person.name;
-            option.textContent = person.name;
-            option.dataset.email = person.email || '';
-            option.dataset.site = person.site || '';
-            employeeSelect.appendChild(option);
-        });
-        
-        // For staff users, auto-select their name and disable dropdown
-        if (isStaffUser && currentUser) {
-            // Try to find staff by email match
-            const staffPerson = staff.find(p => 
-                p.email && currentUser.email && 
-                p.email.toLowerCase() === currentUser.email.toLowerCase()
+        } catch (e) {
+            console.error('Error loading staff for filter:', e);
+        }
+    }
+    
+    console.log('populateVacationEmployeeDropdown called, currentUser:', currentUser);
+    
+    if (!currentUser || (!currentUser.name && !currentUser.email)) {
+        console.log('No current user session or missing data - will retry in 500ms');
+        // Retry after a short delay (timing issue with auth)
+        setTimeout(async () => {
+            const retryUser = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+            console.log('Retry getCurrentUser:', retryUser);
+            if (retryUser && (retryUser.name || retryUser.email)) {
+                const nameEl = document.getElementById('vacationEmployeeName');
+                const emailEl = document.getElementById('vacationEmployeeEmail');
+                if (nameEl) nameEl.value = retryUser.name || '';
+                if (emailEl) emailEl.value = retryUser.email || '';
+                console.log('Auto-filled on retry:', retryUser.name, retryUser.email);
+                // Also fill site/team
+                await autoFillSiteAndTeamByEmail(retryUser.email, retryUser.name);
+            } else {
+                console.warn('Still no user data after retry. User may need to sign out and sign back in.');
+            }
+        }, 500);
+        return;
+    }
+    
+    // Auto-fill name and email from session (read-only)
+    nameInput.value = currentUser.name || '';
+    emailInput.value = currentUser.email || '';
+    
+    console.log('Auto-filled vacation form for:', currentUser.name, currentUser.email);
+    
+    // Look up site and team from contacts table by email
+    await autoFillSiteAndTeamByEmail(currentUser.email, currentUser.name);
+}
+
+// Look up site and team from contacts table by email
+async function autoFillSiteAndTeamByEmail(email, userName) {
+    const siteInput = document.getElementById('vacationSite');
+    const teamInput = document.getElementById('vacationTeam');
+    const approverNameInput = document.getElementById('vacationApproverName');
+    const managerEmailInput = document.getElementById('vacationManagerEmail');
+    
+    let site = '';
+    let team = '';
+    
+    try {
+        // First try to find by email in contacts table
+        if (email) {
+            const contactResponse = await fetch(
+                `${SUPABASE_URL}/rest/v1/contacts?email=ilike.${encodeURIComponent(email)}&select=site,team`,
+                {
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                    }
+                }
             );
             
-            if (staffPerson) {
-                employeeSelect.value = staffPerson.name;
-                employeeSelect.disabled = true;
-                // Trigger change event to auto-fill other fields
-                employeeSelect.dispatchEvent(new Event('change'));
-            } else {
-                // If not found in staff_directory, try using the name from session
-                const matchByName = staff.find(p => 
-                    p.name && currentUser.name && 
-                    p.name.toLowerCase() === currentUser.name.toLowerCase()
-                );
-                if (matchByName) {
-                    employeeSelect.value = matchByName.name;
-                    employeeSelect.disabled = true;
-                    employeeSelect.dispatchEvent(new Event('change'));
+            if (contactResponse.ok) {
+                const contacts = await contactResponse.json();
+                if (contacts.length > 0) {
+                    site = contacts[0].site || '';
+                    team = contacts[0].team || '';
+                    console.log('Found contact by email:', { site, team });
                 }
             }
         }
         
-        // Also populate My Requests filter (only for managers)
-        if (myRequestsSelect && !isStaffUser) {
-            myRequestsSelect.innerHTML = '<option value="">All Employees</option>';
-            staff.forEach(person => {
-                const option = document.createElement('option');
-                option.value = person.name;
-                option.textContent = person.name;
-                myRequestsSelect.appendChild(option);
-            });
+        // If not found by email, try by name
+        if (!site && !team && userName) {
+            const teamData = await fetchEmployeeTeam(userName);
+            if (teamData) {
+                team = teamData.team || '';
+                // Try to get site from staff_directory
+                const staffResponse = await fetch(
+                    `${SUPABASE_URL}/rest/v1/staff_directory?name=ilike.${encodeURIComponent(userName)}&select=site`,
+                    {
+                        headers: {
+                            'apikey': SUPABASE_ANON_KEY,
+                            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                        }
+                    }
+                );
+                if (staffResponse.ok) {
+                    const staffData = await staffResponse.json();
+                    if (staffData.length > 0) {
+                        site = staffData[0].site || '';
+                    }
+                }
+                console.log('Found by name lookup:', { site, team });
+            }
         }
         
-        // Add change listener to auto-fill email, site, team, and manager
-        employeeSelect.addEventListener('change', async function() {
-            const selectedOption = this.options[this.selectedIndex];
-            const emailInput = document.getElementById('vacationEmployeeEmail');
-            const siteInput = document.getElementById('vacationSite');
-            const teamInput = document.getElementById('vacationTeam');
-            const approverNameInput = document.getElementById('vacationApproverName');
-            const managerEmailInput = document.getElementById('vacationManagerEmail');
+        // Update form fields
+        if (siteInput) siteInput.value = site;
+        if (teamInput) teamInput.value = team ? capitalizeFirst(team) + ' Team' : '';
+        
+        // Determine approvers based on site and team
+        const approvers = determineVacationApprovers(site, team);
+        
+        if (approvers.length > 0) {
+            const approverNames = approvers.map(a => a.name).join(', ');
+            const approverEmails = approvers.map(a => a.email).join(';');
             
-            if (selectedOption.value) {
-                // Auto-fill email and site from staff_directory
-                if (emailInput) emailInput.value = selectedOption.dataset.email || '';
-                if (siteInput) siteInput.value = selectedOption.dataset.site || '';
-                
-                // Fetch team from contacts table
-                const employeeName = selectedOption.value;
-                const teamData = await fetchEmployeeTeam(employeeName);
-                const team = teamData?.team || '';
-                const teamDisplay = team ? capitalizeFirst(team) + ' Team' : '';
-                
-                if (teamInput) teamInput.value = teamDisplay;
-                
-                // Auto-determine managers based on Site and Team (now supports multiple)
-                const approvers = determineVacationApprovers(
-                    selectedOption.dataset.site || '',
-                    team
-                );
-                
-                if (approvers.length > 0) {
-                    // Display all approver names (comma-separated)
-                    const approverNames = approvers.map(a => a.name).join(', ');
-                    // Store all approver emails (semicolon-separated for multiple recipients)
-                    const approverEmails = approvers.map(a => a.email).join(';');
-                    
-                    if (approverNameInput) approverNameInput.value = approverNames;
-                    if (managerEmailInput) managerEmailInput.value = approverEmails;
-                } else {
-                    if (approverNameInput) approverNameInput.value = 'Not Configured';
-                    if (managerEmailInput) managerEmailInput.value = '';
-                }
-            } else {
-                // Clear all fields
-                if (emailInput) emailInput.value = '';
-                if (siteInput) siteInput.value = '';
-                if (teamInput) teamInput.value = '';
-                if (approverNameInput) approverNameInput.value = '';
-                if (managerEmailInput) managerEmailInput.value = '';
-            }
-        });
+            if (approverNameInput) approverNameInput.value = approverNames;
+            if (managerEmailInput) managerEmailInput.value = approverEmails;
+        } else {
+            if (approverNameInput) approverNameInput.value = 'Not Configured';
+            if (managerEmailInput) managerEmailInput.value = '';
+        }
     } catch (error) {
-        console.error('Error loading staff for vacation form:', error);
+        console.error('Error looking up site/team:', error);
     }
 }
 
@@ -6257,83 +6283,53 @@ function closeVacationDetailModal() {
     currentVacationRequest = null;
 }
 
-// Quick approve - with manager selection
+// Quick approve - uses logged-in manager's name from session
 async function quickApprove(id) {
-    // Fetch request data to get approver_name list
+    // Fetch request data
     const request = allVacationRequests.find(r => r.id === id) || await fetchVacationRequestById(id);
     if (!request) {
         showErrorModal('Request not found');
         return;
     }
     
-    // Get list of approvers from the request
-    const approverNames = request.approver_name ? request.approver_name.split(',').map(n => n.trim()) : [];
+    // Get reviewer name from logged-in user's session
+    const currentUser = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+    const reviewerName = currentUser?.name || 'Manager';
     
-    if (approverNames.length > 1) {
-        // Multiple approvers - show selection modal
-        showApproverSelectModal(
-            'Select your name to approve this request:',
-            'Approve Leave Request',
-            approverNames,
-            async (selectedApprover) => {
-                currentVacationRequest = request;
-                await updateVacationStatusWithReviewer(id, 'approved', '', selectedApprover);
-                currentVacationRequest = null;
-            }
-        );
-    } else {
-        // Single approver - use simple confirmation
-        showApproveModal(
-            'Are you sure you want to approve this leave request?',
-            'Approve Leave Request',
-            async () => {
-                currentVacationRequest = request;
-                const reviewerName = approverNames[0] || 'Manager';
-                await updateVacationStatusWithReviewer(id, 'approved', '', reviewerName);
-                currentVacationRequest = null;
-            }
-        );
-    }
+    showApproveModal(
+        `Are you sure you want to approve this leave request?\n\nApproving as: ${reviewerName}`,
+        'Approve Leave Request',
+        async () => {
+            currentVacationRequest = request;
+            await updateVacationStatusWithReviewer(id, 'approved', '', reviewerName);
+            currentVacationRequest = null;
+        }
+    );
 }
 
-// Quick reject - with manager selection
+// Quick reject - uses logged-in manager's name from session
 async function quickReject(id) {
-    // Fetch request data to get approver_name list
+    // Fetch request data
     const request = allVacationRequests.find(r => r.id === id) || await fetchVacationRequestById(id);
     if (!request) {
         showErrorModal('Request not found');
         return;
     }
     
-    // Get list of approvers from the request
-    const approverNames = request.approver_name ? request.approver_name.split(',').map(n => n.trim()) : [];
+    // Get reviewer name from logged-in user's session
+    const currentUser = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+    const reviewerName = currentUser?.name || 'Manager';
     
-    if (approverNames.length > 1) {
-        // Multiple approvers - show selection modal with reason input
-        showApproverSelectWithReasonModal(
-            'Select your name and provide a reason for rejection:',
-            'Reject Leave Request',
-            approverNames,
-            async (selectedApprover, reason) => {
-                currentVacationRequest = request;
-                await updateVacationStatusWithReviewer(id, 'rejected', reason || '', selectedApprover);
-                currentVacationRequest = null;
-            }
-        );
-    } else {
-        // Single approver - use simple prompt
-        showPromptModal(
-            'Please provide a reason for rejection (optional):',
-            'Reject Leave Request',
-            'Enter rejection reason...',
-            async (reason) => {
-                currentVacationRequest = request;
-                const reviewerName = approverNames[0] || 'Manager';
-                await updateVacationStatusWithReviewer(id, 'rejected', reason || '', reviewerName);
-                currentVacationRequest = null;
-            }
-        );
-    }
+    showPromptModal(
+        `Please provide a reason for rejection (optional):\n\nRejecting as: ${reviewerName}`,
+        'Reject Leave Request',
+        'Enter rejection reason...',
+        async (reason) => {
+            currentVacationRequest = request;
+            await updateVacationStatusWithReviewer(id, 'rejected', reason || '', reviewerName);
+            currentVacationRequest = null;
+        }
+    );
 }
 
 // Update vacation status with specific reviewer name
@@ -6400,9 +6396,13 @@ async function rejectVacationRequest() {
 // Update vacation request status
 async function updateVacationStatus(id, status, notes) {
     try {
-        // Get the reviewer name from the current request's approver_name, or derive from manager_email
+        // Get the reviewer name from the logged-in user's session
         let reviewerName = 'Manager';
-        if (currentVacationRequest) {
+        const currentUser = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+        if (currentUser && currentUser.name) {
+            reviewerName = currentUser.name;
+        } else if (currentVacationRequest) {
+            // Fallback: use approver_name from request if session not available
             if (currentVacationRequest.approver_name) {
                 reviewerName = currentVacationRequest.approver_name;
             } else if (currentVacationRequest.manager_email) {
