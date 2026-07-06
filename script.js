@@ -766,12 +766,13 @@ async function loadModScheduleFromSupabase() {
         }
         
         // Convert Supabase format to app format
+        // Columns: onsite_name, onsite_email, offshore_name, offshore_email
         const entries = data.map(row => ({
             date: row.date,
-            primary: row.onsite_mod || '',
-            secondary: row.offshore_mod || '',
-            primaryDisplay: row.onsite_mod || '',
-            secondaryDisplay: row.offshore_mod || ''
+            primary: row.onsite_name || '',
+            secondary: row.offshore_name || '',
+            primaryDisplay: row.onsite_name || '',
+            secondaryDisplay: row.offshore_name || ''
         }));
         
         // Build the schedule object
