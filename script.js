@@ -178,7 +178,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         console.log('Using localStorage (Supabase not configured)');
     }
     
-    loadAllData();
+    await loadAllData();
     initializeFileUploads();
     initializeDatePickers();
     await initializeModPersonnelData();
@@ -705,19 +705,34 @@ function deleteModScheduleEntry(index) {
 }
 
 // Load all saved data
-function loadAllData() {
-    ['mod', 'oncall'].forEach(screen => {
-        loadSavedSchedule(screen);
-        loadEscalationContacts(screen);
-    });
+async function loadAllData() {
+    // Load MOD schedule first (async for Supabase)
+    await loadSavedSchedule('mod');
+    loadEscalationContacts('mod');
+    
+    // Load oncall schedule
+    await loadSavedSchedule('oncall');
+    loadEscalationContacts('oncall');
     
     // Initialize MOD schedule filter with current month
     initializeModScheduleFilter();
 }
 
 // Load saved schedule
-function loadSavedSchedule(screen) {
+async function loadSavedSchedule(screen) {
     try {
+        // For MOD schedule, try to load from Supabase first if database is configured
+        if (screen === 'mod' && useDatabase) {
+            const dbSchedule = await loadModScheduleFromSupabase();
+            if (dbSchedule && dbSchedule.entries && dbSchedule.entries.length > 0) {
+                appData[screen].savedSchedule = dbSchedule;
+                displaySavedSchedule(screen);
+                console.log('MOD Schedule loaded from Supabase:', dbSchedule.entries.length, 'entries');
+                return;
+            }
+        }
+        
+        // Fallback to localStorage
         const savedData = localStorage.getItem(STORAGE_KEYS[screen].schedule);
         if (savedData) {
             appData[screen].savedSchedule = JSON.parse(savedData);
@@ -725,6 +740,52 @@ function loadSavedSchedule(screen) {
         }
     } catch (e) {
         console.error(`Error loading ${screen} schedule:`, e);
+    }
+}
+
+// Load MOD Schedule from Supabase
+async function loadModScheduleFromSupabase() {
+    try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/mod_schedule?order=date`, {
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+            }
+        });
+        
+        if (!response.ok) {
+            console.error('Failed to load MOD schedule from Supabase');
+            return null;
+        }
+        
+        const data = await response.json();
+        
+        if (!data || data.length === 0) {
+            console.log('No MOD schedule data in Supabase');
+            return null;
+        }
+        
+        // Convert Supabase format to app format
+        const entries = data.map(row => ({
+            date: row.date,
+            primary: row.onsite_mod || '',
+            secondary: row.offshore_mod || '',
+            primaryDisplay: row.onsite_mod || '',
+            secondaryDisplay: row.offshore_mod || ''
+        }));
+        
+        // Build the schedule object
+        const scheduleData = {
+            primaryShiftLabel: '7Am to 7pm AEST',
+            secondaryShiftLabel: '7pm to 7am AEST',
+            entries: entries,
+            lastUpdated: new Date().toISOString()
+        };
+        
+        return scheduleData;
+    } catch (e) {
+        console.error('Error loading MOD schedule from Supabase:', e);
+        return null;
     }
 }
 
