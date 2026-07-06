@@ -570,6 +570,220 @@ function closeModScheduleModal() {
     document.getElementById('modScheduleModal').classList.add('hidden');
 }
 
+// ==================== EDIT WEEK MODAL ====================
+
+function openEditWeekModal() {
+    const modal = document.getElementById('editWeekModal');
+    const weekStartInput = document.getElementById('editWeekStart');
+    
+    // Set default to next Monday
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const daysUntilMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek) % 7 || 7;
+    const nextMonday = new Date(today);
+    nextMonday.setDate(today.getDate() + daysUntilMonday);
+    
+    // If today is Monday, use today
+    if (dayOfWeek === 1) {
+        weekStartInput.value = today.toISOString().split('T')[0];
+    } else {
+        weekStartInput.value = nextMonday.toISOString().split('T')[0];
+    }
+    
+    // Populate MOD dropdowns
+    populateWeekModDropdowns();
+    
+    // Update week preview
+    updateWeekPreview();
+    
+    // Reset checkboxes (Mon-Fri checked, Sat-Sun unchecked)
+    document.getElementById('weekDayMon').checked = true;
+    document.getElementById('weekDayTue').checked = true;
+    document.getElementById('weekDayWed').checked = true;
+    document.getElementById('weekDayThu').checked = true;
+    document.getElementById('weekDayFri').checked = true;
+    document.getElementById('weekDaySat').checked = false;
+    document.getElementById('weekDaySun').checked = false;
+    document.getElementById('weekDayAll').checked = false;
+    
+    modal.classList.remove('hidden');
+}
+
+function closeEditWeekModal() {
+    document.getElementById('editWeekModal').classList.add('hidden');
+}
+
+function populateWeekModDropdowns() {
+    const onsiteSelect = document.getElementById('weekOnsiteMod');
+    const offshoreSelect = document.getElementById('weekOffshoreMod');
+    
+    // Clear existing options
+    onsiteSelect.innerHTML = '<option value="">Select Onsite MOD</option>';
+    offshoreSelect.innerHTML = '<option value="">Select Offshore MOD</option>';
+    
+    // Populate with onsite MOD personnel
+    if (modPersonnelData.onsite) {
+        modPersonnelData.onsite.forEach(person => {
+            const option = document.createElement('option');
+            option.value = person.name;
+            option.textContent = person.name;
+            onsiteSelect.appendChild(option);
+        });
+    }
+    
+    // Populate with offshore MOD personnel
+    if (modPersonnelData.offshore) {
+        modPersonnelData.offshore.forEach(person => {
+            const option = document.createElement('option');
+            option.value = person.name;
+            option.textContent = person.name;
+            offshoreSelect.appendChild(option);
+        });
+    }
+}
+
+function updateWeekPreview() {
+    const weekStartInput = document.getElementById('editWeekStart');
+    const previewEl = document.getElementById('weekRangePreview');
+    
+    if (!weekStartInput.value) {
+        previewEl.textContent = '';
+        return;
+    }
+    
+    const startDate = new Date(weekStartInput.value);
+    const endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + 6);
+    
+    const formatDate = (date) => date.toLocaleDateString('en-US', { 
+        weekday: 'short', 
+        month: 'short', 
+        day: 'numeric' 
+    });
+    
+    previewEl.textContent = `Week: ${formatDate(startDate)} - ${formatDate(endDate)}`;
+}
+
+function toggleAllWeekDays(checkbox) {
+    const isChecked = checkbox.checked;
+    ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach(day => {
+        document.getElementById(`weekDay${day}`).checked = isChecked;
+    });
+}
+
+async function saveWeekSchedule(event) {
+    event.preventDefault();
+    
+    const weekStart = document.getElementById('editWeekStart').value;
+    const onsiteMod = document.getElementById('weekOnsiteMod').value;
+    const offshoreMod = document.getElementById('weekOffshoreMod').value;
+    
+    if (!weekStart) {
+        showWarningModal('Please select a week start date.', 'Missing Date');
+        return;
+    }
+    
+    if (!onsiteMod && !offshoreMod) {
+        showWarningModal('Please select at least one MOD (Onsite or Offshore).', 'Missing Selection');
+        return;
+    }
+    
+    // Get selected days
+    const selectedDays = [];
+    const dayMap = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
+    
+    ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach(day => {
+        if (document.getElementById(`weekDay${day}`).checked) {
+            selectedDays.push(dayMap[day]);
+        }
+    });
+    
+    if (selectedDays.length === 0) {
+        showWarningModal('Please select at least one day to update.', 'No Days Selected');
+        return;
+    }
+    
+    // Generate entries for each selected day
+    const startDate = new Date(weekStart);
+    const entries = [];
+    
+    selectedDays.forEach(dayOffset => {
+        const entryDate = new Date(startDate);
+        entryDate.setDate(startDate.getDate() + dayOffset);
+        
+        entries.push({
+            date: entryDate.toISOString().split('T')[0],
+            onsite_name: onsiteMod || null,
+            offshore_name: offshoreMod || null,
+            updated_at: new Date().toISOString()
+        });
+    });
+    
+    // Save to Supabase
+    if (useDatabase) {
+        try {
+            for (const entry of entries) {
+                await fetch(`${SUPABASE_URL}/rest/v1/mod_schedule?on_conflict=date`, {
+                    method: 'POST',
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json',
+                        'Prefer': 'resolution=merge-duplicates'
+                    },
+                    body: JSON.stringify(entry)
+                });
+            }
+            
+            showToast(`Updated ${entries.length} day(s) successfully!`);
+            
+            // Reload schedule from Supabase
+            await loadSavedSchedule('mod');
+            
+            closeEditWeekModal();
+        } catch (error) {
+            console.error('Error saving week schedule:', error);
+            showErrorModal('Failed to save week schedule. Please try again.');
+        }
+    } else {
+        // For localStorage, update the local schedule
+        if (!appData.mod.savedSchedule) {
+            appData.mod.savedSchedule = { entries: [] };
+        }
+        
+        entries.forEach(newEntry => {
+            const existingIndex = appData.mod.savedSchedule.entries.findIndex(
+                e => e.date === newEntry.date
+            );
+            
+            const scheduleEntry = {
+                date: newEntry.date,
+                primary: newEntry.onsite_name || '',
+                secondary: newEntry.offshore_name || '',
+                primaryDisplay: newEntry.onsite_name || '',
+                secondaryDisplay: newEntry.offshore_name || ''
+            };
+            
+            if (existingIndex >= 0) {
+                appData.mod.savedSchedule.entries[existingIndex] = scheduleEntry;
+            } else {
+                appData.mod.savedSchedule.entries.push(scheduleEntry);
+            }
+        });
+        
+        // Sort by date
+        appData.mod.savedSchedule.entries.sort((a, b) => 
+            new Date(a.date) - new Date(b.date)
+        );
+        
+        saveScheduleToStorage('mod', appData.mod.savedSchedule);
+        displaySavedSchedule('mod');
+        
+        showToast(`Updated ${entries.length} day(s) successfully!`);
+        closeEditWeekModal();
+    }
+}
+
 function populateModScheduleDropdowns() {
     const onsiteSelect = document.getElementById('modScheduleOnsite');
     const offshoreSelect = document.getElementById('modScheduleOffshore');

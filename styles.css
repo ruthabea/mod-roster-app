@@ -3633,6 +3633,18 @@ header h1 {
     transform: none;
 }
 
+/* Info Button (for Edit Week) */
+.btn-info {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+    border: none;
+}
+
+.btn-info:hover {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    transform: translateY(-1px);
+}
+
 /* Email Notification Button */
 .btn-email {
     background: linear-gradient(135deg, #10b981 0%, #059669 100%);

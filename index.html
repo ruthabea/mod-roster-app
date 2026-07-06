@@ -184,6 +184,15 @@
                                 </svg>
                                 Add Entry
                             </button>
+                            <button class="btn btn-info" onclick="openEditWeekModal()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                                    <line x1="16" y1="2" x2="16" y2="6"/>
+                                    <line x1="8" y1="2" x2="8" y2="6"/>
+                                    <line x1="3" y1="10" x2="21" y2="10"/>
+                                </svg>
+                                Edit Week
+                            </button>
                             <button class="btn btn-outline" onclick="exportScheduleJSON('mod')">Export</button>
                             <button class="btn btn-outline" onclick="window.print()">Print</button>
                             <button class="btn btn-success" onclick="forceModScheduleSync()" title="Sync MOD Schedule to Cloud">
@@ -229,6 +238,73 @@
                                 <div class="modal-footer">
                                     <button type="button" class="btn btn-secondary" onclick="closeModScheduleModal()">Cancel</button>
                                     <button type="submit" class="btn btn-primary">Save Entry</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <!-- Edit Week Modal -->
+                    <div id="editWeekModal" class="modal hidden">
+                        <div class="modal-content" style="max-width: 500px;">
+                            <div class="modal-header">
+                                <h3>Edit Week Schedule</h3>
+                                <button class="modal-close" onclick="closeEditWeekModal()">&times;</button>
+                            </div>
+                            <form id="editWeekForm" onsubmit="saveWeekSchedule(event)">
+                                <div class="form-group">
+                                    <label for="editWeekStart">Week Starting (Monday) *</label>
+                                    <input type="date" id="editWeekStart" required onchange="updateWeekPreview()">
+                                    <small id="weekRangePreview" style="color: #666; margin-top: 4px; display: block;"></small>
+                                </div>
+                                
+                                <div class="schedule-form-grid">
+                                    <div class="form-group">
+                                        <label for="weekOnsiteMod">Onsite MOD (7AM-7PM AEST)</label>
+                                        <select id="weekOnsiteMod">
+                                            <option value="">Select Onsite MOD</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="weekOffshoreMod">Offshore MOD (7PM-7AM AEST)</label>
+                                        <select id="weekOffshoreMod">
+                                            <option value="">Select Offshore MOD</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group" style="background: #f0f9ff; padding: 12px; border-radius: 6px; margin-top: 16px;">
+                                    <label style="margin-bottom: 8px; display: block; font-weight: 600;">Days to Update</label>
+                                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+                                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                            <input type="checkbox" id="weekDayMon" checked> Mon
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                            <input type="checkbox" id="weekDayTue" checked> Tue
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                            <input type="checkbox" id="weekDayWed" checked> Wed
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                            <input type="checkbox" id="weekDayThu" checked> Thu
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                            <input type="checkbox" id="weekDayFri" checked> Fri
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                            <input type="checkbox" id="weekDaySat"> Sat
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                            <input type="checkbox" id="weekDaySun"> Sun
+                                        </label>
+                                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                            <input type="checkbox" id="weekDayAll" onchange="toggleAllWeekDays(this)"> All
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" onclick="closeEditWeekModal()">Cancel</button>
+                                    <button type="submit" class="btn btn-primary">Save Week</button>
                                 </div>
                             </form>
                         </div>
