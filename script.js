@@ -647,6 +647,7 @@ function updateWeekPreview() {
     const previewEl = document.getElementById('weekRangePreview');
     
     if (!weekStartInput.value) {
+        previewEl.style.display = 'none';
         previewEl.textContent = '';
         return;
     }
@@ -661,7 +662,8 @@ function updateWeekPreview() {
         day: 'numeric' 
     });
     
-    previewEl.textContent = `Week: ${formatDate(startDate)} - ${formatDate(endDate)}`;
+    previewEl.innerHTML = `<strong>📅 Week:</strong> ${formatDate(startDate)} – ${formatDate(endDate)}`;
+    previewEl.style.display = 'block';
 }
 
 function toggleAllWeekDays(checkbox) {

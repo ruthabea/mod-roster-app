@@ -245,66 +245,110 @@
                     
                     <!-- Edit Week Modal -->
                     <div id="editWeekModal" class="modal hidden">
-                        <div class="modal-content" style="max-width: 500px;">
-                            <div class="modal-header">
-                                <h3>Edit Week Schedule</h3>
-                                <button class="modal-close" onclick="closeEditWeekModal()">&times;</button>
+                        <div class="modal-content" style="max-width: 520px; padding: 0;">
+                            <div class="modal-header" style="background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); color: white; padding: 20px 24px; border-radius: 12px 12px 0 0;">
+                                <div>
+                                    <h3 style="margin: 0; font-size: 1.25rem; font-weight: 600;">Edit Week Schedule</h3>
+                                    <p style="margin: 4px 0 0 0; font-size: 0.875rem; opacity: 0.9;">Update MOD assignments for multiple days at once</p>
+                                </div>
+                                <button class="modal-close" onclick="closeEditWeekModal()" style="color: white; opacity: 0.8;">&times;</button>
                             </div>
-                            <form id="editWeekForm" onsubmit="saveWeekSchedule(event)">
-                                <div class="form-group">
-                                    <label for="editWeekStart">Week Starting (Monday) *</label>
-                                    <input type="date" id="editWeekStart" required onchange="updateWeekPreview()">
-                                    <small id="weekRangePreview" style="color: #666; margin-top: 4px; display: block;"></small>
+                            <form id="editWeekForm" onsubmit="saveWeekSchedule(event)" style="padding: 24px;">
+                                <!-- Week Selection -->
+                                <div class="form-group" style="margin-bottom: 20px;">
+                                    <label for="editWeekStart" style="font-weight: 600; color: #374151; margin-bottom: 8px; display: block;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline-block; vertical-align: middle; margin-right: 6px;">
+                                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                                            <line x1="16" y1="2" x2="16" y2="6"/>
+                                            <line x1="8" y1="2" x2="8" y2="6"/>
+                                            <line x1="3" y1="10" x2="21" y2="10"/>
+                                        </svg>
+                                        Week Starting (Monday)
+                                    </label>
+                                    <input type="date" id="editWeekStart" required onchange="updateWeekPreview()" style="width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 1rem;">
+                                    <div id="weekRangePreview" style="color: #3b82f6; margin-top: 8px; font-size: 0.875rem; font-weight: 500; padding: 8px 12px; background: #eff6ff; border-radius: 6px; display: none;"></div>
                                 </div>
                                 
-                                <div class="schedule-form-grid">
-                                    <div class="form-group">
-                                        <label for="weekOnsiteMod">Onsite MOD (7AM-7PM AEST)</label>
-                                        <select id="weekOnsiteMod">
+                                <!-- MOD Selection -->
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+                                    <div class="form-group" style="margin: 0;">
+                                        <label for="weekOnsiteMod" style="font-weight: 600; color: #374151; margin-bottom: 8px; display: block; font-size: 0.875rem;">
+                                            <span style="display: inline-block; width: 10px; height: 10px; background: #fbbf24; border-radius: 50%; margin-right: 6px;"></span>
+                                            Onsite MOD
+                                        </label>
+                                        <small style="display: block; color: #6b7280; margin-bottom: 8px; font-size: 0.75rem;">7AM - 7PM AEST</small>
+                                        <select id="weekOnsiteMod" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.9rem; background: white;">
                                             <option value="">Select Onsite MOD</option>
                                         </select>
                                     </div>
-                                    <div class="form-group">
-                                        <label for="weekOffshoreMod">Offshore MOD (7PM-7AM AEST)</label>
-                                        <select id="weekOffshoreMod">
+                                    <div class="form-group" style="margin: 0;">
+                                        <label for="weekOffshoreMod" style="font-weight: 600; color: #374151; margin-bottom: 8px; display: block; font-size: 0.875rem;">
+                                            <span style="display: inline-block; width: 10px; height: 10px; background: #60a5fa; border-radius: 50%; margin-right: 6px;"></span>
+                                            Offshore MOD
+                                        </label>
+                                        <small style="display: block; color: #6b7280; margin-bottom: 8px; font-size: 0.75rem;">7PM - 7AM AEST</small>
+                                        <select id="weekOffshoreMod" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.9rem; background: white;">
                                             <option value="">Select Offshore MOD</option>
                                         </select>
                                     </div>
                                 </div>
                                 
-                                <div class="form-group" style="background: #f0f9ff; padding: 12px; border-radius: 6px; margin-top: 16px;">
-                                    <label style="margin-bottom: 8px; display: block; font-weight: 600;">Days to Update</label>
-                                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
-                                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                                            <input type="checkbox" id="weekDayMon" checked> Mon
+                                <!-- Days Selection -->
+                                <div style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); padding: 16px 20px; border-radius: 10px; border: 1px solid #bae6fd;">
+                                    <label style="margin-bottom: 12px; display: block; font-weight: 600; color: #0369a1; font-size: 0.875rem;">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline-block; vertical-align: middle; margin-right: 6px;">
+                                            <polyline points="9 11 12 14 22 4"/>
+                                            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                                        </svg>
+                                        Days to Update
+                                    </label>
+                                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
+                                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 10px; background: white; border-radius: 6px; border: 1px solid #e0e7ff; transition: all 0.2s;">
+                                            <input type="checkbox" id="weekDayMon" checked style="width: 16px; height: 16px; accent-color: #3b82f6;"> 
+                                            <span style="font-size: 0.875rem; font-weight: 500; color: #374151;">Mon</span>
                                         </label>
-                                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                                            <input type="checkbox" id="weekDayTue" checked> Tue
+                                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 10px; background: white; border-radius: 6px; border: 1px solid #e0e7ff; transition: all 0.2s;">
+                                            <input type="checkbox" id="weekDayTue" checked style="width: 16px; height: 16px; accent-color: #3b82f6;"> 
+                                            <span style="font-size: 0.875rem; font-weight: 500; color: #374151;">Tue</span>
                                         </label>
-                                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                                            <input type="checkbox" id="weekDayWed" checked> Wed
+                                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 10px; background: white; border-radius: 6px; border: 1px solid #e0e7ff; transition: all 0.2s;">
+                                            <input type="checkbox" id="weekDayWed" checked style="width: 16px; height: 16px; accent-color: #3b82f6;"> 
+                                            <span style="font-size: 0.875rem; font-weight: 500; color: #374151;">Wed</span>
                                         </label>
-                                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                                            <input type="checkbox" id="weekDayThu" checked> Thu
+                                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 10px; background: white; border-radius: 6px; border: 1px solid #e0e7ff; transition: all 0.2s;">
+                                            <input type="checkbox" id="weekDayThu" checked style="width: 16px; height: 16px; accent-color: #3b82f6;"> 
+                                            <span style="font-size: 0.875rem; font-weight: 500; color: #374151;">Thu</span>
                                         </label>
-                                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                                            <input type="checkbox" id="weekDayFri" checked> Fri
+                                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 10px; background: white; border-radius: 6px; border: 1px solid #e0e7ff; transition: all 0.2s;">
+                                            <input type="checkbox" id="weekDayFri" checked style="width: 16px; height: 16px; accent-color: #3b82f6;"> 
+                                            <span style="font-size: 0.875rem; font-weight: 500; color: #374151;">Fri</span>
                                         </label>
-                                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                                            <input type="checkbox" id="weekDaySat"> Sat
+                                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 10px; background: white; border-radius: 6px; border: 1px solid #e0e7ff; transition: all 0.2s;">
+                                            <input type="checkbox" id="weekDaySat" style="width: 16px; height: 16px; accent-color: #3b82f6;"> 
+                                            <span style="font-size: 0.875rem; font-weight: 500; color: #6b7280;">Sat</span>
                                         </label>
-                                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                                            <input type="checkbox" id="weekDaySun"> Sun
+                                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 10px; background: white; border-radius: 6px; border: 1px solid #e0e7ff; transition: all 0.2s;">
+                                            <input type="checkbox" id="weekDaySun" style="width: 16px; height: 16px; accent-color: #3b82f6;"> 
+                                            <span style="font-size: 0.875rem; font-weight: 500; color: #6b7280;">Sun</span>
                                         </label>
-                                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                                            <input type="checkbox" id="weekDayAll" onchange="toggleAllWeekDays(this)"> All
+                                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 10px; background: #3b82f6; border-radius: 6px; border: 1px solid #3b82f6; transition: all 0.2s;">
+                                            <input type="checkbox" id="weekDayAll" onchange="toggleAllWeekDays(this)" style="width: 16px; height: 16px; accent-color: white;"> 
+                                            <span style="font-size: 0.875rem; font-weight: 600; color: white;">All</span>
                                         </label>
                                     </div>
                                 </div>
                                 
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" onclick="closeEditWeekModal()">Cancel</button>
-                                    <button type="submit" class="btn btn-primary">Save Week</button>
+                                <!-- Footer -->
+                                <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                                    <button type="button" class="btn btn-secondary" onclick="closeEditWeekModal()" style="padding: 10px 20px; font-weight: 500;">Cancel</button>
+                                    <button type="submit" class="btn btn-primary" style="padding: 10px 24px; font-weight: 600;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline-block; vertical-align: middle; margin-right: 6px;">
+                                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                                            <polyline points="17 21 17 13 7 13 7 21"/>
+                                            <polyline points="7 3 7 8 15 8"/>
+                                        </svg>
+                                        Save Week
+                                    </button>
                                 </div>
                             </form>
                         </div>
