@@ -54,7 +54,19 @@ async function supabaseRequest(table, method = 'GET', data = null, query = '') {
             console.error(`Supabase ${method} ${table} error:`, err);
             return { error: err, data: null };
         }
-        const result = method === 'DELETE' ? null : await response.json();
+        
+        // Handle empty responses gracefully
+        if (method === 'DELETE') {
+            return { data: null, error: null };
+        }
+        
+        const text = await response.text();
+        if (!text || text.trim() === '') {
+            // Empty response - return empty array for GET, null for others
+            return { data: method === 'GET' ? [] : null, error: null };
+        }
+        
+        const result = JSON.parse(text);
         return { data: result, error: null };
     } catch (e) {
         console.error('Fetch error:', e);
