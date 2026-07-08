@@ -3883,6 +3883,151 @@ function getDefaultRosterData() {
     ];
 }
 
+// Initialize roster structure for a selected week (copy structure only, no names)
+async function initializeWeekRoster() {
+    // Get selected month and week
+    const monthInput = document.getElementById('rosterMonthFilter');
+    const weekSelect = document.getElementById('rosterWeekSelect');
+    
+    if (!monthInput || !monthInput.value) {
+        showToast('Please select a month first', 'error');
+        return;
+    }
+    
+    // Get the week to initialize
+    let weekStart;
+    
+    if (weekSelect && weekSelect.value) {
+        // Use selected week
+        weekStart = weekSelect.value;
+    } else {
+        // No week selected - calculate first Monday of the selected month
+        const [year, month] = monthInput.value.split('-');
+        const firstDay = new Date(parseInt(year), parseInt(month) - 1, 1);
+        
+        // Find first Monday
+        const dayOfWeek = firstDay.getDay();
+        const daysUntilMonday = dayOfWeek === 0 ? 1 : (dayOfWeek === 1 ? 0 : 8 - dayOfWeek);
+        const firstMonday = new Date(firstDay);
+        firstMonday.setDate(firstDay.getDate() + daysUntilMonday);
+        
+        weekStart = firstMonday.toISOString().split('T')[0];
+    }
+    
+    // Calculate week end date for display
+    const weekStartDate = new Date(weekStart);
+    const weekEndDate = new Date(weekStartDate);
+    weekEndDate.setDate(weekStartDate.getDate() + 6);
+    
+    const weekRange = `${weekStartDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEndDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+    
+    // Check if data already exists for this week
+    let existingData = null;
+    if (useDatabase) {
+        existingData = await db.getRoster(weekStart);
+    } else {
+        const storageKey = `${ROSTER_STORAGE_KEY}_${weekStart}`;
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+            existingData = JSON.parse(saved);
+        }
+    }
+    
+    if (existingData && existingData.length > 0) {
+        // Check if any entry has actual names filled in
+        const hasNames = existingData.some(entry => {
+            const days = entry.days || {};
+            return Object.values(days).some(name => name && name.trim() !== '');
+        });
+        
+        if (hasNames) {
+            showConfirmModal(
+                `The week of ${weekRange} already has roster data with assigned names. Do you want to reset it to an empty template? This will clear all assigned names.`,
+                'Initialize Week',
+                async () => {
+                    await createEmptyRosterForWeek(weekStart, weekRange);
+                }
+            );
+            return;
+        }
+    }
+    
+    // No data or empty data - proceed to initialize
+    await createEmptyRosterForWeek(weekStart, weekRange);
+}
+
+// Create empty roster structure for a week
+async function createEmptyRosterForWeek(weekStart, weekRange) {
+    // Get default template and clear all names
+    const templateData = getDefaultRosterData().map(entry => ({
+        time: entry.time,
+        app: entry.app,
+        team: entry.team,
+        days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }
+    }));
+    
+    if (useDatabase) {
+        try {
+            // Delete existing entries for this week first
+            const existingData = await db.getRoster(weekStart);
+            if (existingData && existingData.length > 0) {
+                for (const entry of existingData) {
+                    if (entry._id) {
+                        await db.deleteRosterEntry(entry._id);
+                    }
+                }
+            }
+            
+            // Batch insert all entries
+            await db.saveRosterEntriesBatch(templateData, weekStart);
+            
+            showToast(`Roster initialized for ${weekRange}`);
+            
+            // Reload month data and refresh display
+            await loadRosterDataForMonth();
+            
+            // Select this week in the dropdown
+            const weekSelect = document.getElementById('rosterWeekSelect');
+            if (weekSelect) {
+                // Add option if it doesn't exist
+                let optionExists = false;
+                for (const option of weekSelect.options) {
+                    if (option.value === weekStart) {
+                        optionExists = true;
+                        break;
+                    }
+                }
+                
+                if (!optionExists) {
+                    const weekStartDate = new Date(weekStart);
+                    const weekEndDate = new Date(weekStartDate);
+                    weekEndDate.setDate(weekStartDate.getDate() + 6);
+                    const label = `${weekStartDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEndDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+                    const newOption = document.createElement('option');
+                    newOption.value = weekStart;
+                    newOption.textContent = label;
+                    weekSelect.appendChild(newOption);
+                }
+                
+                weekSelect.value = weekStart;
+            }
+            
+            await renderSelectedWeek();
+        } catch (error) {
+            console.error('Error initializing roster:', error);
+            showToast('Failed to initialize roster. Please try again.', 'error');
+        }
+    } else {
+        // localStorage mode
+        const storageKey = `${ROSTER_STORAGE_KEY}_${weekStart}`;
+        localStorage.setItem(storageKey, JSON.stringify(templateData));
+        rosterData = templateData;
+        
+        showToast(`Roster initialized for ${weekRange}`);
+        renderRosterTable();
+    }
+}
+
 function saveRosterData() {
     const weekStart = getCurrentWeekStart();
     const storageKey = `${ROSTER_STORAGE_KEY}_${weekStart}`;
