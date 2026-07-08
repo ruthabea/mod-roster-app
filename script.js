@@ -1262,6 +1262,8 @@ function initializeModScheduleFilter() {
     if (monthFilter) {
         const now = new Date();
         monthFilter.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        // Apply the filter immediately after setting the value
+        filterModScheduleByMonth();
     }
 }
 
