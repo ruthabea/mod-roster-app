@@ -3981,7 +3981,7 @@ async function initializeEntireMonth(monthValue) {
     const [year, month] = monthValue.split('-');
     const monthName = new Date(parseInt(year), parseInt(month) - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
     
-    // Get all Mondays in the month
+    // Get all Mondays in the month (returns array of YYYY-MM-DD strings)
     const mondays = getMondaysInMonth(parseInt(year), parseInt(month));
     
     if (mondays.length === 0) {
@@ -3994,8 +3994,8 @@ async function initializeEntireMonth(monthValue) {
     let successCount = 0;
     let skipCount = 0;
     
-    for (const monday of mondays) {
-        const weekStart = monday.toISOString().split('T')[0];
+    for (const weekStart of mondays) {
+        // weekStart is already a YYYY-MM-DD string
         
         // Check if data already exists with names
         let existingData = null;
@@ -4031,7 +4031,7 @@ async function initializeEntireMonth(monthValue) {
     }
 }
 
-// Get all Mondays in a given month
+// Get all Mondays in a given month (returns date strings in YYYY-MM-DD format)
 function getMondaysInMonth(year, month) {
     const mondays = [];
     const firstDay = new Date(year, month - 1, 1);
@@ -4044,8 +4044,11 @@ function getMondaysInMonth(year, month) {
     current.setDate(current.getDate() + daysUntilMonday);
     
     // Collect all Mondays in the month
+    // Use local date formatting to avoid timezone issues with toISOString()
     while (current <= lastDay) {
-        mondays.push(new Date(current));
+        // Format as YYYY-MM-DD using local date (NOT toISOString which converts to UTC)
+        const dateStr = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
+        mondays.push(dateStr);
         current.setDate(current.getDate() + 7);
     }
     
