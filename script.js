@@ -895,7 +895,9 @@ function deleteModScheduleEntry(index) {
     // Get the entry details for the confirmation message
     const entry = appData.mod.savedSchedule?.entries?.[index];
     let dateDisplay = 'this entry';
+    let entryDate = null;
     if (entry && entry.date) {
+        entryDate = entry.date;
         const date = new Date(entry.date);
         dateDisplay = date.toLocaleDateString('en-US', { 
             weekday: 'long', 
@@ -908,12 +910,29 @@ function deleteModScheduleEntry(index) {
     showConfirmModal(
         `Are you sure you want to delete the schedule entry for ${dateDisplay}?`,
         'Delete Schedule Entry',
-        () => {
+        async () => {
             // On confirm - delete the entry
             if (appData.mod.savedSchedule && appData.mod.savedSchedule.entries) {
                 appData.mod.savedSchedule.entries.splice(index, 1);
                 saveScheduleToStorage('mod', appData.mod.savedSchedule);
                 displaySavedSchedule('mod');
+                
+                // Also delete from Supabase
+                if (useDatabase && entryDate) {
+                    try {
+                        await fetch(`${SUPABASE_URL}/rest/v1/mod_schedule?date=eq.${entryDate}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'apikey': SUPABASE_ANON_KEY,
+                                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                            }
+                        });
+                        console.log('Deleted from Supabase:', entryDate);
+                    } catch (error) {
+                        console.error('Error deleting from Supabase:', error);
+                    }
+                }
+                
                 showToast('Schedule entry deleted');
             }
         }
@@ -942,6 +961,8 @@ async function loadSavedSchedule(screen) {
             const dbSchedule = await loadModScheduleFromSupabase();
             if (dbSchedule && dbSchedule.entries && dbSchedule.entries.length > 0) {
                 appData[screen].savedSchedule = dbSchedule;
+                // Sync localStorage with Supabase data to avoid stale entries
+                localStorage.setItem(STORAGE_KEYS[screen].schedule, JSON.stringify(dbSchedule));
                 displaySavedSchedule(screen);
                 console.log('MOD Schedule loaded from Supabase:', dbSchedule.entries.length, 'entries');
                 return;
