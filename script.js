@@ -3894,18 +3894,177 @@ async function initializeWeekRoster() {
         return;
     }
     
-    // Get the week to initialize
+    const [year, month] = monthInput.value.split('-');
+    const monthName = new Date(parseInt(year), parseInt(month) - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    
+    // Ask user: initialize selected week or entire month?
+    const hasSelectedWeek = weekSelect && weekSelect.value && weekSelect.value !== '';
+    
+    const questions = [{
+        id: 'initScope',
+        prompt: `What would you like to initialize for ${monthName}?`,
+        options: [
+            { id: 'month', label: `Initialize entire month (all weeks in ${monthName}) (Recommended)` },
+            { id: 'week', label: hasSelectedWeek ? `Initialize selected week only (${weekSelect.options[weekSelect.selectedIndex]?.text || 'current week'})` : 'Initialize first week of the month only' }
+        ]
+    }];
+    
+    // Use a simple confirm dialog instead if AskQuestion not available
+    showInitializeOptionsModal(monthInput.value, weekSelect?.value, monthName);
+}
+
+// Show modal to choose initialization scope
+function showInitializeOptionsModal(monthValue, selectedWeek, monthName) {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'initOptionsModal';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 12px 12px 0 0;">
+                <h3 style="margin: 0; display: flex; align-items: center; gap: 10px;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                        <line x1="16" y1="2" x2="16" y2="6"/>
+                        <line x1="8" y1="2" x2="8" y2="6"/>
+                        <line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                    Initialize Roster
+                </h3>
+                <button class="modal-close" onclick="closeInitOptionsModal()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; cursor: pointer; padding: 5px 10px; border-radius: 5px;">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 25px;">
+                <p style="margin-bottom: 20px; color: #555;">Choose what to initialize for <strong>${monthName}</strong>:</p>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <button class="btn btn-primary" onclick="initializeEntireMonth('${monthValue}')" style="padding: 15px 20px; display: flex; align-items: center; gap: 10px; justify-content: flex-start;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                            <line x1="3" y1="10" x2="21" y2="10"/>
+                            <line x1="9" y1="2" x2="9" y2="6"/>
+                            <line x1="15" y1="2" x2="15" y2="6"/>
+                        </svg>
+                        <span>
+                            <strong>Initialize Entire Month</strong><br>
+                            <small style="opacity: 0.8;">Create roster template for all weeks</small>
+                        </span>
+                    </button>
+                    <button class="btn btn-outline" onclick="initializeSingleWeek('${monthValue}', '${selectedWeek || ''}')" style="padding: 15px 20px; display: flex; align-items: center; gap: 10px; justify-content: flex-start;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                            <line x1="3" y1="10" x2="21" y2="10"/>
+                        </svg>
+                        <span>
+                            <strong>Initialize Selected Week Only</strong><br>
+                            <small style="opacity: 0.8;">Create roster template for one week</small>
+                        </span>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 15px 25px; background: #f8f9fa; border-radius: 0 0 12px 12px;">
+                <button class="btn btn-secondary" onclick="closeInitOptionsModal()">Cancel</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function closeInitOptionsModal() {
+    const modal = document.getElementById('initOptionsModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+// Initialize all weeks in a month
+async function initializeEntireMonth(monthValue) {
+    closeInitOptionsModal();
+    
+    const [year, month] = monthValue.split('-');
+    const monthName = new Date(parseInt(year), parseInt(month) - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    
+    // Get all Mondays in the month
+    const mondays = getMondaysInMonth(parseInt(year), parseInt(month));
+    
+    if (mondays.length === 0) {
+        showToast('No weeks found in the selected month', 'error');
+        return;
+    }
+    
+    showToast(`Initializing ${mondays.length} weeks for ${monthName}...`, 'info');
+    
+    let successCount = 0;
+    let skipCount = 0;
+    
+    for (const monday of mondays) {
+        const weekStart = monday.toISOString().split('T')[0];
+        
+        // Check if data already exists with names
+        let existingData = null;
+        if (useDatabase) {
+            existingData = await db.getRoster(weekStart);
+        }
+        
+        if (existingData && existingData.length > 0) {
+            const hasNames = existingData.some(entry => {
+                const days = entry.days || {};
+                return Object.values(days).some(name => name && name.trim() !== '');
+            });
+            
+            if (hasNames) {
+                skipCount++;
+                continue; // Skip weeks that already have names
+            }
+        }
+        
+        // Initialize this week
+        await createEmptyRosterForWeekSilent(weekStart);
+        successCount++;
+    }
+    
+    // Reload month data
+    await loadRosterDataForMonth();
+    await renderSelectedWeek();
+    
+    if (skipCount > 0) {
+        showToast(`Initialized ${successCount} weeks. Skipped ${skipCount} weeks with existing data.`, 'success');
+    } else {
+        showToast(`Successfully initialized ${successCount} weeks for ${monthName}!`, 'success');
+    }
+}
+
+// Get all Mondays in a given month
+function getMondaysInMonth(year, month) {
+    const mondays = [];
+    const firstDay = new Date(year, month - 1, 1);
+    const lastDay = new Date(year, month, 0); // Last day of the month
+    
+    // Find first Monday
+    let current = new Date(firstDay);
+    const dayOfWeek = current.getDay();
+    const daysUntilMonday = dayOfWeek === 0 ? 1 : (dayOfWeek === 1 ? 0 : 8 - dayOfWeek);
+    current.setDate(current.getDate() + daysUntilMonday);
+    
+    // Collect all Mondays in the month
+    while (current <= lastDay) {
+        mondays.push(new Date(current));
+        current.setDate(current.getDate() + 7);
+    }
+    
+    return mondays;
+}
+
+// Initialize single week
+async function initializeSingleWeek(monthValue, selectedWeek) {
+    closeInitOptionsModal();
+    
     let weekStart;
     
-    if (weekSelect && weekSelect.value) {
-        // Use selected week
-        weekStart = weekSelect.value;
+    if (selectedWeek) {
+        weekStart = selectedWeek;
     } else {
-        // No week selected - calculate first Monday of the selected month
-        const [year, month] = monthInput.value.split('-');
+        // Calculate first Monday of the selected month
+        const [year, month] = monthValue.split('-');
         const firstDay = new Date(parseInt(year), parseInt(month) - 1, 1);
         
-        // Find first Monday
         const dayOfWeek = firstDay.getDay();
         const daysUntilMonday = dayOfWeek === 0 ? 1 : (dayOfWeek === 1 ? 0 : 8 - dayOfWeek);
         const firstMonday = new Date(firstDay);
@@ -3914,27 +4073,20 @@ async function initializeWeekRoster() {
         weekStart = firstMonday.toISOString().split('T')[0];
     }
     
-    // Calculate week end date for display
+    // Calculate week range for display
     const weekStartDate = new Date(weekStart);
     const weekEndDate = new Date(weekStartDate);
     weekEndDate.setDate(weekStartDate.getDate() + 6);
     
     const weekRange = `${weekStartDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEndDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
     
-    // Check if data already exists for this week
+    // Check if data exists with names
     let existingData = null;
     if (useDatabase) {
         existingData = await db.getRoster(weekStart);
-    } else {
-        const storageKey = `${ROSTER_STORAGE_KEY}_${weekStart}`;
-        const saved = localStorage.getItem(storageKey);
-        if (saved) {
-            existingData = JSON.parse(saved);
-        }
     }
     
     if (existingData && existingData.length > 0) {
-        // Check if any entry has actual names filled in
         const hasNames = existingData.some(entry => {
             const days = entry.days || {};
             return Object.values(days).some(name => name && name.trim() !== '');
@@ -3952,8 +4104,39 @@ async function initializeWeekRoster() {
         }
     }
     
-    // No data or empty data - proceed to initialize
     await createEmptyRosterForWeek(weekStart, weekRange);
+}
+
+// Create empty roster silently (no toast, for batch operations)
+async function createEmptyRosterForWeekSilent(weekStart) {
+    const templateData = getDefaultRosterData().map(entry => ({
+        time: entry.time,
+        app: entry.app,
+        team: entry.team,
+        days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }
+    }));
+    
+    if (useDatabase) {
+        try {
+            // Delete existing entries for this week first
+            const existingData = await db.getRoster(weekStart);
+            if (existingData && existingData.length > 0) {
+                for (const entry of existingData) {
+                    if (entry._id) {
+                        await db.deleteRosterEntry(entry._id);
+                    }
+                }
+            }
+            
+            // Batch insert all entries
+            await db.saveRosterEntriesBatch(templateData, weekStart);
+        } catch (error) {
+            console.error('Error initializing roster for week:', weekStart, error);
+        }
+    } else {
+        const storageKey = `${ROSTER_STORAGE_KEY}_${weekStart}`;
+        localStorage.setItem(storageKey, JSON.stringify(templateData));
+    }
 }
 
 // Create empty roster structure for a week
