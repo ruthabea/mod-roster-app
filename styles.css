@@ -5123,55 +5123,124 @@ header h1 {
 }
 
 .leave-calendar-grid {
-    display: grid;
-    gap: 0.75rem;
-}
-
-.leave-calendar-item {
-    display: flex;
-    align-items: center;
-    padding: 1rem;
-    background: #f8fafc;
-    border-radius: 8px;
-    border-left: 4px solid var(--primary-color);
-}
-
-.leave-calendar-item .calendar-dates {
-    min-width: 150px;
-    font-weight: 600;
-    color: #1e293b;
-}
-
-.leave-calendar-item .calendar-employee {
-    flex: 1;
-    font-weight: 500;
-    color: #374151;
-    min-width: 150px;
-}
-
-.leave-calendar-item .calendar-approver {
-    min-width: 180px;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-.leave-calendar-item .calendar-approver .approver-label {
-    font-size: 0.7rem;
-    color: #94a3b8;
+/* Header Row */
+.leave-calendar-header {
+    display: flex;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
+    color: white;
+    font-weight: 600;
+    font-size: 0.8rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
-.leave-calendar-item .calendar-approver .approver-name {
-    font-weight: 500;
-    color: #059669;
+/* Data Rows */
+.leave-calendar-item {
+    display: flex;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    background: #ffffff;
+    border-bottom: 1px solid #e2e8f0;
+    border-left: 4px solid var(--primary-color);
+    transition: background-color 0.15s ease;
 }
 
-.leave-calendar-item .calendar-type {
-    margin-left: auto;
-    min-width: 100px;
-    text-align: right;
+.leave-calendar-item:last-child {
+    border-bottom: none;
+}
+
+.leave-calendar-item:hover {
+    background: #f0fdf4;
+}
+
+/* Alternating row colors */
+.leave-calendar-item:nth-child(odd) {
+    background: #f8fafc;
+}
+
+.leave-calendar-item:nth-child(odd):hover {
+    background: #f0fdf4;
+}
+
+/* Column Styles */
+.calendar-col {
+    padding-right: 1.5rem;
+}
+
+.calendar-col-dates {
+    width: 140px;
+    min-width: 140px;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.calendar-col-employee {
+    flex: 1;
+    min-width: 180px;
+    font-weight: 500;
+    color: #374151;
+}
+
+.calendar-col-approver {
+    width: 240px;
+    min-width: 240px;
+    color: #059669;
+    font-weight: 500;
+}
+
+.calendar-col-type {
+    width: 120px;
+    min-width: 120px;
+    text-align: center;
+    padding-right: 0;
+}
+
+/* Header specific styles */
+.leave-calendar-header .calendar-col {
+    color: white;
+    font-weight: 600;
+}
+
+.leave-calendar-header .calendar-col-dates,
+.leave-calendar-header .calendar-col-employee,
+.leave-calendar-header .calendar-col-approver,
+.leave-calendar-header .calendar-col-type {
+    color: white;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .leave-calendar-header,
+    .leave-calendar-item {
+        padding: 0.75rem 1rem;
+    }
+    
+    .calendar-col-dates {
+        width: 100px;
+        min-width: 100px;
+        font-size: 0.85rem;
+    }
+    
+    .calendar-col-approver {
+        width: 150px;
+        min-width: 150px;
+        font-size: 0.85rem;
+    }
+    
+    .calendar-col-type {
+        width: 90px;
+        min-width: 90px;
+    }
 }
 
 /* Empty States */

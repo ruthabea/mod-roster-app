@@ -7171,28 +7171,35 @@ async function loadLeaveCalendar() {
         
         if (contentEl) contentEl.classList.remove('hidden');
         
+        // Create header row
+        const headerRow = `
+            <div class="leave-calendar-header">
+                <div class="calendar-col calendar-col-dates">Dates</div>
+                <div class="calendar-col calendar-col-employee">Employee</div>
+                <div class="calendar-col calendar-col-approver">Approved By</div>
+                <div class="calendar-col calendar-col-type">Type</div>
+            </div>
+        `;
+        
         const items = leaves.map(leave => {
             const startDate = new Date(leave.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             const endDate = new Date(leave.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            const typeClass = leave.request_type.toLowerCase().replace(' ', '');
+            const typeClass = leave.request_type.toLowerCase().replace(/\s+/g, '');
             const approver = leave.reviewed_by || leave.approver_name || '-';
             
             return `
                 <div class="leave-calendar-item">
-                    <div class="calendar-dates">${startDate} - ${endDate}</div>
-                    <div class="calendar-employee">${escapeHtml(leave.employee_name)}</div>
-                    <div class="calendar-approver">
-                        <span class="approver-label">Approved by:</span>
-                        <span class="approver-name">${escapeHtml(approver)}</span>
-                    </div>
-                    <div class="calendar-type">
+                    <div class="calendar-col calendar-col-dates">${startDate} - ${endDate}</div>
+                    <div class="calendar-col calendar-col-employee">${escapeHtml(leave.employee_name)}</div>
+                    <div class="calendar-col calendar-col-approver">${escapeHtml(approver)}</div>
+                    <div class="calendar-col calendar-col-type">
                         <span class="leave-type-badge ${typeClass}">${leave.request_type}</span>
                     </div>
                 </div>
             `;
         }).join('');
         
-        if (gridEl) gridEl.innerHTML = items;
+        if (gridEl) gridEl.innerHTML = headerRow + items;
         
     } catch (error) {
         console.error('Error loading leave calendar:', error);
