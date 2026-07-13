@@ -3845,38 +3845,38 @@ async function onWeekChange() {
 function getDefaultRosterData() {
     return [
         // Frontend - ASOM (3 rows)
-        { time: '07:00 - 16:00 (AEST) / 02:30 - 10:30 (IST)', app: 'Frontend', team: 'ASOM', days: { mon: 'Yash', tue: 'Anurag', wed: 'Anurag', thu: 'Anurag', fri: 'Jerome', sat: 'Yash', sun: 'Yash' }},
-        { time: '16:00 - 02:30 (AEST) / 10:30 - 21:00 (IST)', app: 'Frontend', team: 'ASOM', days: { mon: 'Yash', tue: 'Yash', wed: 'Yash', thu: 'Yash', fri: 'Yash', sat: 'Yash', sun: 'Yash' }},
-        { time: '02:30 - 07:00 (AEST) / 21:00 - 02:30 (IST)', app: 'Frontend', team: 'ASOM', days: { mon: 'Yash', tue: 'Yash', wed: 'Yash', thu: 'Yash', fri: 'Yash', sat: 'Yash', sun: 'Yash' }},
+        { time: '07:00 - 16:00 (AEST) / 02:30 - 10:30 (IST)', app: 'Frontend', team: 'ASOM', days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }},
+        { time: '16:00 - 02:30 (AEST) / 10:30 - 21:00 (IST)', app: 'Frontend', team: 'ASOM', days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }},
+        { time: '02:30 - 07:00 (AEST) / 21:00 - 02:30 (IST)', app: 'Frontend', team: 'ASOM', days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }},
         // Frontend - OMS (3 rows)
-        { time: '07:00 - 16:00 (AEST) / 02:30 - 10:30 (IST)', app: 'Frontend', team: 'OMS', days: { mon: 'Bhomesh', tue: 'Anurag', wed: 'Anurag', thu: 'Anurag', fri: 'Anurag', sat: 'Bhomesh', sun: 'Bhomesh' }},
-        { time: '16:00 - 02:30 (AEST) / 10:30 - 21:00 (IST)', app: 'Frontend', team: 'OMS', days: { mon: 'Bhomesh', tue: 'Bhomesh', wed: 'Bhomesh', thu: 'Bhomesh', fri: 'Bhomesh', sat: 'Bhomesh', sun: 'Bhomesh' }},
-        { time: '02:30 - 07:00 (AEST) /21:00 - 02:30 (IST)', app: 'Frontend', team: 'OMS', days: { mon: 'Bhomesh', tue: 'Bhomesh', wed: 'Bhomesh', thu: 'Bhomesh', fri: 'Bhomesh', sat: 'Bhomesh', sun: 'Bhomesh' }},
+        { time: '07:00 - 16:00 (AEST) / 02:30 - 10:30 (IST)', app: 'Frontend', team: 'OMS', days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }},
+        { time: '16:00 - 02:30 (AEST) / 10:30 - 21:00 (IST)', app: 'Frontend', team: 'OMS', days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }},
+        { time: '02:30 - 07:00 (AEST) / 21:00 - 02:30 (IST)', app: 'Frontend', team: 'OMS', days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }},
         // Frontend - CRM/SDP/MCO/WSF (3 rows)
-        { time: '07:00 - 16:00 (AEST) / 02:30 - 10:30 (IST)', app: 'Frontend', team: 'CRM/SDP/MCO/WSF', days: { mon: 'Anubhav', tue: 'Anubhav', wed: 'Anubhav', thu: 'Anubhav', fri: 'Anubhav', sat: 'Anudhav', sun: 'Anudhav' }},
-        { time: '16:00 - 02:30 (AEST) / 10:30 - 21:00 (IST)', app: 'Frontend', team: 'CRM/SDP/MCO/WSF', days: { mon: 'Anudhav', tue: 'Anudhav', wed: 'Anudhav', thu: 'Anudhav', fri: 'Anudhav', sat: 'Anudhav', sun: 'Anudhav' }},
-        { time: '02:30 - 07:00 (AEST) / 21:00 - 02:30 (IST)', app: 'Frontend', team: 'CRM/SDP/MCO/WSF', days: { mon: 'Anudhav', tue: 'Anudhav', wed: 'Anudhav', thu: 'Anudhav', fri: 'Anudhav', sat: 'Anudhav', sun: 'Anudhav' }},
+        { time: '07:00 - 16:00 (AEST) / 02:30 - 10:30 (IST)', app: 'Frontend', team: 'CRM/SDP/MCO/WSF', days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }},
+        { time: '16:00 - 02:30 (AEST) / 10:30 - 21:00 (IST)', app: 'Frontend', team: 'CRM/SDP/MCO/WSF', days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }},
+        { time: '02:30 - 07:00 (AEST) / 21:00 - 02:30 (IST)', app: 'Frontend', team: 'CRM/SDP/MCO/WSF', days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }},
         // Digital (2 rows)
-        { time: '7AM to 7PM AEST', app: 'Digital', team: 'Digital', days: { mon: 'Ankur', tue: 'Ankur', wed: 'Ankur', thu: 'Ankur', fri: 'Bien', sat: 'Bien', sun: 'Bien' }},
-        { time: '7PM to 7AM AEST', app: 'Digital', team: 'Digital', days: { mon: 'Ankur', tue: 'Ankur', wed: 'Ankur', thu: 'Ankur', fri: 'Bien', sat: 'Bien', sun: 'Bien' }},
+        { time: '7AM to 7PM AEST', app: 'Digital', team: 'Digital', days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }},
+        { time: '7PM to 7AM AEST', app: 'Digital', team: 'Digital', days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }},
         // Infra (1 row)
-        { time: 'All Shifts', app: 'Infra', team: 'Infra', days: { mon: 'Rahul More', tue: 'Rahul More', wed: 'Rahul More', thu: 'Rahul More', fri: 'Rahul More', sat: 'Rahul More', sun: 'Rahul More' }},
+        { time: 'All Shifts', app: 'Infra', team: 'Infra', days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }},
         // Backend - INV/AMDD (2 rows)
-        { time: '7AM to 7PM AEST', app: 'Backend', team: 'INV/AMDD', days: { mon: 'Akash', tue: 'Akash', wed: 'Akash', thu: 'Akash', fri: 'Sanket', sat: 'Sanket', sun: 'Sanket' }},
-        { time: '7PM to 7AM AEST', app: 'Backend', team: 'INV/AMDD', days: { mon: 'Akash', tue: 'Akash', wed: 'Deb', thu: 'Deb', fri: 'Deb', sat: 'Deb', sun: 'Deb' }},
+        { time: '7AM to 7PM AEST', app: 'Backend', team: 'INV/AMDD', days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }},
+        { time: '7PM to 7AM AEST', app: 'Backend', team: 'INV/AMDD', days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }},
         // Backend - CM/AR/CL (2 rows)
-        { time: '7AM to 7PM AEST', app: 'Backend', team: 'CM/AR/CL', days: { mon: 'Tanvi', tue: 'Tanvi', wed: 'Tanvi', thu: 'Tanvi', fri: 'Kartik', sat: 'Kartik', sun: 'Kartik' }},
-        { time: '7PM to 7AM AEST', app: 'Backend', team: 'CM/AR/CL', days: { mon: 'Tanvi', tue: 'Tanvi', wed: 'Tanvi', thu: 'Tanvi', fri: 'Kartik', sat: 'Kartik', sun: 'Kartik' }},
+        { time: '7AM to 7PM AEST', app: 'Backend', team: 'CM/AR/CL', days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }},
+        { time: '7PM to 7AM AEST', app: 'Backend', team: 'CM/AR/CL', days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }},
         // Backend - TC/AEM/OFCA (2 rows)
-        { time: '7AM to 7PM AEST', app: 'Backend', team: 'TC/AEM/OFCA', days: { mon: 'Hendry', tue: 'Hendry', wed: 'Vishala', thu: 'Vishala', fri: 'Mariel', sat: 'Mariel', sun: 'Mariel' }},
-        { time: '7PM to 7AM AEST', app: 'Backend', team: 'TC/AEM/OFCA', days: { mon: 'Hendry', tue: 'Hendry', wed: 'Vishala', thu: 'Vishala', fri: 'Mariel', sat: 'Mariel', sun: 'Mariel' }},
+        { time: '7AM to 7PM AEST', app: 'Backend', team: 'TC/AEM/OFCA', days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }},
+        { time: '7PM to 7AM AEST', app: 'Backend', team: 'TC/AEM/OFCA', days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }},
         // Backend - ANM (1 row)
-        { time: 'All Shifts', app: 'Backend', team: 'ANM', days: { mon: 'Orit', tue: 'Orit', wed: 'Orit', thu: 'Orit', fri: 'Orit', sat: 'Orit', sun: 'Orit' }},
+        { time: 'All Shifts', app: 'Backend', team: 'ANM', days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }},
         // ODS (3 rows)
-        { time: '6AM to 6PM AEST', app: 'ODS', team: 'ODS', days: { mon: 'Suraj', tue: 'Suraj', wed: 'Suraj', thu: 'Rohan', fri: 'Abhishek', sat: 'Abhishek', sun: 'Abhishek' }},
-        { time: '6PM to 6AM AEST', app: 'ODS', team: 'ODS', days: { mon: 'Suraj', tue: 'Suraj', wed: 'Suraj', thu: 'Rohan', fri: 'Abhishek', sat: 'Abhishek', sun: 'Abhishek' }},
-        { time: 'All Shifts', app: 'ODS', team: 'ODS Infra', days: { mon: 'Rahul More', tue: 'Rahul More', wed: 'Rahul More', thu: 'Rahul More', fri: 'Rahul More', sat: 'Rahul More', sun: 'Rahul More' }},
-        // B2B (3 rows - empty)
+        { time: '6AM to 6PM AEST', app: 'ODS', team: 'ODS', days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }},
+        { time: '6PM to 6AM AEST', app: 'ODS', team: 'ODS', days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }},
+        { time: 'All Shifts', app: 'ODS', team: 'ODS Infra', days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }},
+        // B2B (3 rows)
         { time: '07:00 - 19:00 (AEST) / 02:30 - 13:30 (IST)', app: 'B2B', team: 'CPQ/COM/LCEP', days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }},
         { time: '19:00 - 07:30 (AEST) / 13:30 - 02:30 (IST)', app: 'B2B', team: 'CPQ/COM', days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }},
         { time: '19:00 - 07:30 (AEST) / 13:30 - 02:30 (IST)', app: 'B2B', team: 'CPQ/COM', days: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }}
