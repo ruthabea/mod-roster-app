@@ -74,6 +74,74 @@ interface Manager {
   active: boolean;
 }
 
+interface ModScheduleEntry {
+  id: number;
+  date: string;
+  onsite_name: string | null;
+  onsite_email: string | null;
+  offshore_name: string | null;
+  offshore_email: string | null;
+}
+
+// Format date for MOD schedule (e.g., "23-Jun")
+function formatModDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  const day = date.getDate();
+  const month = date.toLocaleDateString('en-US', { month: 'short' });
+  return `${day}-${month}`;
+}
+
+// Generate MOD schedule HTML section for On-Call Summary
+function generateModScheduleHtml(modSchedule: ModScheduleEntry[]): string {
+  if (!modSchedule || modSchedule.length === 0) {
+    return '';
+  }
+  
+  const rows = modSchedule.map((entry, index) => `
+    <tr style="background-color: ${index % 2 === 0 ? '#ffffff' : '#f0fdf4'};">
+      <td style="padding: 10px 12px; border: 1px solid #d1d5db; color: #1e293b; font-weight: 600; font-size: 13px; text-align: center;">
+        ${formatModDate(entry.date)}
+      </td>
+      <td style="padding: 10px 12px; border: 1px solid #d1d5db; color: #334155; font-size: 13px; text-align: center;">
+        ${entry.onsite_name || '-'}
+      </td>
+      <td style="padding: 10px 12px; border: 1px solid #d1d5db; color: #334155; font-size: 13px; text-align: center;">
+        ${entry.offshore_name || '-'}
+      </td>
+    </tr>
+  `).join('');
+  
+  return `
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 20px;">
+      <tr>
+        <td align="center">
+          <h3 style="color: #1e293b; margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">
+            📋 MOD Schedule for the Week
+          </h3>
+        </td>
+      </tr>
+      <tr>
+        <td align="center">
+          <table cellpadding="0" cellspacing="0" style="border-collapse: collapse; width: 500px;">
+            <tr style="background-color: #059669;">
+              <th style="padding: 12px 10px; text-align: center; color: #ffffff; font-size: 12px; font-weight: 700; border: 1px solid #047857; width: 70px;">
+                Days
+              </th>
+              <th style="padding: 12px 10px; text-align: center; color: #ffffff; font-size: 12px; font-weight: 700; border: 1px solid #047857;">
+                Onsite MOD<br>(7AM to 7PM AEST)
+              </th>
+              <th style="padding: 12px 10px; text-align: center; color: #ffffff; font-size: 12px; font-weight: 700; border: 1px solid #047857;">
+                Offshore MOD<br>(7PM to 7AM AEST)
+              </th>
+            </tr>
+            ${rows}
+          </table>
+        </td>
+      </tr>
+    </table>
+  `;
+}
+
 // Site to notification timezone mapping
 // Philippines → AEST, India → IST, Australia → AEST
 const SITE_TIMEZONE_MAP: Record<string, string> = {
@@ -189,16 +257,20 @@ async function getMsGraphToken(): Promise<string> {
   return data.access_token;
 }
 
+// CC email for Weekly On-Call Summary
+const WEEKLY_SUMMARY_CC_EMAIL = "AIOOptusLeads@amdocs.com";
+
 // Send email via Microsoft Graph API
 async function sendEmailViaGraph(
   accessToken: string,
   toEmail: string,
   subject: string,
-  htmlContent: string
+  htmlContent: string,
+  ccEmails?: string[]
 ): Promise<void> {
   const sendMailUrl = `https://graph.microsoft.com/v1.0/users/${MS_SENDER_EMAIL}/sendMail`;
 
-  const emailPayload = {
+  const emailPayload: any = {
     message: {
       subject: subject,
       body: {
@@ -215,6 +287,15 @@ async function sendEmailViaGraph(
     },
     saveToSentItems: true,
   };
+
+  // Add CC recipients if provided
+  if (ccEmails && ccEmails.length > 0) {
+    emailPayload.message.ccRecipients = ccEmails.map(email => ({
+      emailAddress: {
+        address: email,
+      },
+    }));
+  }
 
   const response = await fetch(sendMailUrl, {
     method: "POST",
@@ -270,6 +351,7 @@ serve(async (req) => {
     let sendManagerSummary = true;
     let testEmail: string | null = null; // Send all emails to this address for testing
     let simulateDay: string | null = null; // Simulate a specific day (mon, tue, wed, thu, fri, sat, sun)
+    let onlyManagerSummary = false; // If true, skip individual notifications and only send manager summary
     
     const url = new URL(req.url);
     const urlTestMode = url.searchParams.get("testMode");
@@ -277,12 +359,14 @@ serve(async (req) => {
     const urlSkipManager = url.searchParams.get("skipManagerSummary");
     const urlTestEmail = url.searchParams.get("testEmail");
     const urlSimulateDay = url.searchParams.get("simulateDay");
+    const urlOnlyManagerSummary = url.searchParams.get("onlyManagerSummary");
     
     if (urlTestMode === "true" || urlTestMode === "1") testMode = true;
     if (urlTimezone) targetTimezone = urlTimezone;
     if (urlSkipManager === "true" || urlSkipManager === "1") sendManagerSummary = false;
     if (urlTestEmail) testEmail = urlTestEmail;
     if (urlSimulateDay) simulateDay = urlSimulateDay.toLowerCase();
+    if (urlOnlyManagerSummary === "true" || urlOnlyManagerSummary === "1") onlyManagerSummary = true;
     
     try {
       const body = await req.json();
@@ -291,6 +375,7 @@ serve(async (req) => {
       if (body.skipManagerSummary === true || body.skipManagerSummary === "true") sendManagerSummary = false;
       if (body.testEmail) testEmail = body.testEmail;
       if (body.simulateDay) simulateDay = body.simulateDay.toLowerCase();
+      if (body.onlyManagerSummary === true || body.onlyManagerSummary === "true") onlyManagerSummary = true;
     } catch {
       // No body or invalid JSON
     }
@@ -301,7 +386,7 @@ serve(async (req) => {
       simulateDay = null; // Invalid day, ignore
     }
     
-    console.log(`Mode: ${testMode ? 'TEST (dry run)' : isTestEmailMode ? 'TEST EMAIL' : 'NORMAL'}, Timezone: ${targetTimezone || 'ALL'}, Manager Summary: ${sendManagerSummary ? 'YES' : 'SKIP'}${isTestEmailMode ? `, Test Email: ${testEmail}` : ''}${simulateDay ? `, Simulating: ${simulateDay.toUpperCase()}` : ''}`);
+    console.log(`Mode: ${testMode ? 'TEST (dry run)' : isTestEmailMode ? 'TEST EMAIL' : 'NORMAL'}, Timezone: ${targetTimezone || 'ALL'}, Manager Summary: ${sendManagerSummary ? 'YES' : 'SKIP'}, Individual Notifications: ${onlyManagerSummary ? 'SKIP' : 'YES'}${isTestEmailMode ? `, Test Email: ${testEmail}` : ''}${simulateDay ? `, Simulating: ${simulateDay.toUpperCase()}` : ''}`);
 
     const accessToken = await getMsGraphToken();
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -456,7 +541,16 @@ serve(async (req) => {
     // Send notifications
     const results: NotificationResult[] = [];
 
+    // Skip individual notifications if onlyManagerSummary is true
+    if (onlyManagerSummary) {
+      console.log('Skipping individual notifications (onlyManagerSummary=true)');
+    }
+
     for (const person of onCallPeople) {
+      // Skip individual notifications if only sending manager summary
+      if (onlyManagerSummary) {
+        continue;
+      }
       const staffInfo = staffMap.get(person.name.toLowerCase());
       const primaryShift = person.shifts[0]; // First shift for subject line
       const hasMultipleShifts = person.shifts.length > 1;
@@ -692,12 +786,43 @@ serve(async (req) => {
         .from("managers")
         .select("*")
         .eq("active", true);
+      
+      // Fetch MOD schedule for the week
+      const { data: modSchedule, error: modError } = await supabase
+        .from("mod_schedule")
+        .select("*")
+        .gte("date", weekStartStr)
+        .lte("date", weekEndStr)
+        .order("date", { ascending: true });
+      
+      if (modError) {
+        console.error("Error fetching MOD schedule:", modError.message);
+      } else {
+        console.log(`Found ${modSchedule?.length || 0} MOD schedule entries for this week`);
+      }
+      
+      const modScheduleHtml = generateModScheduleHtml((modSchedule as ModScheduleEntry[]) || []);
 
       if (!managersError && managers && managers.length > 0) {
         console.log(`Sending weekly summary to ${managers.length} managers`);
 
-        // Build complete list of ALL on-call people for today (no timezone filter)
-        // Consolidate multiple shifts for the same person
+        // Define application/team order (same as On-Call Roster)
+        const APP_TEAM_ORDER = [
+          { app: 'Frontend', team: 'ASOM' },
+          { app: 'Frontend', team: 'OMS' },
+          { app: 'Frontend', team: 'CRM/SDP/MCO/WSF' },
+          { app: 'Digital', team: 'Digital' },
+          { app: 'Infra', team: 'Infra' },
+          { app: 'Backend', team: 'INV/AMDD' },
+          { app: 'Backend', team: 'CM/AR/CL' },
+          { app: 'Backend', team: 'TC/AEM/OFCA' },
+          { app: 'Backend', team: 'ANM' },
+          { app: 'ODS', team: 'ODS' },
+          { app: 'ODS', team: 'ODS Infra' },
+        ];
+
+        // Build complete list of ALL on-call people for the ENTIRE WEEK
+        // Group by App/Team for ordering
         interface ManagerShiftInfo {
           app: string;
           team: string;
@@ -710,69 +835,168 @@ serve(async (req) => {
           mobile: string;
           isWeekly: boolean;
           shifts: ManagerShiftInfo[];
+          onCallDays: string[];
+          app: string;
+          team: string;
         }
         
         const allPersonShiftsMap = new Map<string, ManagerPersonShifts>();
+        const weekDays = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+        const dayLabels: Record<string, string> = {
+          'mon': 'Mon', 'tue': 'Tue', 'wed': 'Wed', 'thu': 'Thu', 
+          'fri': 'Fri', 'sat': 'Sat', 'sun': 'Sun'
+        };
 
+        // Track which app/team combinations have support
+        const appTeamWithSupport = new Set<string>();
+
+        // Process ALL days of the week for the manager summary
         (roster as RosterEntry[]).forEach((row) => {
-          const personName = row[dayKey as keyof RosterEntry] as string;
-          if (personName && personName.trim()) {
-            const nameLower = personName.toLowerCase().trim();
-            const staffInfo = staffMap.get(nameLower);
-            const site = staffInfo?.site || 'Philippines';
-            const isWeekly = isOnCallForEntireWeek(roster as RosterEntry[], personName);
-            
-            if (allPersonShiftsMap.has(nameLower)) {
-              // Add shift to existing person
-              allPersonShiftsMap.get(nameLower)!.shifts.push({
-                app: row.app,
-                team: row.team,
-                time: row.time_shift,
-              });
-            } else {
-              // New person
-              allPersonShiftsMap.set(nameLower, {
-                name: personName.trim(),
-                site: site,
-                email: staffInfo?.email || '',
-                mobile: staffInfo?.mobile || '',
-                isWeekly: isWeekly,
-                shifts: [{
+          weekDays.forEach((day) => {
+            const personName = row[day as keyof RosterEntry] as string;
+            if (personName && personName.trim()) {
+              const nameLower = personName.toLowerCase().trim();
+              const staffInfo = staffMap.get(nameLower);
+              const site = staffInfo?.site || 'Philippines';
+              const isWeekly = isOnCallForEntireWeek(roster as RosterEntry[], personName);
+              
+              // Track this app/team has support
+              appTeamWithSupport.add(`${row.app}|${row.team}`);
+              
+              // Create unique key per person per app/team
+              const personAppTeamKey = `${nameLower}|${row.app}|${row.team}`;
+              
+              if (allPersonShiftsMap.has(personAppTeamKey)) {
+                const existing = allPersonShiftsMap.get(personAppTeamKey)!;
+                // Add day if not already added
+                if (!existing.onCallDays.includes(dayLabels[day])) {
+                  existing.onCallDays.push(dayLabels[day]);
+                }
+                // Add shift if unique (time combo)
+                const shiftKey = row.time_shift;
+                const existingShiftKeys = existing.shifts.map(s => s.time);
+                if (!existingShiftKeys.includes(shiftKey)) {
+                  existing.shifts.push({
+                    app: row.app,
+                    team: row.team,
+                    time: row.time_shift,
+                  });
+                }
+              } else {
+                // New person for this app/team
+                allPersonShiftsMap.set(personAppTeamKey, {
+                  name: personName.trim(),
+                  site: site,
+                  email: staffInfo?.email || '',
+                  mobile: staffInfo?.mobile || '',
+                  isWeekly: isWeekly,
                   app: row.app,
                   team: row.team,
-                  time: row.time_shift,
-                }],
-              });
+                  shifts: [{
+                    app: row.app,
+                    team: row.team,
+                    time: row.time_shift,
+                  }],
+                  onCallDays: [dayLabels[day]],
+                });
+              }
             }
-          }
+          });
         });
         
+        // Convert to array and sort by App/Team order
         const allOnCallPeople = Array.from(allPersonShiftsMap.values());
-        console.log(`Manager summary includes ${allOnCallPeople.length} on-call people from all sites (with consolidated shifts)`);
+        
+        // Sort by application/team order
+        allOnCallPeople.sort((a, b) => {
+          const aIndex = APP_TEAM_ORDER.findIndex(o => o.app === a.app && o.team === a.team);
+          const bIndex = APP_TEAM_ORDER.findIndex(o => o.app === b.app && o.team === b.team);
+          const aOrder = aIndex === -1 ? 999 : aIndex;
+          const bOrder = bIndex === -1 ? 999 : bIndex;
+          if (aOrder !== bOrder) return aOrder - bOrder;
+          // Same app/team, sort by name
+          return a.name.localeCompare(b.name);
+        });
+        
+        console.log(`Manager summary includes ${allOnCallPeople.length} on-call entries from all sites (grouped by App/Team)`);
+
+        // Find app/team combinations with NO support planned
+        const noSupportPlanned = APP_TEAM_ORDER.filter(at => !appTeamWithSupport.has(`${at.app}|${at.team}`));
+        console.log(`App/Teams with no support: ${noSupportPlanned.length}`);
+
+        // Generate "No Support Planned" HTML section
+        const noSupportHtml = noSupportPlanned.length > 0 ? `
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 24px;">
+            <tr>
+              <td>
+                <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); border-radius: 8px;">
+                  <tr>
+                    <td style="padding: 16px 20px;">
+                      <h3 style="color: white; margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">
+                        ⚠️ Applications with No Planned Support This Week
+                      </h3>
+                      <table width="100%" cellpadding="0" cellspacing="0" style="background: white; border-radius: 6px;">
+                        <tr style="background: #fef2f2;">
+                          <th style="padding: 10px 14px; text-align: left; color: #991b1b; font-size: 13px; font-weight: 600; border-bottom: 2px solid #fecaca;">Application</th>
+                          <th style="padding: 10px 14px; text-align: left; color: #991b1b; font-size: 13px; font-weight: 600; border-bottom: 2px solid #fecaca;">Team</th>
+                          <th style="padding: 10px 14px; text-align: left; color: #991b1b; font-size: 13px; font-weight: 600; border-bottom: 2px solid #fecaca;">Status</th>
+                        </tr>
+                        ${noSupportPlanned.map((at, idx) => `
+                          <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#fef2f2'};">
+                            <td style="padding: 10px 14px; border-bottom: 1px solid #fecaca; font-size: 14px; font-weight: 600; color: #1e293b;">${at.app}</td>
+                            <td style="padding: 10px 14px; border-bottom: 1px solid #fecaca; font-size: 14px; color: #475569;">${at.team}</td>
+                            <td style="padding: 10px 14px; border-bottom: 1px solid #fecaca;">
+                              <span style="display: inline-block; background: #dc2626; color: white; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 600;">No Support Assigned</span>
+                            </td>
+                          </tr>
+                        `).join('')}
+                      </table>
+                      <p style="color: #fecaca; font-size: 12px; margin: 12px 0 0 0;">
+                        Please ensure on-call support is assigned for these applications.
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        ` : '';
+
+        // Application color mapping for visual grouping
+        const appColors: Record<string, string> = {
+          'Frontend': '#3b82f6',
+          'Digital': '#8b5cf6',
+          'Infra': '#f59e0b',
+          'Backend': '#10b981',
+          'ODS': '#ec4899',
+          'B2B': '#6366f1',
+        };
 
         const rosterTableRows = allOnCallPeople.map((r, index) => {
           const hasMultipleShifts = r.shifts.length > 1;
-          const appDisplay = [...new Set(r.shifts.map(s => s.app))].join(', ');
-          const teamDisplay = [...new Set(r.shifts.map(s => s.team))].join(', ');
           const timeDisplay = r.shifts.map(s => getShiftTimeDisplay(s.time)).join('<br>');
+          const appColor = appColors[r.app] || '#64748b';
+          
+          // Format days display
+          const daysDisplay = r.isWeekly 
+            ? '<span style="display: inline-block; background: #7c3aed; color: white; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 500;">Mon-Sun</span>'
+            : `<span style="font-size: 14px; color: #334155;">${r.onCallDays.join(', ')}</span>`;
           
           return `
           <tr style="background: ${index % 2 === 0 ? '#ffffff' : '#f8fafc'};">
-            <td style="padding: 12px 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px; font-weight: 600; color: #1e293b;">
+            <td style="padding: 12px 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px;">
+              <span style="display: inline-block; background: ${appColor}; color: white; padding: 3px 8px; border-radius: 4px; font-weight: 600; font-size: 12px;">${r.app}</span>
+            </td>
+            <td style="padding: 12px 10px; border-bottom: 1px solid #e2e8f0; font-size: 14px; color: #475569; font-weight: 500;">${r.team}</td>
+            <td style="padding: 12px 10px; border-bottom: 1px solid #e2e8f0; font-size: 14px; font-weight: 600; color: #1e293b;">
               ${r.name}
-              ${hasMultipleShifts ? `<br><span style="display: inline-block; margin-top: 3px; font-size: 10px; font-weight: 600; background: #f59e0b; color: white; padding: 2px 6px; border-radius: 3px;">${r.shifts.length} shifts</span>` : ''}
+              ${hasMultipleShifts ? `<br><span style="display: inline-block; margin-top: 3px; font-size: 11px; font-weight: 600; background: #f59e0b; color: white; padding: 2px 6px; border-radius: 3px;">${r.shifts.length} shifts</span>` : ''}
             </td>
-            <td style="padding: 12px 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #334155;">${appDisplay || '-'}</td>
-            <td style="padding: 12px 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #475569;">${teamDisplay || '-'}</td>
-            <td style="padding: 12px 10px; border-bottom: 1px solid #e2e8f0; font-size: 12px; color: #64748b; line-height: 1.5;">${timeDisplay || '-'}</td>
+            <td style="padding: 12px 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b; line-height: 1.5;">${timeDisplay || '-'}</td>
+            <td style="padding: 12px 10px; border-bottom: 1px solid #e2e8f0; text-align: center;">${daysDisplay}</td>
             <td style="padding: 12px 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px;"><a href="mailto:${r.email}" style="color: #0369a1; text-decoration: none;">${r.email || 'N/A'}</a></td>
-            <td style="padding: 12px 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #334155;">${r.mobile || '-'}</td>
-            <td style="padding: 12px 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #334155;">${r.site || '-'}</td>
-            <td style="padding: 12px 10px; border-bottom: 1px solid #e2e8f0; text-align: center;">
-              ${r.isWeekly 
-                ? '<span style="display: inline-block; background: #7c3aed; color: white; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 500;">Weekly</span>' 
-                : '<span style="display: inline-block; background: #4f46e5; color: white; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 500;">Daily</span>'}
-            </td>
+            <td style="padding: 12px 10px; border-bottom: 1px solid #e2e8f0; font-size: 14px; color: #334155;">${r.mobile || '-'}</td>
+            <td style="padding: 12px 10px; border-bottom: 1px solid #e2e8f0; font-size: 14px; color: #334155;">${r.site || '-'}</td>
           </tr>
         `}).join('');
         
@@ -849,32 +1073,25 @@ serve(async (req) => {
                     </tr>
                   </table>
                   
-                  <h3 style="color: #1e293b; margin: 0 0 16px 0; font-size: 16px; font-weight: 600;">Today's Shift On-Call Roster</h3>
+                  <h3 style="color: #1e293b; margin: 0 0 16px 0; font-size: 16px; font-weight: 600;">Weekly On-Call Roster</h3>
                   
                   <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; border: 1px solid #e2e8f0;">
                     <tr style="background: #059669;">
-                      <th style="padding: 12px 10px; text-align: left; color: white; font-size: 12px; font-weight: 600;">Name</th>
-                      <th style="padding: 12px 10px; text-align: left; color: white; font-size: 12px; font-weight: 600;">App</th>
-                      <th style="padding: 12px 10px; text-align: left; color: white; font-size: 12px; font-weight: 600;">Team</th>
-                      <th style="padding: 12px 10px; text-align: left; color: white; font-size: 12px; font-weight: 600;">Shift</th>
-                      <th style="padding: 12px 10px; text-align: left; color: white; font-size: 12px; font-weight: 600;">Email</th>
-                      <th style="padding: 12px 10px; text-align: left; color: white; font-size: 12px; font-weight: 600;">Mobile</th>
-                      <th style="padding: 12px 10px; text-align: left; color: white; font-size: 12px; font-weight: 600;">Site</th>
-                      <th style="padding: 12px 10px; text-align: center; color: white; font-size: 12px; font-weight: 600;">Type</th>
+                      <th style="padding: 12px 10px; text-align: left; color: white; font-size: 13px; font-weight: 600;">Application</th>
+                      <th style="padding: 12px 10px; text-align: left; color: white; font-size: 13px; font-weight: 600;">Team</th>
+                      <th style="padding: 12px 10px; text-align: left; color: white; font-size: 13px; font-weight: 600;">Name</th>
+                      <th style="padding: 12px 10px; text-align: left; color: white; font-size: 13px; font-weight: 600;">Shift</th>
+                      <th style="padding: 12px 10px; text-align: center; color: white; font-size: 13px; font-weight: 600;">Day</th>
+                      <th style="padding: 12px 10px; text-align: left; color: white; font-size: 13px; font-weight: 600;">Email</th>
+                      <th style="padding: 12px 10px; text-align: left; color: white; font-size: 13px; font-weight: 600;">Mobile</th>
+                      <th style="padding: 12px 10px; text-align: left; color: white; font-size: 13px; font-weight: 600;">Site</th>
                     </tr>
                     ${rosterTableRows}
                   </table>
                   
-                  <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 20px; background: #f0f9ff; border-radius: 8px; border: 1px solid #bae6fd;">
-                    <tr>
-                      <td style="padding: 14px 16px;">
-                        <p style="margin: 0; font-size: 13px; color: #0369a1;">
-                          📊 <strong>Acknowledgement Tracking:</strong> View real-time acknowledgement status in the 
-                          <a href="https://ruthabea.github.io/mod-roster-app/" style="color: #0284c7; text-decoration: underline;">Roster App → Acknowledgement Tracker</a> tab.
-                        </p>
-                      </td>
-                    </tr>
-                  </table>
+                  ${noSupportHtml}
+                  
+                  ${modScheduleHtml}
                   
                   <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 24px; border-top: 1px solid #e2e8f0;">
                     <tr>
@@ -901,7 +1118,11 @@ serve(async (req) => {
               body: { contentType: "HTML", content: managerHtmlContent },
               toRecipients: managerEmails,
               // Skip CC when in test mode
-              ...(testEmail ? {} : { ccRecipients: [{ emailAddress: { address: "OPTUSL2@amdocs.com" } }] }),
+              ...(testEmail ? {} : { ccRecipients: [
+                { emailAddress: { address: "OPTUSL2@amdocs.com" } },
+                { emailAddress: { address: "AIOOptusL2@amdocs.com" } },
+                { emailAddress: { address: "AIOOptusLeads@amdocs.com" } }
+              ] }),
             },
             saveToSentItems: true,
           };
