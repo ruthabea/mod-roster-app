@@ -5146,10 +5146,32 @@ header h1 {
     flex: 1;
     font-weight: 500;
     color: #374151;
+    min-width: 150px;
+}
+
+.leave-calendar-item .calendar-approver {
+    min-width: 180px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.leave-calendar-item .calendar-approver .approver-label {
+    font-size: 0.7rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.leave-calendar-item .calendar-approver .approver-name {
+    font-weight: 500;
+    color: #059669;
 }
 
 .leave-calendar-item .calendar-type {
     margin-left: auto;
+    min-width: 100px;
+    text-align: right;
 }
 
 /* Empty States */

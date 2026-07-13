@@ -7175,11 +7175,16 @@ async function loadLeaveCalendar() {
             const startDate = new Date(leave.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             const endDate = new Date(leave.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             const typeClass = leave.request_type.toLowerCase().replace(' ', '');
+            const approver = leave.reviewed_by || leave.approver_name || '-';
             
             return `
                 <div class="leave-calendar-item">
                     <div class="calendar-dates">${startDate} - ${endDate}</div>
-                    <div class="calendar-employee">${leave.employee_name}</div>
+                    <div class="calendar-employee">${escapeHtml(leave.employee_name)}</div>
+                    <div class="calendar-approver">
+                        <span class="approver-label">Approved by:</span>
+                        <span class="approver-name">${escapeHtml(approver)}</span>
+                    </div>
                     <div class="calendar-type">
                         <span class="leave-type-badge ${typeClass}">${leave.request_type}</span>
                     </div>
