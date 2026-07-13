@@ -5174,33 +5174,33 @@ header h1 {
 
 /* Column Styles */
 .calendar-col {
-    padding-right: 1.5rem;
+    padding-right: 2rem;
 }
 
 .calendar-col-dates {
-    width: 140px;
-    min-width: 140px;
+    width: 15%;
+    min-width: 120px;
     font-weight: 600;
     color: #1e293b;
 }
 
 .calendar-col-employee {
-    flex: 1;
+    width: 30%;
     min-width: 180px;
     font-weight: 500;
     color: #374151;
 }
 
 .calendar-col-approver {
-    width: 240px;
-    min-width: 240px;
+    width: 35%;
+    min-width: 200px;
     color: #059669;
     font-weight: 500;
 }
 
 .calendar-col-type {
-    width: 120px;
-    min-width: 120px;
+    width: 20%;
+    min-width: 100px;
     text-align: center;
     padding-right: 0;
 }
@@ -5219,27 +5219,57 @@ header h1 {
 }
 
 /* Responsive adjustments */
+@media (max-width: 992px) {
+    .calendar-col {
+        padding-right: 1rem;
+    }
+    
+    .calendar-col-dates {
+        width: 18%;
+    }
+    
+    .calendar-col-employee {
+        width: 28%;
+    }
+    
+    .calendar-col-approver {
+        width: 32%;
+    }
+    
+    .calendar-col-type {
+        width: 22%;
+    }
+}
+
 @media (max-width: 768px) {
     .leave-calendar-header,
     .leave-calendar-item {
         padding: 0.75rem 1rem;
     }
     
-    .calendar-col-dates {
-        width: 100px;
-        min-width: 100px;
+    .calendar-col {
+        padding-right: 0.75rem;
         font-size: 0.85rem;
+    }
+    
+    .calendar-col-dates {
+        width: 22%;
+        min-width: 90px;
+    }
+    
+    .calendar-col-employee {
+        width: 28%;
+        min-width: 120px;
     }
     
     .calendar-col-approver {
-        width: 150px;
-        min-width: 150px;
-        font-size: 0.85rem;
+        width: 28%;
+        min-width: 120px;
     }
     
     .calendar-col-type {
-        width: 90px;
-        min-width: 90px;
+        width: 22%;
+        min-width: 80px;
     }
 }
 
