@@ -6253,10 +6253,15 @@ async function determineVacationApprovers(site, team) {
             'GET'
         );
         
+        console.log('determineVacationApprovers: Response from DB', response);
+        
         if (response && response.length > 0) {
-            return response.map(r => ({ name: r.manager_name, email: r.manager_email }));
+            const approvers = response.map(r => ({ name: r.manager_name, email: r.manager_email }));
+            console.log('determineVacationApprovers: Returning approvers', approvers);
+            return approvers;
         }
         
+        console.log('determineVacationApprovers: No approvers found');
         return [];
     } catch (error) {
         console.error('Error fetching vacation approvers:', error);
