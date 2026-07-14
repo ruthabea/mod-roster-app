@@ -305,18 +305,8 @@ async function initializeModPersonnelData() {
         if (saved) {
             modPersonnelData = JSON.parse(saved);
         } else {
-            // Default data
-            modPersonnelData = {
-                onsite: [
-                    { name: 'Vikramjeet Saini', email: 'VSAINI@amdocs.com', phone: '+61 434516369' },
-                    { name: 'Sachin Banjara', email: 'SBanjara@amdocs.com', phone: '+61 478 016 068' }
-                ],
-                offshore: [
-                    { name: 'Ashwani Aggarwal', email: 'Ashwani.Aggarwal@ama.optusvendor.com.au', phone: '+61 478 015 240' },
-                    { name: 'Mak John Tadulan', email: 'MakJohn.Tadulan@ama.optusvendor.com.au', phone: '+63 917 847 2898' }
-                ]
-            };
-            saveModPersonnelData();
+            // Empty default - data should be added via the UI or database
+            modPersonnelData = { onsite: [], offshore: [] };
         }
     }
     renderModPersonnelTables();
@@ -6227,51 +6217,16 @@ async function fetchEmployeeTeam(employeeName) {
     }
 }
 
-// Manager directory for vacation approvals
-// NOTE: These emails must match the managers table in Supabase
-const MANAGERS = {
-    josieSolar: { name: 'Josie Solar', email: 'josephis@amdocs.com' },
-    manishaBardiya: { name: 'Manisha Bardiya', email: 'MBARDIYA@amdocs.com' },
-    ashwaniAggarwal: { name: 'Ashwani Aggarwal', email: 'ASHWANIA@amdocs.com' },
-    atmaramMore: { name: 'Atmaram More', email: 'Atmaram.More@amdocs.com' },
-    bindiyaPhadte: { name: 'Bindiya Phadte', email: 'BPHADTE@amdocs.com' },
-    rahulGupta: { name: 'Rahul Gupta', email: 'rahulg5@amdocs.com' },
-    prachiMenon: { name: 'Prachi Menon', email: 'Prachi.Menon@amdocs.com' }
-};
-
-// Manager routing configuration for vacation approvals (supports multiple approvers)
-const VACATION_APPROVERS = {
-    // Philippines Site - Team-based routing
-    'philippines_frontend': [MANAGERS.josieSolar, MANAGERS.manishaBardiya, MANAGERS.ashwaniAggarwal],
-    'philippines_digital': [MANAGERS.josieSolar, MANAGERS.manishaBardiya, MANAGERS.ashwaniAggarwal],
-    'philippines_backend': [MANAGERS.josieSolar, MANAGERS.atmaramMore, MANAGERS.bindiyaPhadte],
-    'philippines_infra': [MANAGERS.josieSolar, MANAGERS.rahulGupta],
-    'philippines_ods': [MANAGERS.josieSolar, MANAGERS.prachiMenon],
-    
-    // India/Australia Site - Team-based routing
-    'india_frontend': [MANAGERS.manishaBardiya, MANAGERS.ashwaniAggarwal],
-    'india_digital': [MANAGERS.manishaBardiya, MANAGERS.ashwaniAggarwal],
-    'india_backend': [MANAGERS.atmaramMore, MANAGERS.bindiyaPhadte],
-    'india_infra': [MANAGERS.rahulGupta],
-    'india_ods': [MANAGERS.prachiMenon],
-    
-    'australia_frontend': [MANAGERS.manishaBardiya, MANAGERS.ashwaniAggarwal],
-    'australia_digital': [MANAGERS.manishaBardiya, MANAGERS.ashwaniAggarwal],
-    'australia_backend': [MANAGERS.atmaramMore, MANAGERS.bindiyaPhadte],
-    'australia_infra': [MANAGERS.rahulGupta],
-    'australia_ods': [MANAGERS.prachiMenon],
-    
-    // Default (for B2B, ANM, SDM, L2, etc.)
-    'default': []
-};
+// Vacation approvers are now fetched from Supabase 'vacation_approvers' table
+// No hardcoded manager emails in code
 
 // Determine vacation approvers based on Site and Team (returns array of approvers)
-function determineVacationApprovers(site, team) {
+async function determineVacationApprovers(site, team) {
     const siteLower = (site || '').toLowerCase().trim();
     const teamLower = (team || '').toLowerCase().trim();
     
     // Normalize site names
-    let siteKey = 'default';
+    let siteKey = '';
     if (siteLower.includes('philippines') || siteLower === 'ph') {
         siteKey = 'philippines';
     } else if (siteLower.includes('india') || siteLower === 'in') {
@@ -6280,21 +6235,32 @@ function determineVacationApprovers(site, team) {
         siteKey = 'australia';
     }
     
-    // Build lookup key
-    const lookupKey = `${siteKey}_${teamLower}`;
-    
-    // Check for exact match
-    if (VACATION_APPROVERS[lookupKey]) {
-        return VACATION_APPROVERS[lookupKey];
+    // If no valid site, return empty
+    if (!siteKey || !teamLower) {
+        return [];
     }
     
-    // Default: No specific approvers found
-    return VACATION_APPROVERS['default'];
+    try {
+        // Fetch approvers from database
+        const response = await supabaseRequest(
+            `vacation_approvers?site=eq.${siteKey}&team=eq.${teamLower}&select=manager_name,manager_email`,
+            'GET'
+        );
+        
+        if (response && response.length > 0) {
+            return response.map(r => ({ name: r.manager_name, email: r.manager_email }));
+        }
+        
+        return [];
+    } catch (error) {
+        console.error('Error fetching vacation approvers:', error);
+        return [];
+    }
 }
 
 // Legacy function for backward compatibility (returns first approver)
-function determineVacationApprover(site, team) {
-    const approvers = determineVacationApprovers(site, team);
+async function determineVacationApprover(site, team) {
+    const approvers = await determineVacationApprovers(site, team);
     if (approvers.length > 0) {
         return approvers[0];
     }
@@ -6442,8 +6408,8 @@ async function autoFillSiteAndTeamByEmail(email, userName) {
         if (siteInput) siteInput.value = site;
         if (teamInput) teamInput.value = team ? capitalizeFirst(team) + ' Team' : '';
         
-        // Determine approvers based on site and team
-        const approvers = determineVacationApprovers(site, team);
+        // Determine approvers based on site and team (fetches from database)
+        const approvers = await determineVacationApprovers(site, team);
         
         if (approvers.length > 0) {
             const approverNames = approvers.map(a => a.name).join(', ');
