@@ -6255,8 +6255,11 @@ async function determineVacationApprovers(site, team) {
         
         console.log('determineVacationApprovers: Response from DB', response);
         
-        if (response && response.length > 0) {
-            const approvers = response.map(r => ({ name: r.manager_name, email: r.manager_email }));
+        // Handle both {data: [...]} format and direct array format
+        const data = response?.data || response;
+        
+        if (data && Array.isArray(data) && data.length > 0) {
+            const approvers = data.map(r => ({ name: r.manager_name, email: r.manager_email }));
             console.log('determineVacationApprovers: Returning approvers', approvers);
             return approvers;
         }
