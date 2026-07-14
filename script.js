@@ -6240,11 +6240,8 @@ async function determineVacationApprovers(site, team) {
     
     // If no valid site, return empty
     if (!siteKey || !teamLower) {
-        console.log('determineVacationApprovers: Missing site or team', { siteKey, teamLower });
         return [];
     }
-    
-    console.log('determineVacationApprovers: Fetching for', { siteKey, teamLower });
     
     try {
         // Fetch approvers from database
@@ -6253,18 +6250,13 @@ async function determineVacationApprovers(site, team) {
             'GET'
         );
         
-        console.log('determineVacationApprovers: Response from DB', response);
-        
         // Handle both {data: [...]} format and direct array format
         const data = response?.data || response;
         
         if (data && Array.isArray(data) && data.length > 0) {
-            const approvers = data.map(r => ({ name: r.manager_name, email: r.manager_email }));
-            console.log('determineVacationApprovers: Returning approvers', approvers);
-            return approvers;
+            return data.map(r => ({ name: r.manager_name, email: r.manager_email }));
         }
         
-        console.log('determineVacationApprovers: No approvers found');
         return [];
     } catch (error) {
         console.error('Error fetching vacation approvers:', error);
