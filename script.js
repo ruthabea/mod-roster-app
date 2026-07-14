@@ -6223,7 +6223,10 @@ async function fetchEmployeeTeam(employeeName) {
 // Determine vacation approvers based on Site and Team (returns array of approvers)
 async function determineVacationApprovers(site, team) {
     const siteLower = (site || '').toLowerCase().trim();
-    const teamLower = (team || '').toLowerCase().trim();
+    let teamLower = (team || '').toLowerCase().trim();
+    
+    // Normalize team name - remove "team" suffix if present
+    teamLower = teamLower.replace(/\s*team$/i, '').trim();
     
     // Normalize site names
     let siteKey = '';
@@ -6237,8 +6240,11 @@ async function determineVacationApprovers(site, team) {
     
     // If no valid site, return empty
     if (!siteKey || !teamLower) {
+        console.log('determineVacationApprovers: Missing site or team', { siteKey, teamLower });
         return [];
     }
+    
+    console.log('determineVacationApprovers: Fetching for', { siteKey, teamLower });
     
     try {
         // Fetch approvers from database
