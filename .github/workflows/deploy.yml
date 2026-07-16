@@ -27,7 +27,8 @@ jobs:
       - name: Inject secrets into config.js
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          # Use a dedicated secret name to avoid stale org/repo secrets named SUPABASE_ANON_KEY
+          SUPABASE_ANON_KEY: ${{ secrets.MOD_SUPABASE_ANON_KEY }}
           TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
         run: |
           # Copy template to config.js
@@ -36,8 +37,18 @@ jobs:
           # Debug: Check if secrets are set (show length only, not values)
           echo "Checking secrets..."
           echo "SUPABASE_URL length: ${#SUPABASE_URL}"
-          echo "SUPABASE_ANON_KEY length: ${#SUPABASE_ANON_KEY}"
+          echo "MOD_SUPABASE_ANON_KEY length: ${#SUPABASE_ANON_KEY}"
           echo "TEAMS_WEBHOOK_URL length: ${#TEAMS_WEBHOOK_URL}"
+
+          if [ ${#SUPABASE_ANON_KEY} -lt 100 ]; then
+            echo "ERROR: MOD_SUPABASE_ANON_KEY is too short (${#SUPABASE_ANON_KEY} chars)."
+            echo "Create repository secret MOD_SUPABASE_ANON_KEY with your Supabase anon public key."
+            exit 1
+          fi
+          if [ "$SUPABASE_ANON_KEY" = "[Credentials]" ]; then
+            echo "ERROR: MOD_SUPABASE_ANON_KEY still contains placeholder text [Credentials]."
+            exit 1
+          fi
           
           # Write Python script to file
           cat > replace_secrets.py << 'PYEOF'
