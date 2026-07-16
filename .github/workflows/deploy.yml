@@ -27,47 +27,32 @@ jobs:
       - name: Inject secrets into config.js
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          # Use a dedicated secret name to avoid stale org/repo secrets named SUPABASE_ANON_KEY
-          SUPABASE_ANON_KEY: ${{ secrets.MOD_SUPABASE_ANON_KEY }}
           TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
         run: |
-          # Copy template to config.js
           cp config.template.js config.js
           
-          # Debug: Check if secrets are set (show length only, not values)
           echo "Checking secrets..."
           echo "SUPABASE_URL length: ${#SUPABASE_URL}"
-          echo "MOD_SUPABASE_ANON_KEY length: ${#SUPABASE_ANON_KEY}"
           echo "TEAMS_WEBHOOK_URL length: ${#TEAMS_WEBHOOK_URL}"
 
-          if [ ${#SUPABASE_ANON_KEY} -lt 100 ]; then
-            echo "ERROR: MOD_SUPABASE_ANON_KEY is too short (${#SUPABASE_ANON_KEY} chars)."
-            echo "Create repository secret MOD_SUPABASE_ANON_KEY with your Supabase anon public key."
-            exit 1
-          fi
-          if [ "$SUPABASE_ANON_KEY" = "[Credentials]" ]; then
-            echo "ERROR: MOD_SUPABASE_ANON_KEY still contains placeholder text [Credentials]."
+          if [ ${#SUPABASE_URL} -lt 20 ]; then
+            echo "ERROR: SUPABASE_URL secret missing or too short."
             exit 1
           fi
           
-          # Write Python script to file
           cat > replace_secrets.py << 'PYEOF'
           import os
-          import sys
 
           with open('config.js', 'r') as f:
               content = f.read()
 
           supabase_url = os.environ.get('SUPABASE_URL', '')
-          supabase_key = os.environ.get('SUPABASE_ANON_KEY', '')
           teams_url = os.environ.get('TEAMS_WEBHOOK_URL', '')
 
           print(f"Python received - SUPABASE_URL: {len(supabase_url)} chars")
-          print(f"Python received - SUPABASE_ANON_KEY: {len(supabase_key)} chars")
           print(f"Python received - TEAMS_WEBHOOK_URL: {len(teams_url)} chars")
 
           content = content.replace('__SUPABASE_URL__', supabase_url)
-          content = content.replace('__SUPABASE_ANON_KEY__', supabase_key)
           content = content.replace('__TEAMS_WEBHOOK_URL__', teams_url)
 
           with open('config.js', 'w') as f:
@@ -76,19 +61,13 @@ jobs:
           print("Config.js updated successfully")
           PYEOF
           
-          # Run the Python script
           python3 replace_secrets.py
           
-          # Verify replacements
           echo "Checking for remaining placeholders..."
           
           FAILED=0
           if grep -q "__SUPABASE_URL__" config.js; then
             echo "ERROR: __SUPABASE_URL__ was not replaced."
-            FAILED=1
-          fi
-          if grep -q "__SUPABASE_ANON_KEY__" config.js; then
-            echo "ERROR: __SUPABASE_ANON_KEY__ was not replaced."
             FAILED=1
           fi
           if grep -q "__TEAMS_WEBHOOK_URL__" config.js; then
