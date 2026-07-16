@@ -10,12 +10,27 @@ const SESSION_DURATION = 24 * 60 * 60 * 1000;
 // Current user session
 let currentUser = null;
 
+// Detect local testing (file:// or localhost) — skip sign-in link
+function isLocalTestingEnvironment() {
+    const { protocol, hostname } = window.location;
+    return protocol === 'file:' || hostname === 'localhost' || hostname === '127.0.0.1';
+}
+
 // Initialize authentication on page load
 function initializeAuth() {
     // If authentication is disabled, show app directly
     if (!AUTH_ENABLED) {
         console.log('Authentication disabled. Showing app directly.');
         showAppWithoutAuth();
+        return;
+    }
+
+    // Skip sign-in for local testing (opening index.html directly)
+    if (isLocalTestingEnvironment()) {
+        console.log('Local testing environment detected. Skipping sign-in.');
+        showAppWithoutAuth({
+            user: { email: 'local-test@amdocs.com', name: 'Local Testing', role: 'manager' }
+        });
         return;
     }
     
@@ -336,17 +351,26 @@ function showLoginScreen() {
     showLoginLoading(false);
 }
 
-// Show app without auth (for development)
-function showAppWithoutAuth() {
+// Show app without auth (for development / local testing)
+function showAppWithoutAuth(options = {}) {
+    if (options.user) {
+        currentUser = options.user;
+    }
+
+    const displayName = currentUser?.name || 'Development Mode';
+    const userNameEl = document.getElementById('userName');
+    if (userNameEl) {
+        userNameEl.textContent = displayName;
+    }
+
+    if (currentUser?.role) {
+        applyRoleBasedAccess(currentUser.role);
+    }
+
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('appContainer').classList.remove('hidden');
     
-    const userNameEl = document.getElementById('userName');
-    if (userNameEl) {
-        userNameEl.textContent = 'Development Mode';
-    }
-    
-    console.log('Running in development mode (no authentication)');
+    console.log('Running without authentication:', displayName);
 }
 
 // Show magic link sent message

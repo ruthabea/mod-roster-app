@@ -271,6 +271,8 @@ function showTab(screen, tabName, clickEvent = null) {
     if (screen === 'holiday') {
         if (tabName === 'summary') {
             loadHolidaySummary();
+        } else if (tabName === 'calendar') {
+            loadPublicHolidayCalendar();
         } else if (tabName === 'support') {
             loadHolidaySupport();
         }
@@ -2255,12 +2257,12 @@ function showInfoModal(message, title = 'Information') {
 }
 
 // Helper function for confirm dialogs
-function showConfirmModal(message, title = 'Confirm', onConfirm, onCancel = null) {
+function showConfirmModal(message, title = 'Confirm', onConfirm, onCancel = null, okText = 'Yes, Delete') {
     showAlertModal(message, { 
         type: 'warning', 
         title,
         showCancel: true,
-        okText: 'Yes, Delete',
+        okText,
         cancelText: 'Cancel',
         onOk: onConfirm,
         onCancel: onCancel
@@ -2402,7 +2404,7 @@ function closeApproverSelectModal(confirmed = false) {
 let promptModalCallback = null;
 
 // Show prompt modal (replacement for prompt)
-function showPromptModal(message, title = 'Input Required', placeholder = '', onSubmit = null, onCancel = null) {
+function showPromptModal(message, title = 'Input Required', placeholder = '', onSubmit = null, onCancel = null, options = {}) {
     const modal = document.getElementById('promptModal');
     const iconEl = document.getElementById('promptModalIcon');
     const titleEl = document.getElementById('promptModalTitle');
@@ -2428,31 +2430,70 @@ function showPromptModal(message, title = 'Input Required', placeholder = '', on
     inputEl.placeholder = placeholder;
     
     // Store callback
-    promptModalCallback = { onSubmit, onCancel };
+    promptModalCallback = { onSubmit, onCancel, staffAutocomplete: !!options.staffAutocomplete };
     
     // Show modal
     modal.classList.remove('hidden');
+
+    const suggestionsDiv = document.getElementById('promptModalInput-suggestions');
+    if (suggestionsDiv) {
+        suggestionsDiv.classList.remove('show');
+        suggestionsDiv.innerHTML = '';
+    }
     
-    // Focus input
-    setTimeout(() => inputEl.focus(), 100);
+    // Focus input and wire autocomplete
+    setTimeout(() => {
+        inputEl.focus();
+        if (options.staffAutocomplete) {
+            loadHolidaySupportContactNames();
+        }
+    }, 100);
     
-    // Handle Enter key
+    inputEl.oninput = options.staffAutocomplete
+        ? () => showStaffNameSuggestions(inputEl)
+        : null;
+
     inputEl.onkeydown = function(e) {
+        if (e.key === 'Escape') {
+            closePromptModal(false);
+            return;
+        }
+        if (options.staffAutocomplete) {
+            handleStaffSuggestionKeydown(e, inputEl);
+            if (e.key === 'Enter' && !e.defaultPrevented) {
+                closePromptModal(true);
+            }
+            return;
+        }
         if (e.key === 'Enter') {
             closePromptModal(true);
-        } else if (e.key === 'Escape') {
-            closePromptModal(false);
         }
     };
+
+    inputEl.onblur = options.staffAutocomplete
+        ? () => hideSuggestionsDelayed(inputEl)
+        : null;
 }
 
 // Close prompt modal
 function closePromptModal(confirmed = true) {
     const modal = document.getElementById('promptModal');
     const inputEl = document.getElementById('promptModalInput');
+    const suggestionsDiv = document.getElementById('promptModalInput-suggestions');
     
     if (modal) {
         modal.classList.add('hidden');
+    }
+
+    if (suggestionsDiv) {
+        suggestionsDiv.classList.remove('show');
+        suggestionsDiv.innerHTML = '';
+    }
+
+    if (inputEl) {
+        inputEl.oninput = null;
+        inputEl.onkeydown = null;
+        inputEl.onblur = null;
     }
     
     if (promptModalCallback) {
@@ -3118,6 +3159,8 @@ async function saveContact(event) {
     
     renderAllContactTables();
     closeContactModal();
+    invalidateHolidaySummaryCache();
+    invalidateHolidaySupportContactNames();
     
     if (contactEditMode) {
         document.querySelector('#oncall-contactsTab .card').classList.add('edit-mode');
@@ -3151,6 +3194,8 @@ async function deleteContact(teamKey, index) {
                 
                 renderAllContactTables();
                 showToast('Contact deleted');
+                invalidateHolidaySummaryCache();
+                invalidateHolidaySupportContactNames();
                 
                 if (contactEditMode) {
                     document.querySelector('#oncall-contactsTab .card').classList.add('edit-mode');
@@ -4570,6 +4615,188 @@ function getAllContactNames() {
         }
     }
     return Array.from(names).sort((a, b) => a.localeCompare(b));
+}
+
+let holidaySupportContactOptions = [];
+
+function invalidateHolidaySupportContactNames() {
+    holidaySupportContactOptions = [];
+}
+
+async function loadHolidaySupportContactNames(forceRefresh = false) {
+    if (!forceRefresh && holidaySupportContactOptions.length > 0) {
+        return holidaySupportContactOptions;
+    }
+
+    try {
+        const result = await supabaseRequest('contacts', 'GET', null, '?select=name,area,team,site&order=name');
+        if (result.data && result.data.length > 0) {
+            holidaySupportContactOptions = result.data
+                .filter(c => c.name && String(c.name).trim())
+                .map(c => ({
+                    name: String(c.name).trim(),
+                    area: c.area || '',
+                    team: capitalizeFirst(c.team || ''),
+                    site: c.site || ''
+                }));
+            return holidaySupportContactOptions;
+        }
+    } catch (err) {
+        console.warn('Could not load contacts for staff suggestions:', err);
+    }
+
+    holidaySupportContactOptions = getAllContactNames().map(name => ({
+        name,
+        area: '',
+        team: '',
+        site: ''
+    }));
+    return holidaySupportContactOptions;
+}
+
+function getStaffNameInputToken(input) {
+    const value = input.value;
+    const cursorPos = typeof input.selectionStart === 'number' ? input.selectionStart : value.length;
+    const beforeCursor = value.substring(0, cursorPos);
+    const lastComma = beforeCursor.lastIndexOf(',');
+    const segment = beforeCursor.substring(lastComma + 1);
+    return {
+        token: segment.trim(),
+        replaceStart: lastComma + 1,
+        replaceEnd: cursorPos
+    };
+}
+
+function buildStaffSuggestionLabel(contact) {
+    const meta = [contact.area, contact.team, contact.site].filter(Boolean).join(' · ');
+    return meta;
+}
+
+function renderStaffSuggestionItem(inputId, contact, query) {
+    const name = contact.name;
+    const lowerName = name.toLowerCase();
+    const matchIndex = lowerName.indexOf(query);
+    let nameHtml = escapeHtml(name);
+    if (matchIndex >= 0) {
+        const before = escapeHtml(name.substring(0, matchIndex));
+        const match = escapeHtml(name.substring(matchIndex, matchIndex + query.length));
+        const after = escapeHtml(name.substring(matchIndex + query.length));
+        nameHtml = `${before}<span class="match">${match}</span>${after}`;
+    }
+    const meta = buildStaffSuggestionLabel(contact);
+    const metaHtml = meta ? `<span class="autocomplete-item-meta">${escapeHtml(meta)}</span>` : '';
+    return `<div class="autocomplete-item" data-input-id="${escapeHtml(inputId)}" data-name="${escapeHtml(name)}">${nameHtml}${metaHtml}</div>`;
+}
+
+async function showStaffNameSuggestions(input) {
+    const suggestionsId = `${input.id}-suggestions`;
+    const suggestionsDiv = document.getElementById(suggestionsId);
+    if (!suggestionsDiv) return;
+
+    await loadHolidaySupportContactNames();
+    const { token } = getStaffNameInputToken(input);
+    const query = token.trim().toLowerCase();
+
+    if (query.length === 0) {
+        suggestionsDiv.classList.remove('show');
+        suggestionsDiv.innerHTML = '';
+        return;
+    }
+
+    const matches = holidaySupportContactOptions
+        .filter(contact => contact.name.toLowerCase().includes(query))
+        .slice(0, 8);
+
+    if (matches.length === 0) {
+        suggestionsDiv.innerHTML = '<div class="autocomplete-no-match">No matching contacts</div>';
+        suggestionsDiv.classList.add('show');
+        return;
+    }
+
+    suggestionsDiv.innerHTML = matches
+        .map(contact => renderStaffSuggestionItem(input.id, contact, query))
+        .join('');
+
+    suggestionsDiv.querySelectorAll('.autocomplete-item').forEach(item => {
+        item.addEventListener('mousedown', (event) => {
+            event.preventDefault();
+            selectStaffNameSuggestion(item.dataset.inputId, item.dataset.name);
+        });
+    });
+
+    suggestionsDiv.classList.add('show');
+}
+
+function selectStaffNameSuggestion(inputId, name) {
+    const input = document.getElementById(inputId);
+    if (!input || !name) return;
+
+    const { replaceStart, replaceEnd } = getStaffNameInputToken(input);
+    let before = input.value.substring(0, replaceStart);
+    const after = input.value.substring(replaceEnd);
+
+    if (before.length > 0 && before.endsWith(',')) {
+        before += ' ';
+    }
+
+    input.value = `${before}${name}${after}`;
+    input.value = input.value
+        .split(',')
+        .map(part => part.trim())
+        .filter(part => part)
+        .join(', ');
+
+    const suggestionsDiv = document.getElementById(`${inputId}-suggestions`);
+    if (suggestionsDiv) {
+        suggestionsDiv.classList.remove('show');
+        suggestionsDiv.innerHTML = '';
+    }
+
+    input.focus();
+    if (inputId === 'assignmentStaff' && typeof updateAssignmentFormPreview === 'function') {
+        updateAssignmentFormPreview();
+    }
+}
+
+function handleStaffSuggestionKeydown(event, input) {
+    const suggestionsDiv = document.getElementById(`${input.id}-suggestions`);
+    if (!suggestionsDiv || !suggestionsDiv.classList.contains('show')) {
+        return;
+    }
+
+    const items = suggestionsDiv.querySelectorAll('.autocomplete-item');
+    if (items.length === 0) return;
+
+    let highlightedIndex = -1;
+    items.forEach((item, index) => {
+        if (item.classList.contains('highlighted')) highlightedIndex = index;
+    });
+
+    switch (event.key) {
+        case 'ArrowDown':
+            event.preventDefault();
+            if (highlightedIndex >= 0) items[highlightedIndex].classList.remove('highlighted');
+            highlightedIndex = (highlightedIndex + 1) % items.length;
+            items[highlightedIndex].classList.add('highlighted');
+            items[highlightedIndex].scrollIntoView({ block: 'nearest' });
+            break;
+        case 'ArrowUp':
+            event.preventDefault();
+            if (highlightedIndex >= 0) items[highlightedIndex].classList.remove('highlighted');
+            highlightedIndex = highlightedIndex <= 0 ? items.length - 1 : highlightedIndex - 1;
+            items[highlightedIndex].classList.add('highlighted');
+            items[highlightedIndex].scrollIntoView({ block: 'nearest' });
+            break;
+        case 'Enter':
+            if (highlightedIndex >= 0) {
+                event.preventDefault();
+                selectStaffNameSuggestion(input.id, items[highlightedIndex].dataset.name);
+            }
+            break;
+        case 'Escape':
+            suggestionsDiv.classList.remove('show');
+            break;
+    }
 }
 
 function showNameSuggestions(input) {
@@ -7287,6 +7514,67 @@ const HOLIDAY_STATUS_OPTIONS = [
 
 // Store holiday staffing data from database
 let holidayStaffingEntries = {};
+let holidaySummaryEditMode = false;
+let holidaySummaryData = [];
+let holidaySummaryDates = [];
+let cachedHolidaySummary = null;
+
+function invalidateHolidaySummaryCache() {
+    cachedHolidaySummary = null;
+}
+
+function syncHolidaySummaryCache() {
+    if (!cachedHolidaySummary) return;
+    cachedHolidaySummary.summaryData = holidaySummaryData;
+    cachedHolidaySummary.holidayStaffingEntries = { ...holidayStaffingEntries };
+}
+
+function getHolidayStatusOptionsHtml(selectedValue = '') {
+    return HOLIDAY_STATUS_OPTIONS.map(opt =>
+        `<option value="${opt.value}" ${opt.value === selectedValue ? 'selected' : ''}>${opt.label}</option>`
+    ).join('');
+}
+
+function updateHolidayStatusCellDisplay(cell, status) {
+    const weekendClass = cell.dataset.weekend === '1' ? 'hs-weekend' : '';
+    const statusClass = status ? `hs-status-${status.toLowerCase()}` : '';
+    cell.dataset.status = status;
+    cell.className = `hs-status-cell hs-status-editable ${weekendClass} ${statusClass}`.trim();
+    cell.innerHTML = status
+        ? escapeHtml(status)
+        : '<span class="hs-status-empty">—</span>';
+}
+
+function openHolidayStatusCell(cell) {
+    if (!cell || cell.querySelector('select')) return;
+
+    const contactId = cell.dataset.contactId;
+    const date = cell.dataset.date;
+    const status = cell.dataset.status || '';
+
+    const select = document.createElement('select');
+    select.className = 'hs-status-dropdown';
+    select.dataset.contactId = contactId;
+    select.dataset.date = date;
+    select.innerHTML = getHolidayStatusOptionsHtml(status);
+
+    select.addEventListener('change', async () => {
+        await onHolidayStatusChange(select);
+        updateHolidayStatusCellDisplay(cell, select.value);
+    });
+
+    select.addEventListener('blur', () => {
+        setTimeout(() => {
+            if (cell.contains(select)) {
+                updateHolidayStatusCellDisplay(cell, cell.dataset.status || '');
+            }
+        }, 120);
+    });
+
+    cell.innerHTML = '';
+    cell.appendChild(select);
+    select.focus();
+}
 
 // Application color mapping
 const APP_COLORS = {
@@ -7362,14 +7650,10 @@ function onHolidayMonthChange() {
 }
 
 // Load Holiday Summary - Main function
-async function loadHolidaySummary() {
+async function loadHolidaySummary(forceRefresh = false) {
     const loadingEl = document.getElementById('holidaySummaryLoading');
     const emptyEl = document.getElementById('holidaySummaryEmpty');
     const tableEl = document.getElementById('holidaySummaryTable');
-    
-    if (loadingEl) loadingEl.classList.remove('hidden');
-    if (emptyEl) emptyEl.classList.add('hidden');
-    if (tableEl) tableEl.classList.add('hidden');
     
     // Initialize date pickers if not set
     const startInput = document.getElementById('holidayStartDate');
@@ -7385,12 +7669,31 @@ async function loadHolidaySummary() {
     if (!startDate || !endDate) {
         if (loadingEl) loadingEl.classList.add('hidden');
         if (emptyEl) emptyEl.classList.remove('hidden');
+        if (tableEl) tableEl.classList.add('hidden');
+        return;
+    }
+
+    const cacheKey = `${startDate}|${endDate}`;
+    if (!forceRefresh && cachedHolidaySummary?.key === cacheKey) {
+        holidayStaffingEntries = { ...cachedHolidaySummary.holidayStaffingEntries };
+        holidaySummaryData = cachedHolidaySummary.summaryData;
+        if (loadingEl) loadingEl.classList.add('hidden');
+        if (emptyEl) emptyEl.classList.add('hidden');
+        if (tableEl) tableEl.classList.remove('hidden');
+        renderHolidaySummaryTable(cachedHolidaySummary.dates, cachedHolidaySummary.summaryData);
         return;
     }
     
+    if (loadingEl) loadingEl.classList.remove('hidden');
+    if (emptyEl) emptyEl.classList.add('hidden');
+    if (tableEl) tableEl.classList.add('hidden');
+    
     try {
-        // Load contacts data from Contact Details
-        const contactsResult = await supabaseRequest('contacts', 'GET', null, '?order=team,area,name');
+        const [contactsResult, staffingResult] = await Promise.all([
+            supabaseRequest('contacts', 'GET', null, '?order=team,area,name'),
+            supabaseRequest('holiday_staffing', 'GET', null,
+                `?staff_date=gte.${startDate}&staff_date=lte.${endDate}`)
+        ]);
         
         if (contactsResult.error || !contactsResult.data || contactsResult.data.length === 0) {
             if (loadingEl) loadingEl.classList.add('hidden');
@@ -7398,44 +7701,43 @@ async function loadHolidaySummary() {
             return;
         }
         
-        // Load existing holiday staffing entries for the date range
-        const staffingResult = await supabaseRequest('holiday_staffing', 'GET', null, 
-            `?staff_date=gte.${startDate}&staff_date=lte.${endDate}`);
-        
-        // Build lookup map for existing entries
         holidayStaffingEntries = {};
+        const statusesByContact = {};
+
         if (staffingResult.data) {
             staffingResult.data.forEach(entry => {
                 const key = `${entry.contact_id}_${entry.staff_date}`;
                 holidayStaffingEntries[key] = entry;
+                if (!statusesByContact[entry.contact_id]) {
+                    statusesByContact[entry.contact_id] = {};
+                }
+                statusesByContact[entry.contact_id][entry.staff_date] = entry.status;
             });
         }
         
-        // Transform contacts data
         const summaryData = contactsResult.data.map(c => ({
             id: c.id,
+            team: c.team || '',
             app: capitalizeFirst(c.team || ''),
             area: c.area || '',
             name: c.name || '',
             site: c.site || '',
             contact: c.phone || '',
-            statuses: {}
+            email: c.email || '',
+            statuses: statusesByContact[c.id] || {}
         }));
         
-        // Fill in statuses from loaded data
-        summaryData.forEach(row => {
-            Object.keys(holidayStaffingEntries).forEach(key => {
-                if (key.startsWith(`${row.id}_`)) {
-                    const entry = holidayStaffingEntries[key];
-                    row.statuses[entry.staff_date] = entry.status;
-                }
-            });
-        });
+        const dates = generateHolidayDates(startDate, endDate);
+
+        cachedHolidaySummary = {
+            key: cacheKey,
+            dates,
+            summaryData,
+            holidayStaffingEntries: { ...holidayStaffingEntries }
+        };
         
         if (loadingEl) loadingEl.classList.add('hidden');
         if (tableEl) tableEl.classList.remove('hidden');
-        
-        const dates = generateHolidayDates(startDate, endDate);
         renderHolidaySummaryTable(dates, summaryData);
         
     } catch (err) {
@@ -7456,28 +7758,37 @@ function renderHolidaySummaryTable(dates, data) {
     const bodyEl = document.getElementById('holidaySummaryBody');
     
     if (!headEl || !bodyEl) return;
+
+    holidaySummaryDates = dates;
+    holidaySummaryData = data;
     
-    // Build header - First row with day of week
+    // Single-row header with stacked date + day per column
     let headerHtml = '<tr class="hs-header-row">';
     headerHtml += '<th class="hs-fixed-col">App</th>';
     headerHtml += '<th class="hs-fixed-col">Application Area</th>';
     headerHtml += '<th class="hs-fixed-col">Name</th>';
     headerHtml += '<th class="hs-fixed-col">Site</th>';
-    headerHtml += '<th class="hs-fixed-col">Contact Number</th>';
-    
+    headerHtml += '<th class="hs-fixed-col">Contact</th>';
+
     dates.forEach(d => {
         const weekendClass = d.isWeekend ? 'hs-weekend' : '';
-        headerHtml += `<th class="hs-date-col ${weekendClass}">${d.display}<br><small>${d.dayOfWeek}</small></th>`;
+        headerHtml += `<th class="hs-date-col ${weekendClass}">
+            <span class="hs-date-label">${d.display}</span>
+            <span class="hs-day-label">${d.dayOfWeek}</span>
+        </th>`;
     });
+
+    if (holidaySummaryEditMode) {
+        headerHtml += '<th class="hs-actions-col">Actions</th>';
+    }
     headerHtml += '</tr>';
-    
+
     headEl.innerHTML = headerHtml;
     
     // Build body with dropdowns
     let bodyHtml = '';
     
-    data.forEach((row, rowIndex) => {
-        // Get color for this application (only for App and Area columns)
+    data.forEach((row) => {
         const appColor = APP_COLORS[row.app] || '#f0f0f0';
         
         bodyHtml += `<tr data-contact-id="${row.id}">`;
@@ -7492,25 +7803,160 @@ function renderHolidaySummaryTable(dates, data) {
             const weekendClass = d.isWeekend ? 'hs-weekend' : '';
             const statusClass = status ? `hs-status-${status.toLowerCase()}` : '';
             
-            // Build dropdown options
-            let optionsHtml = HOLIDAY_STATUS_OPTIONS.map(opt => 
-                `<option value="${opt.value}" ${opt.value === status ? 'selected' : ''}>${opt.label}</option>`
-            ).join('');
-            
-            bodyHtml += `<td class="hs-status-cell ${weekendClass} ${statusClass}">
-                <select class="hs-status-dropdown" 
-                        data-contact-id="${row.id}" 
-                        data-date="${d.date}"
-                        onchange="onHolidayStatusChange(this)">
-                    ${optionsHtml}
-                </select>
-            </td>`;
+            bodyHtml += `<td class="hs-status-cell hs-status-editable ${weekendClass} ${statusClass}"
+                data-contact-id="${row.id}"
+                data-date="${d.date}"
+                data-status="${escapeHtml(status)}"
+                data-weekend="${d.isWeekend ? '1' : '0'}"
+                onclick="openHolidayStatusCell(this)"
+                title="Click to set status">${status ? escapeHtml(status) : '<span class="hs-status-empty">—</span>'}</td>`;
         });
+
+        if (holidaySummaryEditMode) {
+            bodyHtml += `<td class="hs-actions-cell">
+                <button class="btn btn-sm btn-secondary" onclick="editHolidayStaff(${row.id})" title="Edit">Edit</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteHolidayStaff(${row.id})" title="Delete">Delete</button>
+            </td>`;
+        }
         
         bodyHtml += '</tr>';
     });
     
     bodyEl.innerHTML = bodyHtml;
+}
+
+function toggleHolidaySummaryEditMode() {
+    holidaySummaryEditMode = !holidaySummaryEditMode;
+    const card = document.querySelector('#holiday-summaryTab .card');
+    const editBtn = document.querySelector('#holiday-summaryTab .btn-secondary[onclick="toggleHolidaySummaryEditMode()"]');
+    const addBtn = document.getElementById('addHolidayStaffBtn');
+    const editText = document.getElementById('holidaySummaryEditModeText');
+
+    if (holidaySummaryEditMode) {
+        card?.classList.add('holiday-summary-edit-mode');
+        editBtn?.classList.add('edit-mode-active');
+        if (editText) editText.textContent = 'Exit Edit Mode';
+        addBtn?.classList.remove('hidden');
+    } else {
+        card?.classList.remove('holiday-summary-edit-mode');
+        editBtn?.classList.remove('edit-mode-active');
+        if (editText) editText.textContent = 'Edit Mode';
+        addBtn?.classList.add('hidden');
+    }
+
+    if (holidaySummaryDates.length && holidaySummaryData.length) {
+        renderHolidaySummaryTable(holidaySummaryDates, holidaySummaryData);
+    }
+}
+
+function openHolidayStaffModal(contactId = null) {
+    const modal = document.getElementById('holidayStaffModal');
+    const title = document.getElementById('holidayStaffModalTitle');
+    const form = document.getElementById('holidayStaffForm');
+    if (!modal || !form) return;
+
+    form.reset();
+    document.getElementById('holidayStaffEditId').value = contactId || '';
+
+    if (contactId) {
+        const staff = holidaySummaryData.find(s => s.id == contactId);
+        if (!staff) return;
+        title.textContent = 'Edit Staff';
+        document.getElementById('holidayStaffTeam').value = staff.team || '';
+        document.getElementById('holidayStaffTeam').disabled = true;
+        document.getElementById('holidayStaffArea').value = staff.area || '';
+        document.getElementById('holidayStaffName').value = staff.name || '';
+        document.getElementById('holidayStaffSite').value = staff.site || '';
+        document.getElementById('holidayStaffPhone').value = staff.contact || '';
+        document.getElementById('holidayStaffEmail').value = staff.email || '';
+    } else {
+        title.textContent = 'Add Staff';
+        document.getElementById('holidayStaffTeam').disabled = false;
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function closeHolidayStaffModal() {
+    document.getElementById('holidayStaffModal')?.classList.add('hidden');
+    const teamSelect = document.getElementById('holidayStaffTeam');
+    if (teamSelect) teamSelect.disabled = false;
+}
+
+function editHolidayStaff(contactId) {
+    openHolidayStaffModal(contactId);
+}
+
+async function saveHolidayStaff(event) {
+    event.preventDefault();
+
+    const contactId = document.getElementById('holidayStaffEditId').value;
+    const team = document.getElementById('holidayStaffTeam').value;
+    const contact = {
+        area: document.getElementById('holidayStaffArea').value.trim(),
+        name: document.getElementById('holidayStaffName').value.trim(),
+        site: document.getElementById('holidayStaffSite').value,
+        escalation: '',
+        phone: document.getElementById('holidayStaffPhone').value.trim(),
+        cpid: '',
+        email: document.getElementById('holidayStaffEmail').value.trim()
+    };
+
+    try {
+        if (contactId) {
+            const result = await db.updateContact(parseInt(contactId), contact);
+            if (!result) throw new Error('Update failed');
+            showToast('Staff updated successfully', 'success');
+        } else {
+            const result = await db.saveContact(team, contact);
+            if (!result) throw new Error('Save failed');
+            showToast('Staff added successfully', 'success');
+        }
+
+        if (typeof initializeContactsData === 'function') {
+            await initializeContactsData();
+        }
+        closeHolidayStaffModal();
+        invalidateHolidaySummaryCache();
+        invalidateHolidaySupportContactNames();
+        await loadHolidaySummary(true);
+    } catch (err) {
+        console.error('Error saving holiday staff:', err);
+        showToast('Failed to save staff', 'error');
+    }
+}
+
+async function deleteHolidayStaff(contactId) {
+    const staff = holidaySummaryData.find(s => s.id == contactId);
+    const staffName = staff?.name || 'this staff member';
+
+    showConfirmModal(
+        `Are you sure you want to delete "${staffName}"? This will also remove all their availability statuses.`,
+        'Delete Staff',
+        async () => {
+            try {
+                await supabaseRequest('holiday_staffing', 'DELETE', null, `?contact_id=eq.${contactId}`);
+                const deleted = await db.deleteContact(parseInt(contactId, 10));
+                if (!deleted) throw new Error('Delete failed');
+
+                Object.keys(holidayStaffingEntries).forEach(key => {
+                    if (key.startsWith(`${contactId}_`)) {
+                        delete holidayStaffingEntries[key];
+                    }
+                });
+
+                if (typeof initializeContactsData === 'function') {
+                    await initializeContactsData();
+                }
+                showToast('Staff deleted successfully', 'success');
+                invalidateHolidaySummaryCache();
+                await loadHolidaySummary(true);
+            } catch (err) {
+                console.error('Error deleting holiday staff:', err);
+                showToast('Failed to delete staff', 'error');
+            }
+        }
+    );
 }
 
 // Handle status change
@@ -7532,29 +7978,34 @@ async function onHolidayStatusChange(selectEl) {
         if (status) {
             // Check if entry exists
             if (holidayStaffingEntries[key]) {
-                // Update existing
-                await supabaseRequest('holiday_staffing', 'PATCH', 
+                const result = await supabaseRequest('holiday_staffing', 'PATCH', 
                     { status, updated_at: new Date().toISOString() },
                     `?contact_id=eq.${contactId}&staff_date=eq.${date}`
                 );
+                if (result.error) throw new Error(result.error);
             } else {
-                // Insert new
-                await supabaseRequest('holiday_staffing', 'POST', {
-                    contact_id: parseInt(contactId),
+                const result = await supabaseRequest('holiday_staffing', 'POST', {
+                    contact_id: parseInt(contactId, 10),
                     staff_date: date,
                     status: status
                 });
+                if (result.error) throw new Error(result.error);
             }
             holidayStaffingEntries[key] = { contact_id: contactId, staff_date: date, status };
+            const summaryRow = holidaySummaryData.find(s => s.id == contactId);
+            if (summaryRow) summaryRow.statuses[date] = status;
         } else {
-            // Delete if status is empty
             if (holidayStaffingEntries[key]) {
-                await supabaseRequest('holiday_staffing', 'DELETE', null,
+                const result = await supabaseRequest('holiday_staffing', 'DELETE', null,
                     `?contact_id=eq.${contactId}&staff_date=eq.${date}`
                 );
+                if (result.error) throw new Error(result.error);
                 delete holidayStaffingEntries[key];
+                const summaryRow = holidaySummaryData.find(s => s.id == contactId);
+                if (summaryRow) delete summaryRow.statuses[date];
             }
         }
+        syncHolidaySummaryCache();
     } catch (err) {
         console.error('Error saving holiday status:', err);
         showToast('Failed to save status', 'error');
@@ -7568,30 +8019,41 @@ async function saveAllHolidayStaffing() {
 
 // Export Holiday Summary to Excel
 function exportHolidaySummary() {
-    const table = document.getElementById('holidayStaffingTable');
-    if (!table) {
-        showToast('No data to export', 'error');
-        return;
-    }
-    
     if (typeof XLSX === 'undefined') {
         showToast('Excel library not loaded', 'error');
         return;
     }
-    
-    // Clone table and replace dropdowns with their values
-    const clonedTable = table.cloneNode(true);
-    const selects = clonedTable.querySelectorAll('select');
-    selects.forEach(select => {
-        const value = select.value || '';
-        const text = document.createTextNode(value);
-        select.parentNode.replaceChild(text, select);
+
+    if (!holidaySummaryDates.length || !holidaySummaryData.length) {
+        showToast('No data to export', 'error');
+        return;
+    }
+
+    const dates = holidaySummaryDates;
+    const data = holidaySummaryData;
+
+    // Row 1: fixed headers + dates (e.g. 1-Jul)
+    const headerRow1 = ['App', 'Application Area', 'Name', 'Site', 'Contact Number'];
+    dates.forEach(d => headerRow1.push(d.display));
+
+    // Row 2: blank fixed cols + day names (e.g. Wed)
+    const headerRow2 = ['', '', '', '', ''];
+    dates.forEach(d => headerRow2.push(d.dayOfWeek));
+
+    const rows = [headerRow1, headerRow2];
+
+    data.forEach(row => {
+        const dataRow = [row.app, row.area, row.name, row.site, row.contact];
+        dates.forEach(d => {
+            dataRow.push(row.statuses[d.date] || '');
+        });
+        rows.push(dataRow);
     });
-    
+
     const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.table_to_sheet(clonedTable);
+    const ws = XLSX.utils.aoa_to_sheet(rows);
     XLSX.utils.book_append_sheet(wb, ws, 'Holiday Staffing');
-    
+
     const startDate = document.getElementById('holidayStartDate')?.value || 'export';
     XLSX.writeFile(wb, `holiday_staffing_${startDate}.xlsx`);
     showToast('Exported successfully!', 'success');
@@ -7600,46 +8062,890 @@ function exportHolidaySummary() {
 // Store loaded holiday dates and support data
 let loadedHolidayDates = [];
 let loadedHolidaySupport = [];
+let cachedHolidaySupport = null;
+let holidaySupportAssignmentMap = new Map();
+let holidaySupportTeamIndex = new Map();
 
-// Load Holiday Support - Database driven
-async function loadHolidaySupport() {
-    const loadingEl = document.getElementById('holidaySupportLoading');
-    const emptyEl = document.getElementById('holidaySupportEmpty');
-    const contentEl = document.getElementById('holidaySupportContent');
-    
+function invalidateHolidaySupportCache() {
+    cachedHolidaySupport = null;
+}
+
+function buildHolidaySupportAssignmentMap() {
+    holidaySupportAssignmentMap = new Map();
+    holidaySupportTeamIndex = new Map();
+
+    loadedHolidaySupport.forEach(item => {
+        const normTeam = normalizeHolidaySupportTeam(item.team);
+        const exactKey = `${item.support_type}|${item.holiday_date_id}|${normTeam}|${item.application}`;
+        holidaySupportAssignmentMap.set(exactKey, item);
+
+        const teamKey = `${item.support_type}|${item.holiday_date_id}|${normTeam}`;
+        if (!holidaySupportTeamIndex.has(teamKey)) {
+            holidaySupportTeamIndex.set(teamKey, []);
+        }
+        holidaySupportTeamIndex.get(teamKey).push(item);
+    });
+}
+
+function applyHolidaySupportView() {
+    buildHolidaySupportAssignmentMap();
+    if (document.getElementById('holidaySupportContent')?.classList.contains('hidden')) return;
+    renderHolidaySupportFromDB('desk');
+    renderHolidaySupportFromDB('call');
+}
+let publicHolidayCalendarData = [];
+const publicHolidayApiCache = {};
+
+const PUBLIC_HOLIDAY_COUNTRIES = [
+    { key: 'PH', apiCode: 'PH', label: 'Philippines', bodyId: 'phHolidayTableBody', countId: 'phHolidayCount', noteId: 'phHolidayNote' },
+    { key: 'AUS', apiCode: 'AU', label: 'Australia', bodyId: 'ausHolidayTableBody', countId: 'ausHolidayCount', noteId: 'ausHolidayNote' },
+    { key: 'India', apiCode: 'IN', label: 'India', bodyId: 'indiaHolidayTableBody', countId: 'indiaHolidayCount', noteId: 'indiaHolidayNote' }
+];
+
+// Fallback when API returns Filipino-only names for Philippines
+const PHILIPPINES_HOLIDAY_NAME_EN = {
+    'Bagong Taon': "New Year's Day",
+    'Araw ng Kagitingan': 'Day of Valor',
+    'Huwebes Santo': 'Maundy Thursday',
+    'Biyernes Santo': 'Good Friday',
+    'Sabado de Gloria': 'Black Saturday',
+    'Araw ng Paggawa': 'Labour Day',
+    'Araw ng Kalayaan': 'Independence Day',
+    'Araw ng mga Bayani': 'National Heroes Day',
+    'Undas': "All Saints' Day",
+    'Araw ng mga Patay': "All Saints' Day",
+    'Araw ni Bonifacio': 'Bonifacio Day',
+    'Araw ng Pasko': 'Christmas Day',
+    'Pasko': 'Christmas Day',
+    'Araw ni Rizal': 'Rizal Day'
+};
+
+function getPublicHolidayDisplayName(countryKey, holiday) {
+    if (countryKey === 'PH') {
+        const englishName = holiday.name || PHILIPPINES_HOLIDAY_NAME_EN[holiday.localName] || holiday.localName;
+        return englishName || 'Public Holiday';
+    }
+    return holiday.localName || holiday.name || 'Public Holiday';
+}
+
+function mergePublicHolidaysByDate(holidays) {
+    const byKey = new Map();
+
+    holidays.forEach(hd => {
+        const key = `${hd.country}|${hd.holiday_date}`;
+        if (!byKey.has(key)) {
+            byKey.set(key, {
+                country: hd.country,
+                holiday_date: hd.holiday_date,
+                names: [hd.holiday_name],
+                isGlobal: hd.isGlobal
+            });
+            return;
+        }
+
+        const existing = byKey.get(key);
+        if (!existing.names.includes(hd.holiday_name)) {
+            existing.names.push(hd.holiday_name);
+        }
+    });
+
+    return Array.from(byKey.values())
+        .map(entry => ({
+            country: entry.country,
+            holiday_date: entry.holiday_date,
+            holiday_name: entry.names.join(' / '),
+            isGlobal: entry.isGlobal
+        }))
+        .sort((a, b) => a.holiday_date.localeCompare(b.holiday_date) || a.country.localeCompare(b.country));
+}
+
+function populatePublicHolidayYearFilter() {
+    const yearFilter = document.getElementById('publicHolidayYearFilter');
+    if (!yearFilter) return;
+
+    const currentYear = new Date().getFullYear();
+    const selectedYear = yearFilter.value || currentYear;
+    let options = '';
+    for (let year = currentYear - 1; year <= currentYear + 2; year++) {
+        options += `<option value="${year}" ${String(year) === String(selectedYear) ? 'selected' : ''}>${year}</option>`;
+    }
+    yearFilter.innerHTML = options;
+}
+
+async function parseHolidayApiResponse(response, source) {
+    const text = await response.text();
+    if (!text || !text.trim()) {
+        throw new Error(`Empty response from ${source}`);
+    }
+    try {
+        return JSON.parse(text);
+    } catch {
+        throw new Error(`Invalid response from ${source}`);
+    }
+}
+
+async function fetchFromNagerApi(year, apiCode) {
+    const response = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/${apiCode}`);
+    if (!response.ok) {
+        throw new Error(`Nager.Date returned ${response.status}`);
+    }
+
+    const data = await parseHolidayApiResponse(response, 'Nager.Date');
+    if (!Array.isArray(data)) {
+        throw new Error('Unexpected Nager.Date response format');
+    }
+
+    return data.map(h => ({
+        date: h.date,
+        localName: h.localName || h.name,
+        name: h.name,
+        global: h.global !== false
+    }));
+}
+
+async function fetchFromOpenHolidaysApi(year, apiCode) {
+    const validFrom = `${year}-01-01`;
+    const validTo = `${year}-12-31`;
+    const url = `https://openholidaysapi.org/PublicHolidays?countryIsoCode=${apiCode}&validFrom=${validFrom}&validTo=${validTo}&languageIsoCode=EN`;
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`OpenHolidays API returned ${response.status}`);
+    }
+
+    const data = await parseHolidayApiResponse(response, 'OpenHolidays API');
+    if (!Array.isArray(data)) {
+        throw new Error('Unexpected OpenHolidays API response format');
+    }
+
+    return data.map(h => ({
+        date: h.startDate,
+        localName: h.name?.[0]?.text || h.name?.find?.(n => n.language === 'EN')?.text || 'Public Holiday',
+        name: h.name?.[0]?.text || 'Public Holiday',
+        global: true
+    }));
+}
+
+async function fetchFromHolidayProxy(year, apiCode) {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/fetch-public-holidays`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({ year: String(year), countryCode: apiCode })
+    });
+
+    const data = await parseHolidayApiResponse(response, 'Holiday proxy');
+    if (!data.success || !Array.isArray(data.holidays)) {
+        throw new Error(data.error || 'Holiday proxy request failed');
+    }
+
+    return data.holidays;
+}
+
+async function fetchIndiaPublicHolidays(year) {
+    const cacheKey = `${year}-IN`;
+    if (publicHolidayApiCache[cacheKey]) {
+        return publicHolidayApiCache[cacheKey];
+    }
+
+    // Public holiday APIs do not provide India data — use official gazetted list
+    const data = getIndiaBuiltInHolidays(year);
+    publicHolidayApiCache[cacheKey] = data;
+    return data;
+}
+
+async function fetchCountryPublicHolidays(year, apiCode) {
+    if (apiCode === 'IN') {
+        return fetchIndiaPublicHolidays(year);
+    }
+
+    const cacheKey = `${year}-${apiCode}`;
+    if (publicHolidayApiCache[cacheKey]) {
+        return publicHolidayApiCache[cacheKey];
+    }
+
+    let data;
+    try {
+        data = await fetchFromNagerApi(year, apiCode);
+    } catch (primaryError) {
+        console.warn(`Primary holiday API failed for ${apiCode} ${year}:`, primaryError.message);
+        try {
+            data = await fetchFromOpenHolidaysApi(year, apiCode);
+        } catch (fallbackError) {
+            console.warn(`Fallback holiday API failed for ${apiCode} ${year}:`, fallbackError.message);
+            data = await fetchFromHolidayProxy(year, apiCode);
+        }
+    }
+
+    publicHolidayApiCache[cacheKey] = data;
+    return data;
+}
+
+function refreshPublicHolidayCalendar() {
+    const year = document.getElementById('publicHolidayYearFilter')?.value;
+    if (year) {
+        PUBLIC_HOLIDAY_COUNTRIES.forEach(country => {
+            delete publicHolidayApiCache[`${year}-${country.apiCode}`];
+        });
+    }
+    loadPublicHolidayCalendar();
+}
+
+async function loadPublicHolidayCalendar() {
+    const loadingEl = document.getElementById('publicHolidayLoading');
+    const emptyEl = document.getElementById('publicHolidayEmpty');
+    const contentEl = document.getElementById('publicHolidayCalendarContent');
+
+    populatePublicHolidayYearFilter();
+    const selectedYear = document.getElementById('publicHolidayYearFilter')?.value || new Date().getFullYear();
+
     if (loadingEl) loadingEl.classList.remove('hidden');
     if (emptyEl) emptyEl.classList.add('hidden');
     if (contentEl) contentEl.classList.add('hidden');
-    
+
     try {
-        // Get current year
-        const currentYear = new Date().getFullYear();
-        
-        // Load holiday dates for current/next year
-        const datesResult = await supabaseRequest('holiday_dates', 'GET', null, 
-            `?year=in.(${currentYear},${currentYear + 1})&order=holiday_date`);
-        
-        if (datesResult.error || !datesResult.data || datesResult.data.length === 0) {
-            if (loadingEl) loadingEl.classList.add('hidden');
+        const allHolidays = [];
+        const failedCountries = [];
+
+        const results = await Promise.all(
+            PUBLIC_HOLIDAY_COUNTRIES.map(async (country) => {
+                try {
+                    const apiData = await fetchCountryPublicHolidays(selectedYear, country.apiCode);
+                    return apiData.map(h => ({
+                        country: country.key,
+                        holiday_date: h.date,
+                        holiday_name: getPublicHolidayDisplayName(country.key, h),
+                        isGlobal: h.global !== false
+                    }));
+                } catch (err) {
+                    console.error(`Failed to load holidays for ${country.label}:`, err);
+                    failedCountries.push(country.label);
+                    return [];
+                }
+            })
+        );
+
+        results.forEach(countryHolidays => allHolidays.push(...countryHolidays));
+        publicHolidayCalendarData = mergePublicHolidaysByDate(allHolidays);
+
+        if (loadingEl) loadingEl.classList.add('hidden');
+
+        if (allHolidays.length === 0) {
+            if (emptyEl) emptyEl.classList.remove('hidden');
+            if (contentEl) contentEl.classList.add('hidden');
+            showToast('Could not load holidays. Your network may be blocking external holiday APIs.', 'error');
+            return;
+        }
+
+        if (contentEl) contentEl.classList.remove('hidden');
+        if (emptyEl) emptyEl.classList.add('hidden');
+        renderPublicHolidayCalendarTables(publicHolidayCalendarData);
+
+        if (failedCountries.length > 0) {
+            showToast(`Loaded partial data. Failed for: ${failedCountries.join(', ')}`, 'info');
+        }
+    } catch (err) {
+        console.error('Error loading public holiday calendar:', err);
+        if (loadingEl) loadingEl.classList.add('hidden');
+        if (emptyEl) emptyEl.classList.remove('hidden');
+        if (contentEl) contentEl.classList.add('hidden');
+        showToast('Failed to load public holidays. Please try Refresh.', 'error');
+    }
+}
+
+function formatPublicHolidayDate(dateStr) {
+    const dateObj = new Date(dateStr + 'T00:00:00');
+    return {
+        display: dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        day: dateObj.toLocaleDateString('en-US', { weekday: 'short' }),
+        sortKey: dateStr
+    };
+}
+
+function renderPublicHolidayCalendarTables(holidays) {
+    PUBLIC_HOLIDAY_COUNTRIES.forEach(country => {
+        const tbody = document.getElementById(country.bodyId);
+        const countEl = document.getElementById(country.countId);
+        const countryHolidays = holidays
+            .filter(hd => hd.country === country.key)
+            .sort((a, b) => a.holiday_date.localeCompare(b.holiday_date));
+
+        if (countEl) {
+            const count = countryHolidays.length;
+            const valueEl = countEl.querySelector('.count-value');
+            const labelEl = countEl.querySelector('.count-label');
+            if (valueEl) valueEl.textContent = count;
+            if (labelEl) labelEl.textContent = count === 1 ? 'holiday' : 'holidays';
+        }
+
+        const noteEl = country.noteId ? document.getElementById(country.noteId) : null;
+        if (noteEl && country.key === 'India') {
+            noteEl.textContent = 'Central Govt gazetted';
+        }
+
+        if (!tbody) return;
+
+        if (countryHolidays.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="3" class="public-holiday-empty-row">No holidays listed for ${country.label} in this year</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = countryHolidays.map(hd => {
+            const formatted = formatPublicHolidayDate(hd.holiday_date);
+            return `<tr>
+                <td>${formatted.display}</td>
+                <td>${formatted.day}</td>
+                <td>${escapeHtml(hd.holiday_name || '-')}</td>
+            </tr>`;
+        }).join('');
+    });
+}
+
+function exportPublicHolidayCalendar() {
+    if (typeof XLSX === 'undefined') {
+        showToast('Excel library not loaded', 'error');
+        return;
+    }
+
+    const year = document.getElementById('publicHolidayYearFilter')?.value || new Date().getFullYear();
+    const rows = [['Country', 'Date', 'Day', 'Holiday Name']];
+
+    PUBLIC_HOLIDAY_COUNTRIES.forEach(country => {
+        publicHolidayCalendarData
+            .filter(hd => hd.country === country.key)
+            .sort((a, b) => a.holiday_date.localeCompare(b.holiday_date))
+            .forEach(hd => {
+                const formatted = formatPublicHolidayDate(hd.holiday_date);
+                rows.push([country.label, formatted.display, formatted.day, hd.holiday_name || '']);
+            });
+    });
+
+    if (rows.length === 1) {
+        showToast('No holidays to export', 'error');
+        return;
+    }
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, 'Public Holidays');
+    XLSX.writeFile(wb, `public_holidays_${year}.xlsx`);
+    showToast('Exported successfully!', 'success');
+}
+
+// ==================== HOLIDAY SUPPORT CONFIG ====================
+let holidaySupportEditMode = false;
+
+const HOLIDAY_SUPPORT_STRUCTURE = [
+    { application: 'Frontend', teams: ['ASOM/Fallout', 'OMS', 'CRM/SDP/MCO/WSF'] },
+    { application: 'Backend', teams: ['INV/AMDD', 'CM/AR/CL', 'TC/AEM/OFCA', 'ANM'] },
+    { application: 'Infra', teams: ['Infra'] },
+    { application: 'ODS', teams: ['ODS', 'ODS Infra'] },
+    { application: 'Digital', teams: ['Digital'] },
+    { application: 'B2B', teams: ['CPQ/COM/LCEP'] }
+];
+
+const DEFAULT_HOLIDAY_SUPPORT_DATE_TEMPLATE = [
+    { month: 12, day: 8, country: 'PH', yearOffset: 0 },
+    { month: 12, day: 24, country: 'PH', yearOffset: 0 },
+    { month: 12, day: 25, country: 'AUS', yearOffset: 0 },
+    { month: 12, day: 26, country: 'AUS', yearOffset: 0 },
+    { month: 12, day: 29, country: 'Lean Staffing', yearOffset: 0 },
+    { month: 12, day: 30, country: 'PH', yearOffset: 0 },
+    { month: 12, day: 31, country: 'PH', yearOffset: 0 },
+    { month: 1, day: 1, country: 'AUS', yearOffset: 1 },
+    { month: 1, day: 2, country: 'Lean Staffing', yearOffset: 1 }
+];
+
+const HOLIDAY_SUPPORT_TYPE_OPTIONS = [
+    { value: 'desk', label: 'On Desk Support' },
+    { value: 'call', label: 'On Call Support' }
+];
+
+const HOLIDAY_SUPPORT_SECTION_LABELS = {
+    desk: 'ON DESK SUPPORT',
+    call: 'ON CALL SUPPORT'
+};
+
+const HOLIDAY_SUPPORT_COUNTRY_LABELS = {
+    PH: 'PH - Philippines',
+    AUS: 'AUS - Australia',
+    'Lean Staffing': 'Lean Staffing'
+};
+
+function getHolidaySupportApplications() {
+    return HOLIDAY_SUPPORT_STRUCTURE.map(group => group.application);
+}
+
+function getHolidaySupportCountries() {
+    return [...new Set(DEFAULT_HOLIDAY_SUPPORT_DATE_TEMPLATE.map(entry => entry.country))];
+}
+
+function populateHolidaySupportFormDropdowns() {
+    const applications = getHolidaySupportApplications();
+    const countries = getHolidaySupportCountries();
+
+    const applicationSelects = [
+        { id: 'assignmentApplication', placeholder: 'Select...' },
+        { id: 'assignmentAppFilter', placeholder: 'All Applications' }
+    ];
+
+    applicationSelects.forEach(({ id, placeholder }) => {
+        const select = document.getElementById(id);
+        if (!select) return;
+        const currentValue = select.value;
+        select.innerHTML = `<option value="">${placeholder}</option>`;
+        applications.forEach(app => {
+            select.innerHTML += `<option value="${escapeHtml(app)}">${escapeHtml(app)}</option>`;
+        });
+        if (currentValue) select.value = currentValue;
+    });
+
+    const countrySelect = document.getElementById('newHolidayCountry');
+    if (countrySelect) {
+        const currentValue = countrySelect.value;
+        countrySelect.innerHTML = '<option value="">Select...</option>';
+        countries.forEach(country => {
+            const label = HOLIDAY_SUPPORT_COUNTRY_LABELS[country] || country;
+            countrySelect.innerHTML += `<option value="${escapeHtml(country)}">${escapeHtml(label)}</option>`;
+        });
+        if (currentValue) countrySelect.value = currentValue;
+    }
+
+    const typeSelect = document.getElementById('assignmentTypeFilter');
+    if (typeSelect) {
+        const currentValue = typeSelect.value;
+        typeSelect.innerHTML = '<option value="">All Types</option>';
+        HOLIDAY_SUPPORT_TYPE_OPTIONS.forEach(option => {
+            typeSelect.innerHTML += `<option value="${option.value}">${escapeHtml(option.label)}</option>`;
+        });
+        if (currentValue) typeSelect.value = currentValue;
+    }
+
+    const supportTypeSelect = document.getElementById('assignmentSupportType');
+    if (supportTypeSelect) {
+        const currentValue = supportTypeSelect.value;
+        supportTypeSelect.innerHTML = '<option value="">Select...</option>';
+        HOLIDAY_SUPPORT_TYPE_OPTIONS.forEach(option => {
+            supportTypeSelect.innerHTML += `<option value="${option.value}">${escapeHtml(option.label)}</option>`;
+        });
+        if (currentValue) supportTypeSelect.value = currentValue;
+    }
+}
+
+function getHolidaySupportRows() {
+    const rows = [];
+    HOLIDAY_SUPPORT_STRUCTURE.forEach(group => {
+        group.teams.forEach((team, idx) => {
+            rows.push({
+                application: group.application,
+                team,
+                isFirstInApp: idx === 0,
+                appRowspan: group.teams.length
+            });
+        });
+    });
+    return rows;
+}
+
+function getAllHolidaySupportTeams() {
+    return HOLIDAY_SUPPORT_STRUCTURE.flatMap(group =>
+        group.teams.map(team => ({ application: group.application, team }))
+    );
+}
+
+function buildDefaultHolidayDate(year, template) {
+    const dateYear = year + (template.yearOffset || 0);
+    const month = String(template.month).padStart(2, '0');
+    const day = String(template.day).padStart(2, '0');
+    return `${dateYear}-${month}-${day}`;
+}
+
+function filterHolidayDatesForPeriod(dates, periodYear) {
+    const templateKeys = new Set(
+        DEFAULT_HOLIDAY_SUPPORT_DATE_TEMPLATE.map(t => `${buildDefaultHolidayDate(periodYear, t)}|${t.country}`)
+    );
+
+    return dates.filter(d => {
+        if (templateKeys.has(`${d.holiday_date}|${d.country}`)) return true;
+        const dt = new Date(d.holiday_date + 'T00:00:00');
+        const month = dt.getMonth() + 1;
+        const year = dt.getFullYear();
+        return (year === periodYear && month === 12) || (year === periodYear + 1 && month === 1);
+    });
+}
+
+function sortHolidayDatesForDisplay(dates) {
+    const periodYear = parseInt(document.getElementById('holidaySupportYearFilter')?.value || new Date().getFullYear(), 10);
+    const orderOf = (d) => {
+        const idx = DEFAULT_HOLIDAY_SUPPORT_DATE_TEMPLATE.findIndex(t =>
+            d.country === t.country && d.holiday_date === buildDefaultHolidayDate(periodYear, t)
+        );
+        return idx === -1 ? 999 : idx;
+    };
+    return [...dates].sort((a, b) => {
+        const diff = orderOf(a) - orderOf(b);
+        return diff !== 0 ? diff : a.holiday_date.localeCompare(b.holiday_date);
+    });
+}
+
+async function ensureDefaultHolidayDates(year) {
+    const existingResult = await supabaseRequest('holiday_dates', 'GET', null,
+        `?year=in.(${year},${year + 1})&select=holiday_date,country`);
+    const existing = new Set((existingResult.data || []).map(d => `${d.holiday_date}|${d.country}`));
+
+    const missing = DEFAULT_HOLIDAY_SUPPORT_DATE_TEMPLATE.map(template => ({
+        template,
+        holidayDate: buildDefaultHolidayDate(year, template)
+    })).filter(({ template, holidayDate }) => !existing.has(`${holidayDate}|${template.country}`));
+
+    if (missing.length === 0) return 0;
+
+    await Promise.all(missing.map(({ template, holidayDate }) =>
+        supabaseRequest('holiday_dates', 'POST', {
+            holiday_date: holidayDate,
+            country: template.country,
+            holiday_name: null,
+            year: new Date(holidayDate).getFullYear()
+        }).catch(err => {
+            console.warn('Could not seed holiday date:', holidayDate, template.country, err);
+            return null;
+        })
+    ));
+
+    return missing.length;
+}
+
+const HOLIDAY_SUPPORT_TEAM_ALIASES = {
+    'ASOM': 'ASOM/Fallout',
+    'CRM/SDP/MCO': 'CRM/SDP/MCO/WSF'
+};
+
+function normalizeHolidaySupportTeam(team) {
+    return HOLIDAY_SUPPORT_TEAM_ALIASES[team] || team;
+}
+
+function getCanonicalApplicationForTeam(team) {
+    const normalizedTeam = normalizeHolidaySupportTeam(team);
+    for (const group of HOLIDAY_SUPPORT_STRUCTURE) {
+        if (group.teams.includes(normalizedTeam)) {
+            return group.application;
+        }
+    }
+    return null;
+}
+
+function teamsMatch(storedTeam, gridTeam) {
+    return normalizeHolidaySupportTeam(storedTeam) === normalizeHolidaySupportTeam(gridTeam);
+}
+
+function getHolidaySupportAssignment(supportType, holidayDateId, application, team) {
+    const normTeam = normalizeHolidaySupportTeam(team);
+    const exactKey = `${supportType}|${holidayDateId}|${normTeam}|${application}`;
+    if (holidaySupportAssignmentMap.has(exactKey)) {
+        return holidaySupportAssignmentMap.get(exactKey);
+    }
+
+    const teamKey = `${supportType}|${holidayDateId}|${normTeam}`;
+    const candidates = holidaySupportTeamIndex.get(teamKey) || [];
+    if (candidates.length === 0) return null;
+    if (candidates.length === 1) return candidates[0];
+
+    return candidates.find(item => item.application === application) ||
+        candidates.find(item => getCanonicalApplicationForTeam(item.team) === application) ||
+        candidates[0];
+}
+
+function getHolidayDateHeaderClass(country) {
+    if (country === 'AUS') return 'aus-date';
+    if (country === 'India') return 'india-date';
+    if (country === 'Lean Staffing') return 'lean-date';
+    return 'ph-date';
+}
+
+function formatHolidaySupportDateDisplay(dateStr) {
+    const dateObj = new Date(dateStr + 'T00:00:00');
+    return `${dateObj.getDate()}-${dateObj.toLocaleDateString('en-US', { month: 'short' })}`;
+}
+
+function populateHolidaySupportYearFilter() {
+    const yearFilter = document.getElementById('holidaySupportYearFilter');
+    if (!yearFilter) return;
+    const currentYear = new Date().getFullYear();
+    const selectedYear = yearFilter.value || currentYear;
+    let options = '';
+    for (let year = currentYear - 1; year <= currentYear + 1; year++) {
+        options += `<option value="${year}" ${String(year) === String(selectedYear) ? 'selected' : ''}>${year} – ${year + 1}</option>`;
+    }
+    yearFilter.innerHTML = options;
+}
+
+function toggleHolidaySupportEditMode() {
+    holidaySupportEditMode = !holidaySupportEditMode;
+    const card = document.querySelector('#holiday-supportTab .card');
+    const editBtn = document.getElementById('holidaySupportEditBtn');
+    const editText = document.getElementById('holidaySupportEditModeText');
+
+    if (holidaySupportEditMode) {
+        card?.classList.add('holiday-support-edit-mode');
+        editBtn?.classList.add('edit-mode-active');
+        if (editText) editText.textContent = 'Exit Edit Mode';
+        document.getElementById('holidaySupportEditHint')?.classList.remove('hidden');
+    } else {
+        card?.classList.remove('holiday-support-edit-mode');
+        editBtn?.classList.remove('edit-mode-active');
+        if (editText) editText.textContent = 'Edit Mode';
+        document.getElementById('holidaySupportEditHint')?.classList.add('hidden');
+    }
+
+    renderHolidaySupportFromDB('desk');
+    renderHolidaySupportFromDB('call');
+}
+
+function populateAssignmentTeamDropdown(application, selectedTeam = '') {
+    const teamSelect = document.getElementById('assignmentTeam');
+    const teamHint = document.getElementById('assignmentTeamHint');
+    if (!teamSelect) return;
+
+    if (!application) {
+        teamSelect.disabled = true;
+        teamSelect.innerHTML = '<option value="">Select application first</option>';
+        if (teamHint) teamHint.textContent = 'Choose an application to see available teams';
+        return;
+    }
+
+    const teams = HOLIDAY_SUPPORT_STRUCTURE.find(group => group.application === application)?.teams || [];
+    teamSelect.disabled = false;
+    teamSelect.innerHTML = '<option value="">Select team...</option>';
+    teams.forEach(team => {
+        teamSelect.innerHTML += `<option value="${escapeHtml(team)}">${escapeHtml(team)}</option>`;
+    });
+
+    if (selectedTeam && !teams.includes(selectedTeam)) {
+        teamSelect.innerHTML += `<option value="${escapeHtml(selectedTeam)}">${escapeHtml(selectedTeam)} (previous)</option>`;
+    }
+
+    if (selectedTeam) {
+        teamSelect.value = selectedTeam;
+    }
+
+    if (teamHint) {
+        teamHint.textContent = `${teams.length} team${teams.length === 1 ? '' : 's'} available for ${application}`;
+    }
+}
+
+function onAssignmentApplicationChange() {
+    const application = document.getElementById('assignmentApplication')?.value || '';
+    populateAssignmentTeamDropdown(application);
+    updateAssignmentFormPreview();
+}
+
+function updateAssignmentFormUI(isEditing = false) {
+    const titleEl = document.getElementById('assignmentFormTitle');
+    const saveBtn = document.getElementById('assignmentSaveBtn');
+    if (titleEl) titleEl.textContent = isEditing ? 'Edit Staff Assignment' : 'Add Staff Assignment';
+    if (saveBtn) saveBtn.textContent = isEditing ? 'Update Assignment' : 'Save Assignment';
+}
+
+function updateAssignmentFormPreview() {
+    const previewEl = document.getElementById('assignmentFormPreview');
+    if (!previewEl) return;
+
+    const dateSelect = document.getElementById('assignmentHolidayDate');
+    const supportType = document.getElementById('assignmentSupportType')?.value;
+    const application = document.getElementById('assignmentApplication')?.value;
+    const team = document.getElementById('assignmentTeam')?.value;
+    const staff = document.getElementById('assignmentStaff')?.value?.trim();
+
+    const dateLabel = dateSelect?.selectedOptions?.[0]?.text || '';
+    if (!dateLabel || dateLabel.startsWith('Select') || !supportType || !application || !team) {
+        previewEl.classList.add('hidden');
+        previewEl.innerHTML = '';
+        return;
+    }
+
+    const typeLabel = supportType === 'desk' ? 'On Desk Support' : 'On Call Support';
+    previewEl.classList.remove('hidden');
+    previewEl.innerHTML = `
+        <strong>Preview:</strong>
+        ${escapeHtml(typeLabel)} &bull;
+        ${escapeHtml(dateLabel)} &bull;
+        ${escapeHtml(application)} / ${escapeHtml(team)}
+        ${staff ? ` &bull; <em>${escapeHtml(staff)}</em>` : ''}
+    `;
+}
+
+async function populateAssignmentDateFilterDropdown() {
+    const dropdown = document.getElementById('assignmentDateFilter');
+    if (!dropdown) return;
+
+    const selectedYear = parseInt(document.getElementById('holidaySupportYearFilter')?.value || new Date().getFullYear(), 10);
+    const currentValue = dropdown.value;
+
+    try {
+        const result = await supabaseRequest('holiday_dates', 'GET', null,
+            `?year=in.(${selectedYear},${selectedYear + 1})&order=holiday_date`);
+        const dates = sortHolidayDatesForDisplay(filterHolidayDatesForPeriod(result.data || [], selectedYear));
+
+        dropdown.innerHTML = '<option value="">All Dates</option>';
+        dates.forEach(hd => {
+            const dateObj = new Date(hd.holiday_date + 'T00:00:00');
+            const dateDisplay = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            dropdown.innerHTML += `<option value="${hd.id}">${dateDisplay} - ${hd.country}</option>`;
+        });
+        dropdown.value = currentValue;
+    } catch (err) {
+        console.error('Error populating assignment date filter:', err);
+    }
+}
+
+function getAssignmentCountryBadgeClass(country) {
+    if (country === 'AUS') return 'country-aus';
+    if (country === 'Lean Staffing') return 'country-lean-staffing';
+    return 'country-ph';
+}
+
+async function refreshHolidaySupportData() {
+    const supportResult = await supabaseRequest('holiday_support', 'GET', null, '?order=application,team');
+    loadedHolidaySupport = supportResult.data || [];
+    if (cachedHolidaySupport) {
+        cachedHolidaySupport.support = loadedHolidaySupport;
+    }
+    applyHolidaySupportView();
+}
+
+async function handleHolidaySupportCellClick(cellEl) {
+    if (!holidaySupportEditMode || !cellEl) return;
+
+    const supportType = cellEl.dataset.supportType;
+    const holidayDateId = parseInt(cellEl.dataset.dateId, 10);
+    const application = cellEl.dataset.application;
+    const team = cellEl.dataset.team;
+    const assignmentId = cellEl.dataset.assignmentId ? parseInt(cellEl.dataset.assignmentId, 10) : null;
+    let currentStaff = '';
+    if (assignmentId) {
+        const assignment = loadedHolidaySupport.find(item => item.id === assignmentId);
+        currentStaff = assignment?.staff_names || '';
+    }
+    const dateLabel = cellEl.dataset.dateLabel || 'this date';
+
+    showPromptModal(
+        `${application} / ${team} — ${dateLabel}\nEnter staff names (comma-separated):`,
+        `Edit ${supportType === 'desk' ? 'On Desk' : 'On Call'} Support`,
+        currentStaff,
+        async (newStaff) => {
+            const staffNames = String(newStaff || '').trim();
+            try {
+                if (!staffNames) {
+                    if (assignmentId) {
+                        showConfirmModal(
+                            'Remove all staff from this assignment?',
+                            'Clear Assignment',
+                            async () => {
+                                await supabaseRequest('holiday_support', 'DELETE', null, `?id=eq.${assignmentId}`);
+                                showToast('Assignment cleared', 'success');
+                                await refreshHolidaySupportData();
+                            },
+                            null,
+                            'Yes, Clear'
+                        );
+                    }
+                    return;
+                }
+
+                if (assignmentId) {
+                    await supabaseRequest('holiday_support', 'PATCH', {
+                        staff_names: staffNames,
+                        updated_at: new Date().toISOString()
+                    }, `?id=eq.${assignmentId}`);
+                    showToast('Assignment updated!', 'success');
+                } else {
+                    await supabaseRequest('holiday_support', 'POST', {
+                        holiday_date_id: holidayDateId,
+                        support_type: supportType,
+                        application,
+                        team,
+                        staff_names: staffNames
+                    });
+                    showToast('Assignment added!', 'success');
+                }
+
+                await refreshHolidaySupportData();
+            } catch (err) {
+                console.error('Error saving support cell:', err);
+                showToast('Failed to save assignment', 'error');
+            }
+        },
+        null,
+        { staffAutocomplete: true }
+    );
+
+    setTimeout(() => {
+        const inputEl = document.getElementById('promptModalInput');
+        if (inputEl) {
+            inputEl.value = currentStaff;
+            if (currentStaff) showStaffNameSuggestions(inputEl);
+        }
+    }, 150);
+}
+
+// Load Holiday Support - Database driven
+async function loadHolidaySupport(forceRefresh = false) {
+    const loadingEl = document.getElementById('holidaySupportLoading');
+    const emptyEl = document.getElementById('holidaySupportEmpty');
+    const contentEl = document.getElementById('holidaySupportContent');
+
+    populateHolidaySupportYearFilter();
+    const selectedYear = parseInt(document.getElementById('holidaySupportYearFilter')?.value || new Date().getFullYear(), 10);
+
+    if (!forceRefresh && cachedHolidaySupport?.year === selectedYear) {
+        loadedHolidayDates = cachedHolidaySupport.dates;
+        loadedHolidaySupport = cachedHolidaySupport.support;
+        if (loadingEl) loadingEl.classList.add('hidden');
+        if (loadedHolidayDates.length === 0) {
+            if (emptyEl) emptyEl.classList.remove('hidden');
+            if (contentEl) contentEl.classList.add('hidden');
+            return;
+        }
+        if (emptyEl) emptyEl.classList.add('hidden');
+        if (contentEl) contentEl.classList.remove('hidden');
+        applyHolidaySupportView();
+        loadHolidaySupportContactNames();
+        return;
+    }
+
+    if (loadingEl) loadingEl.classList.remove('hidden');
+    if (emptyEl) emptyEl.classList.add('hidden');
+    if (contentEl) contentEl.classList.add('hidden');
+
+    try {
+        await ensureDefaultHolidayDates(selectedYear);
+
+        const [datesResult, supportResult] = await Promise.all([
+            supabaseRequest('holiday_dates', 'GET', null,
+                `?year=in.(${selectedYear},${selectedYear + 1})&order=holiday_date`),
+            supabaseRequest('holiday_support', 'GET', null, '?order=application,team')
+        ]);
+
+        loadedHolidayDates = sortHolidayDatesForDisplay(filterHolidayDatesForPeriod(datesResult.data || [], selectedYear));
+        loadedHolidaySupport = supportResult.data || [];
+
+        cachedHolidaySupport = {
+            year: selectedYear,
+            dates: loadedHolidayDates,
+            support: loadedHolidaySupport
+        };
+
+        if (loadingEl) loadingEl.classList.add('hidden');
+
+        if (loadedHolidayDates.length === 0) {
             if (emptyEl) emptyEl.classList.remove('hidden');
             return;
         }
-        
-        loadedHolidayDates = datesResult.data;
-        
-        // Load support assignments
-        const supportResult = await supabaseRequest('holiday_support', 'GET', null, 
-            `?order=application,team`);
-        
-        loadedHolidaySupport = supportResult.data || [];
-        
-        if (loadingEl) loadingEl.classList.add('hidden');
+
         if (contentEl) contentEl.classList.remove('hidden');
-        
-        // Render tables
-        renderHolidaySupportFromDB('desk');
-        renderHolidaySupportFromDB('call');
-        
+        applyHolidaySupportView();
+        loadHolidaySupportContactNames();
     } catch (err) {
         console.error('Error loading holiday support:', err);
         if (loadingEl) loadingEl.classList.add('hidden');
@@ -7647,90 +8953,127 @@ async function loadHolidaySupport() {
     }
 }
 
-// Render Holiday Support Table from Database
 function renderHolidaySupportFromDB(type) {
     const headId = type === 'desk' ? 'deskSupportHead' : 'callSupportHead';
     const bodyId = type === 'desk' ? 'deskSupportBody' : 'callSupportBody';
-    
     const headEl = document.getElementById(headId);
     const bodyEl = document.getElementById(bodyId);
-    
-    if (!headEl || !bodyEl) return;
-    
-    // Filter support data by type
-    const typeData = loadedHolidaySupport.filter(s => s.support_type === type);
-    
-    // Build header with country tags
-    let headerHtml = '<tr><th class="app-header">Application</th><th class="team-header">Team</th>';
-    
+
+    if (!headEl || !bodyEl || !loadedHolidayDates.length) return;
+
+    let headerHtml = '<tr><th class="hs-app-header">Application</th><th class="hs-team-header">Team</th>';
+
     loadedHolidayDates.forEach(hd => {
-        const dateObj = new Date(hd.holiday_date);
-        const dateDisplay = `${dateObj.getDate()}-${dateObj.toLocaleDateString('en-US', { month: 'short' })}`;
-        
-        // Determine header class based on country
-        let headerClass = 'ph-date';
-        let countryLabel = hd.country;
-        if (hd.country === 'AUS') headerClass = 'aus-date';
-        else if (hd.country === 'India') headerClass = 'india-date';
-        else if (hd.country === 'Lean Staffing') { headerClass = 'lean-date'; countryLabel = 'Lean Staffing'; }
-        
-        headerHtml += `<th class="${headerClass}"><span class="country-tag">${countryLabel}</span><br>${dateDisplay}</th>`;
+        const headerClass = getHolidayDateHeaderClass(hd.country);
+        const countryLabel = hd.country === 'Lean Staffing' ? 'Lean Staffing' : hd.country;
+        const dateDisplay = formatHolidaySupportDateDisplay(hd.holiday_date);
+        headerHtml += `<th class="${headerClass}">
+            <span class="country-tag">${countryLabel}</span>
+            <span class="date-label">${dateDisplay}</span>
+        </th>`;
     });
     headerHtml += '</tr>';
-    
     headEl.innerHTML = headerHtml;
-    
-    // Group data by application and team
-    const groupedData = {};
-    typeData.forEach(item => {
-        const key = `${item.application}|${item.team}`;
-        if (!groupedData[key]) {
-            groupedData[key] = { application: item.application, team: item.team, staffByDate: {} };
-        }
-        const hd = loadedHolidayDates.find(d => d.id === item.holiday_date_id);
-        if (hd) {
-            groupedData[key].staffByDate[hd.holiday_date] = item.staff_names;
-        }
-    });
-    
-    // Build body
+
+    const rows = getHolidaySupportRows();
     let bodyHtml = '';
-    
-    if (Object.keys(groupedData).length === 0) {
-        bodyHtml = `<tr><td colspan="${loadedHolidayDates.length + 2}" style="text-align: center; padding: 2rem; color: #6b7280;">No ${type === 'desk' ? 'desk' : 'call'} support assignments yet. Click "Edit Schedule" to add.</td></tr>`;
-    } else {
-        Object.values(groupedData).forEach(row => {
-            const appColor = APP_COLORS[row.application] || '#f0f0f0';
-            
-            bodyHtml += `<tr>`;
-            bodyHtml += `<td class="app-col" style="background-color: ${appColor};">${escapeHtml(row.application)}</td>`;
-            bodyHtml += `<td class="team-col" style="background-color: ${appColor};">${escapeHtml(row.team)}</td>`;
-            
-            loadedHolidayDates.forEach(hd => {
-                const staff = row.staffByDate[hd.holiday_date] || '';
-                bodyHtml += `<td class="staff-cell">${escapeHtml(staff)}</td>`;
-            });
-            
-            bodyHtml += '</tr>';
+
+    rows.forEach(row => {
+        const appColor = APP_COLORS[row.application] || '#f0f0f0';
+        bodyHtml += '<tr>';
+
+        if (row.isFirstInApp) {
+            bodyHtml += `<td class="app-col" rowspan="${row.appRowspan}" style="background-color: ${appColor};">${escapeHtml(row.application)}</td>`;
+        }
+
+        bodyHtml += `<td class="team-col" style="background-color: ${appColor};">${escapeHtml(row.team)}</td>`;
+
+        loadedHolidayDates.forEach(hd => {
+            const assignment = getHolidaySupportAssignment(type, hd.id, row.application, row.team);
+            const staff = assignment?.staff_names || '';
+            const editableClass = holidaySupportEditMode ? ' staff-cell-editable' : '';
+            const dateLabel = `${formatHolidaySupportDateDisplay(hd.holiday_date)} (${hd.country})`;
+
+            bodyHtml += `<td class="staff-cell${editableClass}"
+                data-support-type="${type}"
+                data-date-id="${hd.id}"
+                data-date-label="${escapeHtml(dateLabel)}"
+                data-application="${escapeHtml(row.application)}"
+                data-team="${escapeHtml(row.team)}"
+                data-assignment-id="${assignment?.id || ''}"
+                onclick="handleHolidaySupportCellClick(this)"
+                title="${holidaySupportEditMode ? 'Click to edit staff' : ''}">${staff ? escapeHtml(staff) : '<span class="staff-cell-empty">—</span>'}</td>`;
         });
-    }
-    
+
+        bodyHtml += '</tr>';
+    });
+
     bodyEl.innerHTML = bodyHtml;
 }
 
 // Export Holiday Support
 function exportHolidaySupport() {
-    showToast('Export feature coming soon', 'info');
+    if (typeof XLSX === 'undefined') {
+        showToast('Excel library not loaded', 'error');
+        return;
+    }
+
+    if (!loadedHolidayDates.length) {
+        showToast('No holiday dates to export', 'error');
+        return;
+    }
+
+    const year = document.getElementById('holidaySupportYearFilter')?.value || new Date().getFullYear();
+    const wb = XLSX.utils.book_new();
+
+    ['desk', 'call'].forEach(type => {
+        const sheetLabel = type === 'desk' ? 'On Desk Support' : 'On Call Support';
+        const headerRow1 = ['Application', 'Team'];
+        const headerRow2 = ['', ''];
+
+        loadedHolidayDates.forEach(hd => {
+            headerRow1.push(hd.country);
+            headerRow2.push(formatHolidaySupportDateDisplay(hd.holiday_date));
+        });
+
+        const rows = [headerRow1, headerRow2];
+        getHolidaySupportRows().forEach(row => {
+            const dataRow = [row.application, row.team];
+            loadedHolidayDates.forEach(hd => {
+                const assignment = getHolidaySupportAssignment(type, hd.id, row.application, row.team);
+                dataRow.push(assignment?.staff_names || '');
+            });
+            rows.push(dataRow);
+        });
+
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        XLSX.utils.book_append_sheet(wb, ws, sheetLabel.substring(0, 31));
+    });
+
+    XLSX.writeFile(wb, `holiday_support_${year}.xlsx`);
+    showToast('Exported successfully!', 'success');
 }
 
 // ==================== HOLIDAY SCHEDULE MODAL FUNCTIONS ====================
 
 // Open Edit Holiday Support Modal
-function openEditHolidaySupportModal() {
+function openEditHolidaySupportModal(tabName = 'dates') {
     document.getElementById('holidayScheduleModal').classList.remove('hidden');
+    populateHolidaySupportFormDropdowns();
+    clearHolidayDateForm();
+    clearAssignmentForm();
     loadHolidayDates();
-    loadStaffAssignments();
     populateHolidayDateDropdown();
+    populateAssignmentDateFilterDropdown();
+    loadStaffAssignments();
+    loadHolidaySupportContactNames();
+
+    const tabButtons = document.querySelectorAll('#holidayScheduleModal .modal-tab');
+    if (tabName === 'assignments' && tabButtons[1]) {
+        switchHolidayModalTab('assignments', { target: tabButtons[1] });
+    } else if (tabButtons[0]) {
+        switchHolidayModalTab('dates', { target: tabButtons[0] });
+    }
 }
 
 // Close Holiday Schedule Modal
@@ -7759,6 +9102,7 @@ function switchHolidayModalTab(tabName, event) {
     } else {
         document.getElementById('holidayAssignmentsTab').classList.remove('hidden');
         document.getElementById('holidayAssignmentsTab').classList.add('active');
+        populateAssignmentDateFilterDropdown();
     }
 }
 
@@ -7787,14 +9131,16 @@ async function loadHolidayDates() {
         
         let html = '';
         result.data.forEach(hd => {
-            const dateObj = new Date(hd.holiday_date);
+            const dateObj = new Date(hd.holiday_date + 'T00:00:00');
             const dateDisplay = dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-            
+            const countryClass = hd.country.toLowerCase().replace(/\s+/g, '-');
+
             html += `<tr>
                 <td>${dateDisplay}</td>
-                <td><span class="country-badge country-${hd.country.toLowerCase().replace(/\s+/g, '-')}">${hd.country}</span></td>
+                <td><span class="country-badge country-${countryClass}">${hd.country}</span></td>
                 <td>${escapeHtml(hd.holiday_name || '-')}</td>
                 <td>
+                    <button class="btn btn-sm btn-outline" onclick="editHolidayDateById(${hd.id})">Edit</button>
                     <button class="btn btn-sm btn-danger" onclick="deleteHolidayDate(${hd.id})">Delete</button>
                 </td>
             </tr>`;
@@ -7807,83 +9153,163 @@ async function loadHolidayDates() {
     }
 }
 
-// Add new holiday date
+// Add or update holiday date
+async function getHolidayDateConflict(holidayDate, country, excludeId = null) {
+    let query = `?holiday_date=eq.${holidayDate}&country=eq.${encodeURIComponent(country)}`;
+    if (excludeId) {
+        query += `&id=neq.${excludeId}`;
+    }
+    const result = await supabaseRequest('holiday_dates', 'GET', null, query);
+    return result.data && result.data.length > 0 ? result.data[0] : null;
+}
+
+function getHolidayDateSaveErrorMessage(error) {
+    if (!error) return 'Unknown error';
+    const errorText = typeof error === 'string' ? error : JSON.stringify(error);
+    if (errorText.includes('23505') || errorText.includes('holiday_dates_holiday_date_country_key')) {
+        return 'This date and country/type combination already exists. Edit the existing entry instead, or choose a different date or country.';
+    }
+    try {
+        const parsed = typeof error === 'string' ? JSON.parse(error) : error;
+        if (parsed.code === '23505') {
+            return 'This date and country/type combination already exists. Edit the existing entry instead, or choose a different date or country.';
+        }
+        return parsed.message || errorText;
+    } catch {
+        return errorText;
+    }
+}
+
 async function addHolidayDate() {
+    const editId = document.getElementById('editHolidayDateId')?.value;
     const dateInput = document.getElementById('newHolidayDate');
     const countryInput = document.getElementById('newHolidayCountry');
     const nameInput = document.getElementById('newHolidayName');
-    
+
     if (!dateInput.value || !countryInput.value) {
         showToast('Please fill in required fields', 'error');
         return;
     }
-    
-    const dateObj = new Date(dateInput.value);
+
+    const conflict = await getHolidayDateConflict(dateInput.value, countryInput.value, editId || null);
+    if (conflict) {
+        const conflictDate = new Date(dateInput.value + 'T00:00:00');
+        const dateLabel = conflictDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        showToast(`${dateLabel} (${countryInput.value}) already exists. Edit that entry from the list below instead.`, 'error');
+        return;
+    }
+
+    const dateObj = new Date(dateInput.value + 'T00:00:00');
     const year = dateObj.getFullYear();
-    
+    const payload = {
+        holiday_date: dateInput.value,
+        country: countryInput.value,
+        holiday_name: nameInput.value || null,
+        year
+    };
+
     try {
-        const result = await supabaseRequest('holiday_dates', 'POST', {
-            holiday_date: dateInput.value,
-            country: countryInput.value,
-            holiday_name: nameInput.value || null,
-            year: year
-        });
-        
-        if (result.error) {
-            showToast('Failed to add holiday date: ' + result.error, 'error');
-            return;
+        if (editId) {
+            const result = await supabaseRequest('holiday_dates', 'PATCH', payload, `?id=eq.${editId}`);
+            if (result.error) {
+                showToast(getHolidayDateSaveErrorMessage(result.error), 'error');
+                return;
+            }
+            showToast('Holiday date updated!', 'success');
+        } else {
+            const result = await supabaseRequest('holiday_dates', 'POST', payload);
+            if (result.error) {
+                showToast(getHolidayDateSaveErrorMessage(result.error), 'error');
+                return;
+            }
+            showToast('Holiday date added!', 'success');
         }
-        
-        showToast('Holiday date added!', 'success');
-        
-        // Clear form
-        dateInput.value = '';
-        countryInput.value = '';
-        nameInput.value = '';
-        
-        // Reload table
+
+        clearHolidayDateForm();
         loadHolidayDates();
         populateHolidayDateDropdown();
-        
+        invalidateHolidaySupportCache();
+        loadHolidaySupport(true);
     } catch (err) {
-        console.error('Error adding holiday date:', err);
-        showToast('Failed to add holiday date', 'error');
+        console.error('Error saving holiday date:', err);
+        showToast('Failed to save holiday date', 'error');
     }
 }
 
-// Delete holiday date
-async function deleteHolidayDate(id) {
-    if (!confirm('Delete this holiday date? All associated staff assignments will also be deleted.')) return;
-    
+function editHolidayDate(id, date, country, name) {
+    document.getElementById('editHolidayDateId').value = id;
+    document.getElementById('newHolidayDate').value = date;
+    document.getElementById('newHolidayCountry').value = country;
+    document.getElementById('newHolidayName').value = name || '';
+    const saveBtn = document.getElementById('holidayDateSaveBtn');
+    if (saveBtn) saveBtn.textContent = 'Update Date';
+    const datesTabBtn = document.querySelector('#holidayScheduleModal .modal-tab');
+    if (datesTabBtn) switchHolidayModalTab('dates', { target: datesTabBtn });
+}
+
+async function editHolidayDateById(id) {
     try {
-        await supabaseRequest('holiday_dates', 'DELETE', null, `?id=eq.${id}`);
-        showToast('Holiday date deleted', 'success');
-        loadHolidayDates();
-        populateHolidayDateDropdown();
+        const result = await supabaseRequest('holiday_dates', 'GET', null, `?id=eq.${id}`);
+        if (result.data && result.data.length > 0) {
+            const hd = result.data[0];
+            editHolidayDate(hd.id, hd.holiday_date, hd.country, hd.holiday_name || '');
+        }
     } catch (err) {
-        console.error('Error deleting holiday date:', err);
-        showToast('Failed to delete', 'error');
+        console.error('Error loading holiday date:', err);
+        showToast('Failed to load holiday date', 'error');
     }
+}
+
+function clearHolidayDateForm() {
+    const editIdEl = document.getElementById('editHolidayDateId');
+    if (editIdEl) editIdEl.value = '';
+    document.getElementById('newHolidayDate').value = '';
+    document.getElementById('newHolidayCountry').value = '';
+    document.getElementById('newHolidayName').value = '';
+    const saveBtn = document.getElementById('holidayDateSaveBtn');
+    if (saveBtn) saveBtn.textContent = 'Add Date';
+}
+
+// Delete holiday date
+function deleteHolidayDate(id) {
+    showConfirmModal(
+        'Delete this holiday date? All associated staff assignments will also be deleted.',
+        'Delete Holiday Date',
+        async () => {
+            try {
+                await supabaseRequest('holiday_dates', 'DELETE', null, `?id=eq.${id}`);
+                showToast('Holiday date deleted', 'success');
+                clearHolidayDateForm();
+                loadHolidayDates();
+                populateHolidayDateDropdown();
+                populateAssignmentDateFilterDropdown();
+                invalidateHolidaySupportCache();
+                loadHolidaySupport(true);
+            } catch (err) {
+                console.error('Error deleting holiday date:', err);
+                showToast('Failed to delete', 'error');
+            }
+        }
+    );
 }
 
 // Populate holiday date dropdown for assignments
 async function populateHolidayDateDropdown() {
     const dropdown = document.getElementById('assignmentHolidayDate');
-    const currentYear = new Date().getFullYear();
-    
+    const selectedYear = parseInt(document.getElementById('holidaySupportYearFilter')?.value || new Date().getFullYear(), 10);
+
     try {
-        const result = await supabaseRequest('holiday_dates', 'GET', null, 
-            `?year=in.(${currentYear},${currentYear + 1})&order=holiday_date`);
-        
+        const result = await supabaseRequest('holiday_dates', 'GET', null,
+            `?year=in.(${selectedYear},${selectedYear + 1})&order=holiday_date`);
+
         dropdown.innerHTML = '<option value="">Select holiday date...</option>';
-        
-        if (result.data) {
-            result.data.forEach(hd => {
-                const dateObj = new Date(hd.holiday_date);
-                const dateDisplay = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                dropdown.innerHTML += `<option value="${hd.id}">${dateDisplay} - ${hd.country}${hd.holiday_name ? ' (' + hd.holiday_name + ')' : ''}</option>`;
-            });
-        }
+
+        const dates = sortHolidayDatesForDisplay(filterHolidayDatesForPeriod(result.data || [], selectedYear));
+        dates.forEach(hd => {
+            const dateObj = new Date(hd.holiday_date + 'T00:00:00');
+            const dateDisplay = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            dropdown.innerHTML += `<option value="${hd.id}">${dateDisplay} - ${hd.country}${hd.holiday_name ? ' (' + hd.holiday_name + ')' : ''}</option>`;
+        });
     } catch (err) {
         console.error('Error populating dropdown:', err);
     }
@@ -7891,52 +9317,89 @@ async function populateHolidayDateDropdown() {
 
 // Load staff assignments
 async function loadStaffAssignments() {
-    const typeFilter = document.getElementById('assignmentTypeFilter').value;
-    
+    const typeFilter = document.getElementById('assignmentTypeFilter')?.value || '';
+    const appFilter = document.getElementById('assignmentAppFilter')?.value || '';
+    const dateFilter = document.getElementById('assignmentDateFilter')?.value || '';
+    const staffSearch = document.getElementById('assignmentStaffSearch')?.value?.trim().toLowerCase() || '';
+    const selectedYear = parseInt(document.getElementById('holidaySupportYearFilter')?.value || new Date().getFullYear(), 10);
+
     let query = '?order=holiday_date_id,application,team';
-    if (typeFilter) {
-        query += `&support_type=eq.${typeFilter}`;
-    }
-    
+    if (typeFilter) query += `&support_type=eq.${typeFilter}`;
+    if (appFilter) query += `&application=eq.${encodeURIComponent(appFilter)}`;
+    if (dateFilter) query += `&holiday_date_id=eq.${dateFilter}`;
+
     try {
         const result = await supabaseRequest('holiday_support', 'GET', null, query);
         const tbody = document.getElementById('assignmentsTableBody');
-        
-        if (!result.data || result.data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #6b7280;">No assignments yet</td></tr>';
+        const countBadge = document.getElementById('assignmentCountBadge');
+
+        const datesResult = await supabaseRequest('holiday_dates', 'GET', null,
+            `?year=in.(${selectedYear},${selectedYear + 1})&order=holiday_date`);
+        const periodDates = filterHolidayDatesForPeriod(datesResult.data || [], selectedYear);
+        const periodDateIds = new Set(periodDates.map(d => d.id));
+        const datesMap = {};
+        periodDates.forEach(d => {
+            datesMap[d.id] = d;
+        });
+
+        let assignments = (result.data || []).filter(item => periodDateIds.has(item.holiday_date_id));
+        if (staffSearch) {
+            assignments = assignments.filter(item =>
+                (item.staff_names || '').toLowerCase().includes(staffSearch)
+            );
+        }
+
+        if (countBadge) {
+            countBadge.textContent = `${assignments.length} assignment${assignments.length === 1 ? '' : 's'}`;
+        }
+
+        if (!tbody) return;
+
+        if (assignments.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="assignment-empty-row">No assignments match your filters</td></tr>';
             return;
         }
-        
-        // Get holiday dates for display
-        const datesResult = await supabaseRequest('holiday_dates', 'GET', null, '?order=holiday_date');
-        const datesMap = {};
-        if (datesResult.data) {
-            datesResult.data.forEach(d => {
-                const dateObj = new Date(d.holiday_date);
-                datesMap[d.id] = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ` (${d.country})`;
-            });
-        }
-        
+
         let html = '';
-        result.data.forEach(item => {
+        assignments.forEach(item => {
+            const dateInfo = datesMap[item.holiday_date_id];
+            const dateObj = dateInfo ? new Date(dateInfo.holiday_date + 'T00:00:00') : null;
+            const dateDisplay = dateObj
+                ? dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                : 'Unknown';
+            const country = dateInfo?.country || '';
+            const countryClass = getAssignmentCountryBadgeClass(country);
+            const typeClass = item.support_type === 'desk' ? 'assignment-type-desk' : 'assignment-type-call';
+            const typeLabel = item.support_type === 'desk' ? 'Desk' : 'Call';
+            const appColor = APP_COLORS[item.application] || '#f3f4f6';
+
             html += `<tr>
-                <td>${datesMap[item.holiday_date_id] || 'Unknown'}</td>
-                <td>${item.support_type === 'desk' ? 'Desk' : 'Call'}</td>
-                <td>${escapeHtml(item.application)}</td>
-                <td>${escapeHtml(item.team)}</td>
-                <td>${escapeHtml(item.staff_names || '-')}</td>
                 <td>
+                    <span class="assignment-date-label">${dateDisplay}</span>
+                    ${country ? `<span class="country-badge ${countryClass}">${country}</span>` : ''}
+                </td>
+                <td><span class="assignment-type-badge ${typeClass}">${typeLabel}</span></td>
+                <td><span class="assignment-app-badge" style="background:${appColor};">${escapeHtml(item.application)}</span></td>
+                <td>${escapeHtml(item.team)}</td>
+                <td class="assignment-staff-cell">${escapeHtml(item.staff_names || '-')}</td>
+                <td class="assignment-actions-cell">
                     <button class="btn btn-sm btn-outline" onclick="editAssignment(${item.id})">Edit</button>
                     <button class="btn btn-sm btn-danger" onclick="deleteAssignment(${item.id})">Delete</button>
                 </td>
             </tr>`;
         });
-        
+
         tbody.innerHTML = html;
-        
     } catch (err) {
         console.error('Error loading assignments:', err);
     }
+}
+
+async function getAssignmentConflict(holidayDateId, supportType, application, team, excludeId = null) {
+    let query = `?holiday_date_id=eq.${holidayDateId}&support_type=eq.${supportType}&application=eq.${encodeURIComponent(application)}&team=eq.${encodeURIComponent(team)}`;
+    if (excludeId) query += `&id=neq.${excludeId}`;
+    const result = await supabaseRequest('holiday_support', 'GET', null, query);
+    return result.data && result.data.length > 0 ? result.data[0] : null;
 }
 
 // Save staff assignment
@@ -7946,36 +9409,59 @@ async function saveStaffAssignment() {
     const supportType = document.getElementById('assignmentSupportType').value;
     const application = document.getElementById('assignmentApplication').value;
     const team = document.getElementById('assignmentTeam').value;
-    const staffNames = document.getElementById('assignmentStaff').value;
-    
+    const staffNames = document.getElementById('assignmentStaff').value?.trim();
+
     if (!holidayDateId || !supportType || !application || !team) {
         showToast('Please fill in all required fields', 'error');
         return;
     }
-    
+
+    if (!staffNames) {
+        showToast('Please enter at least one staff name', 'error');
+        return;
+    }
+
+    const conflict = await getAssignmentConflict(
+        parseInt(holidayDateId, 10),
+        supportType,
+        application,
+        team,
+        editId || null
+    );
+    if (conflict) {
+        showToast('An assignment already exists for this date, type, application, and team. Edit the existing entry instead.', 'error');
+        return;
+    }
+
     const data = {
-        holiday_date_id: parseInt(holidayDateId),
+        holiday_date_id: parseInt(holidayDateId, 10),
         support_type: supportType,
-        application: application,
-        team: team,
-        staff_names: staffNames || null,
+        application,
+        team,
+        staff_names: staffNames,
         updated_at: new Date().toISOString()
     };
-    
+
     try {
         if (editId) {
-            // Update existing
-            await supabaseRequest('holiday_support', 'PATCH', data, `?id=eq.${editId}`);
+            const result = await supabaseRequest('holiday_support', 'PATCH', data, `?id=eq.${editId}`);
+            if (result.error) {
+                showToast('Failed to update assignment', 'error');
+                return;
+            }
             showToast('Assignment updated!', 'success');
         } else {
-            // Insert new
-            await supabaseRequest('holiday_support', 'POST', data);
+            const result = await supabaseRequest('holiday_support', 'POST', data);
+            if (result.error) {
+                showToast('Failed to add assignment', 'error');
+                return;
+            }
             showToast('Assignment added!', 'success');
         }
-        
+
         clearAssignmentForm();
         loadStaffAssignments();
-        
+        await refreshHolidaySupportData();
     } catch (err) {
         console.error('Error saving assignment:', err);
         showToast('Failed to save assignment', 'error');
@@ -7986,33 +9472,46 @@ async function saveStaffAssignment() {
 async function editAssignment(id) {
     try {
         const result = await supabaseRequest('holiday_support', 'GET', null, `?id=eq.${id}`);
-        
+
         if (result.data && result.data.length > 0) {
             const item = result.data[0];
+            const tabButtons = document.querySelectorAll('#holidayScheduleModal .modal-tab');
+            if (tabButtons[1]) switchHolidayModalTab('assignments', { target: tabButtons[1] });
+
             document.getElementById('editAssignmentId').value = id;
             document.getElementById('assignmentHolidayDate').value = item.holiday_date_id;
             document.getElementById('assignmentSupportType').value = item.support_type;
             document.getElementById('assignmentApplication').value = item.application;
-            document.getElementById('assignmentTeam').value = item.team;
+            populateAssignmentTeamDropdown(item.application, item.team);
             document.getElementById('assignmentStaff').value = item.staff_names || '';
+            updateAssignmentFormUI(true);
+            updateAssignmentFormPreview();
+
+            document.querySelector('.assignment-form-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
     } catch (err) {
         console.error('Error loading assignment:', err);
+        showToast('Failed to load assignment', 'error');
     }
 }
 
 // Delete assignment
-async function deleteAssignment(id) {
-    if (!confirm('Delete this assignment?')) return;
-    
-    try {
-        await supabaseRequest('holiday_support', 'DELETE', null, `?id=eq.${id}`);
-        showToast('Assignment deleted', 'success');
-        loadStaffAssignments();
-    } catch (err) {
-        console.error('Error deleting assignment:', err);
-        showToast('Failed to delete', 'error');
-    }
+function deleteAssignment(id) {
+    showConfirmModal(
+        'Are you sure you want to delete this assignment?',
+        'Delete Assignment',
+        async () => {
+            try {
+                await supabaseRequest('holiday_support', 'DELETE', null, `?id=eq.${id}`);
+                showToast('Assignment deleted', 'success');
+                loadStaffAssignments();
+                await refreshHolidaySupportData();
+            } catch (err) {
+                console.error('Error deleting assignment:', err);
+                showToast('Failed to delete', 'error');
+            }
+        }
+    );
 }
 
 // Clear assignment form
@@ -8021,8 +9520,10 @@ function clearAssignmentForm() {
     document.getElementById('assignmentHolidayDate').value = '';
     document.getElementById('assignmentSupportType').value = '';
     document.getElementById('assignmentApplication').value = '';
-    document.getElementById('assignmentTeam').value = '';
+    populateAssignmentTeamDropdown();
     document.getElementById('assignmentStaff').value = '';
+    updateAssignmentFormUI(false);
+    updateAssignmentFormPreview();
 }
 
 // ==================== EXCEL IMPORT FUNCTIONS ====================
@@ -8104,15 +9605,33 @@ async function importHolidayExcel() {
         let importedDates = 0;
         let importedAssignments = 0;
         
-        if (!supportSheet) {
-            showToast('Could not find a valid sheet to import', 'error');
-            return;
+        const sheetsToImport = sheetNames
+            .map(name => {
+                const lowerName = name.toLowerCase();
+                if (lowerName.includes('desk') && lowerName.includes('support')) {
+                    return { name, sheet: holidayExcelData.Sheets[name], supportType: 'desk' };
+                }
+                if (lowerName.includes('call') && lowerName.includes('support')) {
+                    return { name, sheet: holidayExcelData.Sheets[name], supportType: 'call' };
+                }
+                return null;
+            })
+            .filter(Boolean);
+
+        if (sheetsToImport.length === 0) {
+            if (!supportSheet) {
+                showToast('Could not find a valid sheet to import', 'error');
+                return;
+            }
+            sheetsToImport.push({ name: selectedSheetName, sheet: supportSheet, supportType: null });
         }
-        
-        // Parse and import support data (which includes dates)
-        const result = await parseAndImportSupportSheet(supportSheet);
-        importedDates = result.dates;
-        importedAssignments = result.assignments;
+
+        for (const entry of sheetsToImport) {
+            console.log('Importing sheet:', entry.name, 'supportType:', entry.supportType || 'auto-detect');
+            const result = await parseAndImportSupportSheet(entry.sheet, entry.supportType);
+            importedDates += result.dates;
+            importedAssignments += result.assignments;
+        }
         
         showToast(`Imported ${importedDates} holiday dates and ${importedAssignments} assignments!`, 'success');
         
@@ -8120,6 +9639,8 @@ async function importHolidayExcel() {
         loadHolidayDates();
         loadStaffAssignments();
         populateHolidayDateDropdown();
+        invalidateHolidaySupportCache();
+        loadHolidaySupport(true);
         
         // Clear the file input
         document.getElementById('holidayExcelFile').value = '';
@@ -8133,8 +9654,8 @@ async function importHolidayExcel() {
     }
 }
 
-// Parse and import support sheet
-async function parseAndImportSupportSheet(sheet) {
+// Parse and import support sheet (optional forcedSupportType: 'desk' | 'call' for multi-sheet templates)
+async function parseAndImportSupportSheet(sheet, forcedSupportType = null) {
     const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
     
     console.log('Total rows:', jsonData.length);
@@ -8275,10 +9796,8 @@ async function parseAndImportSupportSheet(sheet) {
     
     console.log('Date ID map:', dateIdMap);
     
-    // Determine support type from sheet name or data
-    let supportType = 'desk'; // default
-    const sheetName = sheet['!ref'] ? 'unknown' : '';
-    
+    let supportType = forcedSupportType || 'desk';
+
     // Import assignments - data starts from row 2
     let importedAssignments = 0;
     const startRow = 2;
@@ -8299,19 +9818,27 @@ async function parseAndImportSupportSheet(sheet) {
         let rowApp = String(row[appCol] || '').trim();
         let rowTeam = String(row[teamCol] || '').trim();
         
-        // Check if row indicates support type change
         const rowAppLower = rowApp.toLowerCase();
-        if (rowAppLower.includes('desk support') || rowAppLower === 'on desk' || rowAppLower.includes('on desk')) {
-            supportType = 'desk';
-            currentApp = '';
-            currentTeam = '';
-            console.log('Switched to desk support at row', rowIdx);
-            continue;
-        } else if (rowAppLower.includes('call support') || rowAppLower === 'on call' || rowAppLower.includes('on call')) {
-            supportType = 'call';
-            currentApp = '';
-            currentTeam = '';
-            console.log('Switched to call support at row', rowIdx);
+        if (!forcedSupportType) {
+            if (rowAppLower.includes('desk support') || rowAppLower === 'on desk' || rowAppLower.includes('on desk')) {
+                supportType = 'desk';
+                currentApp = '';
+                currentTeam = '';
+                console.log('Switched to desk support at row', rowIdx);
+                continue;
+            } else if (rowAppLower.includes('call support') || rowAppLower === 'on call' || rowAppLower.includes('on call')) {
+                supportType = 'call';
+                currentApp = '';
+                currentTeam = '';
+                console.log('Switched to call support at row', rowIdx);
+                continue;
+            }
+        } else if (
+            rowAppLower.includes('desk support') ||
+            rowAppLower.includes('call support') ||
+            rowAppLower === 'on desk' ||
+            rowAppLower === 'on call'
+        ) {
             continue;
         }
         
@@ -8331,15 +9858,16 @@ async function parseAndImportSupportSheet(sheet) {
         
         console.log(`Row ${rowIdx}: App="${rowApp}", Team="${rowTeam}"`);
         
-        // Skip if still no app/team
         if (!rowApp || !rowTeam) continue;
-        
-        // Collect staff names for each date
+
+        const normalizedTeam = normalizeHolidaySupportTeam(rowTeam);
+        const canonicalApp = getCanonicalApplicationForTeam(normalizedTeam) || rowApp;
+
         for (const dateCol of dateColumns) {
             const staffName = String(row[dateCol.col] || '').trim();
             if (!staffName) continue;
             
-            const key = `${supportType}|${rowApp}|${rowTeam}|${dateCol.col}`;
+            const key = `${supportType}|${canonicalApp}|${normalizedTeam}|${dateCol.col}`;
             if (!staffMap[key]) {
                 staffMap[key] = [];
             }
@@ -8530,55 +10058,61 @@ function parseDateHeader(header) {
     return null;
 }
 
+function formatTemplateDateLabel(template) {
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${template.day}-${monthNames[template.month - 1]}`;
+}
+
+function buildHolidaySupportSheetRows() {
+    const dateCount = DEFAULT_HOLIDAY_SUPPORT_DATE_TEMPLATE.length;
+    const emptyDates = Array(dateCount).fill('');
+
+    const countryRow = ['Application', 'Team', ...DEFAULT_HOLIDAY_SUPPORT_DATE_TEMPLATE.map(t => t.country)];
+    const dateRow = ['', '', ...DEFAULT_HOLIDAY_SUPPORT_DATE_TEMPLATE.map(formatTemplateDateLabel)];
+    const rows = [countryRow, dateRow];
+
+    getHolidaySupportRows().forEach(row => {
+        rows.push([row.application, row.team, ...emptyDates]);
+    });
+
+    return rows;
+}
+
+function getHolidaySupportTemplateColumnWidths() {
+    return [
+        { width: 14 },
+        { width: 18 },
+        ...DEFAULT_HOLIDAY_SUPPORT_DATE_TEMPLATE.map(() => ({ width: 14 }))
+    ];
+}
+
 // Download holiday template
 function downloadHolidayTemplate(event) {
     event.preventDefault();
-    
+
     if (typeof XLSX === 'undefined') {
         showToast('Excel library not loaded', 'error');
         return;
     }
-    
-    // Create sample data
-    const sampleData = [
-        ['Application', 'Team', 'PH\n8-Dec', 'PH\n24-Dec', 'AUS\n25-Dec', 'AUS\n26-Dec', 'Lean Staffing\n29-Dec'],
-        ['ON DESK SUPPORT', '', '', '', '', '', ''],
-        ['Frontend', 'ASOM/Fallout', 'Ganesh, Yash', 'Ganesh, Yash', '', '', 'Ganesh'],
-        ['Frontend', 'OMS', 'India Team', 'India Team', '', '', ''],
-        ['Frontend', 'CRM/SDP/MCO', 'Chirag, Pankaj', '', '', '', ''],
-        ['Backend', 'INV/AMDD', 'India Team', 'Jerome', '', '', ''],
-        ['Backend', 'TC/AEM/OFCA', 'Ganesh, Hendry', 'Ganesh', '', '', ''],
-        ['', '', '', '', '', '', ''],
-        ['ON CALL SUPPORT', '', '', '', '', '', ''],
-        ['Frontend', 'ASOM', 'Anurag, Yash', 'Anurag, Yash', '', '', ''],
-        ['Frontend', 'OMS', 'Anurag, Bhomesh', 'Aditya', '', '', ''],
-        ['Infra', 'Infra', 'Rohan', 'Sakshi', '', '', ''],
-        ['MOD', 'Onshore', 'Mak', 'Vikram', '', '', ''],
-        ['MOD', 'Offshore', 'Saurabh', 'Neil', '', '', ''],
-    ];
-    
-    const ws = XLSX.utils.aoa_to_sheet(sampleData);
-    
-    // Set column widths
-    ws['!cols'] = [
-        { width: 12 }, // Application
-        { width: 15 }, // Team
-        { width: 15 }, // Date 1
-        { width: 15 }, // Date 2
-        { width: 15 }, // Date 3
-        { width: 15 }, // Date 4
-        { width: 18 }, // Date 5
-    ];
-    
+
+    const teamCount = getHolidaySupportRows().length;
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Holiday Support');
-    
+
+    HOLIDAY_SUPPORT_TYPE_OPTIONS.forEach(option => {
+        const rows = buildHolidaySupportSheetRows();
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        ws['!cols'] = getHolidaySupportTemplateColumnWidths();
+        XLSX.utils.book_append_sheet(wb, ws, option.label.substring(0, 31));
+    });
+
     XLSX.writeFile(wb, 'holiday_support_template.xlsx');
-    showToast('Template downloaded!', 'success');
+    showToast(`Template downloaded (${teamCount} teams × 2 sheets)`, 'success');
 }
 
 // Initialize Holiday Staffing when switching to it
 document.addEventListener('DOMContentLoaded', function() {
+    populateHolidaySupportFormDropdowns();
+
     const originalSwitchMainScreen = window.switchMainScreen;
     if (originalSwitchMainScreen) {
         const newSwitchMainScreen = function(screen, clickEvent = null) {

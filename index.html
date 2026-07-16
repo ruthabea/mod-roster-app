@@ -2536,6 +2536,7 @@
             <!-- Holiday Staffing Sub-tabs -->
             <nav class="main-nav">
                 <button class="nav-tab active" onclick="showTab('holiday', 'summary', event)">Summary</button>
+                <button class="nav-tab" onclick="showTab('holiday', 'calendar', event)">Public Holidays</button>
                 <button class="nav-tab" onclick="showTab('holiday', 'support', event)">Holiday Support</button>
             </nav>
 
@@ -2554,6 +2555,20 @@
                             <input type="date" id="holidayStartDate" onchange="loadHolidaySummary()">
                             <label>To:</label>
                             <input type="date" id="holidayEndDate" onchange="loadHolidaySummary()">
+                            <button class="btn btn-secondary" onclick="toggleHolidaySummaryEditMode()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                                <span id="holidaySummaryEditModeText">Edit Mode</span>
+                            </button>
+                            <button class="btn btn-primary hidden" id="addHolidayStaffBtn" onclick="openHolidayStaffModal()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                                Add Staff
+                            </button>
                             <button class="btn btn-outline" onclick="exportHolidaySummary()">Export</button>
                             <button class="btn btn-primary" onclick="saveAllHolidayStaffing()">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -2600,6 +2615,205 @@
                             </tbody>
                         </table>
                     </div>
+
+                    <!-- Holiday Staff Modal -->
+                    <div id="holidayStaffModal" class="modal hidden">
+                        <div class="modal-content holiday-staff-modal-content">
+                            <div class="modal-header">
+                                <h3 id="holidayStaffModalTitle">Add Staff</h3>
+                                <button class="modal-close" onclick="closeHolidayStaffModal()">&times;</button>
+                            </div>
+                            <form id="holidayStaffForm" onsubmit="saveHolidayStaff(event)">
+                                <input type="hidden" id="holidayStaffEditId" value="">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="holidayStaffTeam">App / Team *</label>
+                                        <select id="holidayStaffTeam" required>
+                                            <option value="">Select Team</option>
+                                            <option value="frontend">Frontend Team</option>
+                                            <option value="b2b">B2B Team</option>
+                                            <option value="backend">Backend Team</option>
+                                            <option value="anm">ANM Team</option>
+                                            <option value="digital">Digital Team</option>
+                                            <option value="infra">Infra Team</option>
+                                            <option value="ods">ODS Team</option>
+                                            <option value="sdm">SDM Team</option>
+                                            <option value="senior">Senior Escalation</option>
+                                            <option value="l2">L2 Team</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="holidayStaffArea">Application Area</label>
+                                        <input type="text" id="holidayStaffArea" placeholder="e.g., CRM/SDP/MCO">
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="holidayStaffName">Name *</label>
+                                        <input type="text" id="holidayStaffName" required placeholder="Full Name">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="holidayStaffSite">Site *</label>
+                                        <select id="holidayStaffSite" required>
+                                            <option value="">Select Site</option>
+                                            <option value="India">India</option>
+                                            <option value="Philippines">Philippines</option>
+                                            <option value="Australia">Australia</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="holidayStaffPhone">Contact Number</label>
+                                        <input type="text" id="holidayStaffPhone" placeholder="+91 XXXXX XXXXX">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="holidayStaffEmail">Amdocs Email</label>
+                                        <input type="email" id="holidayStaffEmail" placeholder="name@amdocs.com">
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" onclick="closeHolidayStaffModal()">Cancel</button>
+                                    <button type="submit" class="btn btn-primary">Save Staff</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Public Holidays Tab -->
+            <section id="holiday-calendarTab" class="tab-content">
+                <div class="card">
+                    <div class="vacation-header">
+                        <div>
+                            <h2>Public Holiday Calendar</h2>
+                            <p class="help-text">Official public holidays for Philippines, Australia, and India — loaded automatically for the selected year</p>
+                        </div>
+                        <div class="holiday-filters">
+                            <label>Year:</label>
+                            <select id="publicHolidayYearFilter" onchange="loadPublicHolidayCalendar()"></select>
+                            <button class="btn btn-secondary" onclick="refreshPublicHolidayCalendar()" title="Refresh holidays">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="23 4 23 10 17 10"></polyline>
+                                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                                </svg>
+                                Refresh
+                            </button>
+                            <button class="btn btn-outline" onclick="exportPublicHolidayCalendar()">Export</button>
+                        </div>
+                    </div>
+
+                    <div class="public-holiday-auto-note">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="16" x2="12" y2="12"></line>
+                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                        </svg>
+                        Holidays are fetched automatically — Philippines & Australia via public holiday APIs; India via official Central Government gazetted holiday list.
+                    </div>
+
+                    <div id="publicHolidayLoading" class="loading-state">
+                        <div class="spinner"></div>
+                        <p>Loading public holidays...</p>
+                    </div>
+
+                    <div id="publicHolidayEmpty" class="empty-state hidden">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="16" y1="2" x2="16" y2="6"></line>
+                            <line x1="8" y1="2" x2="8" y2="6"></line>
+                            <line x1="3" y1="10" x2="21" y2="10"></line>
+                        </svg>
+                        <h3>Unable to Load Holidays</h3>
+                        <p>Could not fetch public holidays. This may be blocked by your corporate network. Try Refresh, or contact IT to allow access to holiday API services.</p>
+                    </div>
+
+                    <div id="publicHolidayCalendarContent" class="public-holidays-grid hidden">
+                        <div class="public-holiday-country-card ph-card">
+                            <div class="public-holiday-country-header ph-header">
+                                <div class="public-holiday-country-identity">
+                                    <span class="public-holiday-flag" aria-hidden="true">🇵🇭</span>
+                                    <div class="public-holiday-country-text">
+                                        <span class="public-holiday-country-name">Philippines</span>
+                                        <span class="public-holiday-country-note" id="phHolidayNote"></span>
+                                    </div>
+                                </div>
+                                <div class="public-holiday-count-pill" id="phHolidayCount">
+                                    <span class="count-value">0</span>
+                                    <span class="count-label">holidays</span>
+                                </div>
+                            </div>
+                            <div class="public-holiday-table-wrapper">
+                                <table class="public-holiday-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Day</th>
+                                            <th>Holiday</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="phHolidayTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="public-holiday-country-card aus-card">
+                            <div class="public-holiday-country-header aus-header">
+                                <div class="public-holiday-country-identity">
+                                    <span class="public-holiday-flag" aria-hidden="true">🇦🇺</span>
+                                    <div class="public-holiday-country-text">
+                                        <span class="public-holiday-country-name">Australia</span>
+                                        <span class="public-holiday-country-note" id="ausHolidayNote"></span>
+                                    </div>
+                                </div>
+                                <div class="public-holiday-count-pill" id="ausHolidayCount">
+                                    <span class="count-value">0</span>
+                                    <span class="count-label">holidays</span>
+                                </div>
+                            </div>
+                            <div class="public-holiday-table-wrapper">
+                                <table class="public-holiday-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Day</th>
+                                            <th>Holiday</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="ausHolidayTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="public-holiday-country-card india-card">
+                            <div class="public-holiday-country-header india-header">
+                                <div class="public-holiday-country-identity">
+                                    <span class="public-holiday-flag" aria-hidden="true">🇮🇳</span>
+                                    <div class="public-holiday-country-text">
+                                        <span class="public-holiday-country-name">India</span>
+                                        <span class="public-holiday-country-note" id="indiaHolidayNote">Central Govt gazetted</span>
+                                    </div>
+                                </div>
+                                <div class="public-holiday-count-pill" id="indiaHolidayCount">
+                                    <span class="count-value">0</span>
+                                    <span class="count-label">holidays</span>
+                                </div>
+                            </div>
+                            <div class="public-holiday-table-wrapper">
+                                <table class="public-holiday-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Day</th>
+                                            <th>Holiday</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="indiaHolidayTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -2609,21 +2823,24 @@
                     <div class="vacation-header">
                         <div>
                             <h2>Holiday Support Schedule</h2>
-                            <p class="help-text">On-desk and On-call support assignments during holiday periods</p>
+                            <p class="help-text">On-desk and On-call support assignments during the Christmas period (Dec 8 – Jan 2)</p>
+                            <p id="holidaySupportEditHint" class="help-text holiday-support-edit-hint hidden">Edit Mode is on — click any cell to add or update support staff.</p>
                         </div>
                         <div class="holiday-filters">
-                            <select id="holidaySupportPeriod" onchange="loadHolidaySupport()">
-                                <option value="christmas">Christmas Period (Dec 20 - Jan 2)</option>
-                                <option value="easter">Easter Period</option>
-                                <option value="custom">Custom Period</option>
+                            <label for="holidaySupportYearFilter" class="filter-label">Period:</label>
+                            <select id="holidaySupportYearFilter" onchange="loadHolidaySupport()">
+                                <!-- Populated by JS -->
                             </select>
+                            <button class="btn btn-secondary" id="holidaySupportEditBtn" onclick="toggleHolidaySupportEditMode()">
+                                <span id="holidaySupportEditModeText">Edit Mode</span>
+                            </button>
                             <button class="btn btn-outline" onclick="exportHolidaySupport()">Export</button>
-                            <button class="btn btn-primary" onclick="openEditHolidaySupportModal()">
+                            <button class="btn btn-primary" id="holidaySupportManageBtn" onclick="openEditHolidaySupportModal()">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                                 </svg>
-                                Edit Schedule
+                                Manage Dates &amp; Import
                             </button>
                         </div>
                     </div>
@@ -2638,7 +2855,7 @@
                             <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
                         </svg>
                         <h3>No Support Schedule</h3>
-                        <p>Click "Edit Schedule" to assign support coverage.</p>
+                        <p>Holiday dates will be created automatically. Use Edit Mode to assign staff, or Manage Dates &amp; Import to configure columns.</p>
                     </div>
                     
                     <div id="holidaySupportContent" class="hidden">
@@ -2714,8 +2931,9 @@
             </div>
             <h3 class="notification-modal-title" id="promptModalTitle">Input Required</h3>
             <p class="notification-modal-message" id="promptModalMessage">Please enter a value:</p>
-            <div class="prompt-input-container">
-                <input type="text" id="promptModalInput" class="prompt-modal-input" placeholder="">
+            <div class="prompt-input-container autocomplete-field">
+                <input type="text" id="promptModalInput" class="prompt-modal-input" placeholder="" autocomplete="off">
+                <div class="autocomplete-suggestions" id="promptModalInput-suggestions"></div>
             </div>
             <div class="notification-modal-actions">
                 <button class="btn btn-secondary notification-modal-btn" id="promptModalCancelBtn" onclick="closePromptModal(false)">Cancel</button>
@@ -2790,7 +3008,8 @@
             <!-- Tab 1: Manage Holiday Dates -->
             <div id="holidayDatesTab" class="modal-tab-content active">
                 <div class="form-section">
-                    <h4>Add New Holiday Date</h4>
+                    <h4>Add / Edit Holiday Date</h4>
+                    <input type="hidden" id="editHolidayDateId" value="">
                     <div class="form-row">
                         <div class="form-group">
                             <label for="newHolidayDate">Date *</label>
@@ -2800,18 +3019,15 @@
                             <label for="newHolidayCountry">Country/Type *</label>
                             <select id="newHolidayCountry" required>
                                 <option value="">Select...</option>
-                                <option value="PH">PH - Philippines</option>
-                                <option value="AUS">AUS - Australia</option>
-                                <option value="India">India</option>
-                                <option value="Lean Staffing">Lean Staffing</option>
                             </select>
                         </div>
                         <div class="form-group">
                             <label for="newHolidayName">Holiday Name</label>
                             <input type="text" id="newHolidayName" placeholder="e.g., Christmas Day">
                         </div>
-                        <div class="form-group" style="align-self: flex-end;">
-                            <button class="btn btn-primary" onclick="addHolidayDate()">Add Date</button>
+                        <div class="form-group" style="align-self: flex-end; display: flex; gap: 0.5rem;">
+                            <button class="btn btn-primary" id="holidayDateSaveBtn" onclick="addHolidayDate()">Add Date</button>
+                            <button class="btn btn-outline" onclick="clearHolidayDateForm()">Clear</button>
                         </div>
                     </div>
                 </div>
@@ -2844,68 +3060,86 @@
             
             <!-- Tab 2: Staff Assignments -->
             <div id="holidayAssignmentsTab" class="modal-tab-content hidden">
-                <div class="form-section">
-                    <h4>Add/Edit Staff Assignment</h4>
+                <div class="form-section assignment-form-section">
+                    <div class="assignment-form-header">
+                        <h4 id="assignmentFormTitle">Add Staff Assignment</h4>
+                        <p class="assignment-form-help">Assign on-desk or on-call support staff for a specific holiday date, application, and team.</p>
+                    </div>
                     <input type="hidden" id="editAssignmentId" value="">
-                    <div class="form-row">
+                    <div class="assignment-form-grid">
                         <div class="form-group">
                             <label for="assignmentHolidayDate">Holiday Date *</label>
-                            <select id="assignmentHolidayDate" required>
+                            <select id="assignmentHolidayDate" required onchange="updateAssignmentFormPreview()">
                                 <option value="">Select holiday date...</option>
                             </select>
                         </div>
                         <div class="form-group">
                             <label for="assignmentSupportType">Support Type *</label>
-                            <select id="assignmentSupportType" required>
+                            <select id="assignmentSupportType" required onchange="updateAssignmentFormPreview()">
                                 <option value="">Select...</option>
-                                <option value="desk">On Desk Support</option>
-                                <option value="call">On Call Support</option>
                             </select>
                         </div>
-                    </div>
-                    <div class="form-row">
                         <div class="form-group">
                             <label for="assignmentApplication">Application *</label>
-                            <select id="assignmentApplication" required>
+                            <select id="assignmentApplication" required onchange="onAssignmentApplicationChange()">
                                 <option value="">Select...</option>
-                                <option value="Frontend">Frontend</option>
-                                <option value="Backend">Backend</option>
-                                <option value="Digital">Digital</option>
-                                <option value="Infra">Infra</option>
-                                <option value="ODS">ODS</option>
-                                <option value="B2B">B2B</option>
-                                <option value="MOD">MOD</option>
                             </select>
                         </div>
                         <div class="form-group">
                             <label for="assignmentTeam">Team *</label>
-                            <input type="text" id="assignmentTeam" required placeholder="e.g., ASOM, OMS, CRM/SDP">
+                            <select id="assignmentTeam" required disabled onchange="updateAssignmentFormPreview()">
+                                <option value="">Select application first</option>
+                            </select>
+                            <span class="field-hint" id="assignmentTeamHint">Choose an application to see available teams</span>
+                        </div>
+                        <div class="form-group assignment-staff-field autocomplete-field">
+                            <label for="assignmentStaff">Staff Names *</label>
+                            <input type="text" id="assignmentStaff" placeholder="e.g., John, Jane, Bob" autocomplete="off"
+                                oninput="showStaffNameSuggestions(this); updateAssignmentFormPreview()"
+                                onkeydown="handleStaffSuggestionKeydown(event, this)"
+                                onblur="hideSuggestionsDelayed(this)">
+                            <div class="autocomplete-suggestions" id="assignmentStaff-suggestions"></div>
+                            <span class="field-hint">Separate multiple names with commas — suggestions from Contacts</span>
                         </div>
                     </div>
-                    <div class="form-row">
-                        <div class="form-group" style="flex: 2;">
-                            <label for="assignmentStaff">Staff Names (comma-separated)</label>
-                            <input type="text" id="assignmentStaff" placeholder="e.g., John, Jane, Bob">
-                        </div>
-                        <div class="form-group" style="align-self: flex-end;">
-                            <button class="btn btn-primary" onclick="saveStaffAssignment()">Save Assignment</button>
-                            <button class="btn btn-outline" onclick="clearAssignmentForm()">Clear</button>
-                        </div>
+                    <div id="assignmentFormPreview" class="assignment-form-preview hidden"></div>
+                    <div class="assignment-form-actions">
+                        <button class="btn btn-primary" id="assignmentSaveBtn" onclick="saveStaffAssignment()">Save Assignment</button>
+                        <button class="btn btn-outline" onclick="clearAssignmentForm()">Clear</button>
                     </div>
                 </div>
-                
-                <div class="form-section">
-                    <h4>Existing Assignments</h4>
-                    <div class="filter-row">
-                        <label>Filter:</label>
-                        <select id="assignmentTypeFilter" onchange="loadStaffAssignments()">
-                            <option value="">All Types</option>
-                            <option value="desk">On Desk Support</option>
-                            <option value="call">On Call Support</option>
-                        </select>
+
+                <div class="form-section assignment-list-section">
+                    <div class="assignment-list-header">
+                        <h4>Existing Assignments</h4>
+                        <span class="assignment-count-badge" id="assignmentCountBadge">0 assignments</span>
                     </div>
-                    <div class="table-container" style="max-height: 250px; overflow-y: auto;">
-                        <table class="data-table">
+                    <div class="assignment-filter-row">
+                        <div class="form-group">
+                            <label for="assignmentTypeFilter">Support Type</label>
+                            <select id="assignmentTypeFilter" onchange="loadStaffAssignments()">
+                                <option value="">All Types</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="assignmentAppFilter">Application</label>
+                            <select id="assignmentAppFilter" onchange="loadStaffAssignments()">
+                                <option value="">All Applications</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="assignmentDateFilter">Holiday Date</label>
+                            <select id="assignmentDateFilter" onchange="loadStaffAssignments()">
+                                <option value="">All Dates</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="assignmentStaffSearch">Search Staff</label>
+                            <input type="text" id="assignmentStaffSearch" placeholder="Search by name..." oninput="loadStaffAssignments()">
+                        </div>
+                    </div>
+                    <div class="table-container assignment-table-container">
+                        <table class="data-table assignment-data-table">
                             <thead>
                                 <tr>
                                     <th>Date</th>
@@ -2936,9 +3170,11 @@
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <!-- Database Configuration (REST API - no SDK needed) -->
     <script src="config.js"></script>
+    <!-- India public holidays (official gazetted list — APIs don't cover India) -->
+    <script src="india-holidays-data.js"></script>
     <!-- Authentication Script -->
     <script src="auth.js"></script>
     <!-- Main Application Script -->
-    <script src="script.js"></script>
+    <script src="script.js?v=20260717d"></script>
 </body>
 </html>
